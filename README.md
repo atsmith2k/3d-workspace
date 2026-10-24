@@ -62,12 +62,15 @@ Follow these steps when a user asks you to set up this repository.
 you describe it  ->  models/<name>.py  ->  cad build  ->  output/<name>/
                      (Claude writes)       (checks it)    <name>.stl          print or import into Tinkercad
                                                           <name>.step         editable CAD (engineered parts)
-                                                          <name>_preview.png  5 views + size, weight, warnings
+                                                          <name>_preview.png  7 views incl. dimensions + sections, stats, warnings
+                                                          <name>.gcode        print time + filament (cad slice, needs PrusaSlicer)
                                                           report.txt
 ```
 
 `cad build` checks every model before you see it: watertight single solid, flat base,
-overhangs that would need support, fits the print bed, under Tinkercad's 25 MB limit.
+overhangs that would need support (red in the preview), walls thinner than 1.2 mm
+(yellow), fits the print bed, under Tinkercad's 25 MB limit. `cad slice` runs
+PrusaSlicer headlessly for the print time, filament use and whether supports are needed.
 
 Two modeling engines, picked per object:
 
@@ -84,6 +87,8 @@ Run from the repo root. Windows: `cad ...`; macOS/Linux/Git Bash: `./cad ...`
 | `cad build models/<name>.py --set thickness=30` | Build a variant with a parameter changed |
 | `cad build ... --fast` | Quicker, coarser build for iterating |
 | `cad build ... --bed 220 220 250` | Check against a different printer bed (default 256 mm) |
+| `cad build ... --section y=10` | Cut the section views at a chosen place (default: centre) |
+| `cad slice models/<name>.py [--supports] [--layer-height 0.28] [--profile p.ini]` | Print time, filament, layers via PrusaSlicer (`--slice` on build does the same) |
 | `cad new <name> "description"` | Start a model from the template |
 | `cad list` | List models and whether they're built |
 | `cad selftest` | Confirm the install works |
@@ -97,3 +102,6 @@ the model script as the source of truth.
 ## Requirements
 
 Python 3.12, 3.13 or 3.14 on Windows, macOS or Linux. Setup installs the rest into `.venv`.
+`cad slice` is optional and needs [PrusaSlicer](https://www.prusa3d.com/page/prusaslicer_424/)
+installed; it is found automatically in the default location, or set `CAD_SLICER` to the
+console binary.
