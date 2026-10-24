@@ -44,7 +44,7 @@ def _project(v, cam, scale, size, center):
     return v @ r * scale + size / 2, size / 2 - v @ u * scale, v @ c
 
 
-def _render_view(tm, cam, scale, size, center, tint=None, cut=None):
+def _render_view(tm, cam, scale, size, center, tint=None, cut=None, marks=None):
     """Returns the RGB tile as a float array. `tint` is an (F, 3) per-face colour.
     `cut` is a view-space depth: everything nearer the camera than that plane is
     clipped away per pixel, back faces are drawn too, and wherever the nearest
@@ -102,6 +102,14 @@ def _render_view(tm, cam, scale, size, center, tint=None, cut=None):
     edge[:-1] |= empty[:-1] != empty[1:]
     edge[:, :-1] |= empty[:, :-1] != empty[:, 1:]
     img[edge] = img[edge] * 0.35
+    if marks is not None and len(marks):
+        # yellow dots at sample points that are visible in this view (depth test)
+        mx, my, mz = _project(np.asarray(marks, float), cam, scale, size, center)
+        rad = max(2, SS * 2)
+        for x, y, zm in zip(mx, my, mz):
+            xi, yi = int(x), int(y)
+            if 0 <= xi < size and 0 <= yi < size and zm >= zb[yi, xi] - 0.6:
+                img[max(yi - rad, 0):yi + rad + 1, max(xi - rad, 0):xi + rad + 1] = THIN
     return img
 
 
@@ -114,7 +122,7 @@ def _subset(tm, keep):
     return trimesh.Trimesh(tm.vertices, tm.faces[keep], face_normals=tm.face_normals[keep], process=False)
 
 
-def _view(tm, cam, scale, size, center, tint=None, cut=None, hidden=None):
+def _view(tm, cam, scale, size, center, tint=None, cut=None, hidden=None, marks=None):
     """Faces of enclosed voids (`hidden`) can never be seen from outside, so they are
     dropped from exterior views (a lattice-filled part is 98% void faces). Section
     views keep the ones just behind the cut, where the lattice shows."""
@@ -125,7 +133,7 @@ def _view(tm, cam, scale, size, center, tint=None, cut=None, hidden=None):
             keep |= (depth <= cut) & (depth >= cut - SECTION_DEPTH * scale)
         tm = _subset(tm, keep)
         tint = tint[keep] if tint is not None else None
-    return _render_view(tm, cam, scale, size, center, tint, cut)
+    return _render_view(tm, cam, scale, size, center, tint, cut, marks)
 
 
 def _tile(img):
@@ -165,7 +173,7 @@ def _draw_dims(im, tm, cam, scale, center, font):
 
 
 def render_sheet(tm, path, title, info_lines, overhang_faces=None, thin_faces=None,
-                 sections=None, hidden_faces=None):
+                 sections=None, hidden_faces=None, thin_points=None):
     """`sections`: list of (axis_index, position_mm) cuts; default both through the
     bounding-box centre."""
     size = TILE * SS
@@ -177,12 +185,12 @@ def render_sheet(tm, path, title, info_lines, overhang_faces=None, thin_faces=No
     tint = np.tile(BASE, (len(tm.faces), 1))
     if overhang_faces is not None:
         tint[overhang_faces] = OVERHANG
-    if thin_faces is not None:
-        tint[thin_faces] = THIN
+    # thin walls are marked at the sample points rather than by tinting faces: one
+    # thin spot on a large flat facet would otherwise paint the whole facet yellow
 
     tiles = []
     for name, cam in VIEWS:
-        im = _tile(_view(tm, cam, scale, size, center, tint, hidden=hidden_faces))
+        im = _tile(_view(tm, cam, scale, size, center, tint, hidden=hidden_faces, marks=thin_points))
         if name in ("Top", "Front", "Right"):
             _draw_dims(im, tm, cam, scale, center, small)
         tiles.append((name, im))
@@ -218,7 +226,7 @@ def render_sheet(tm, path, title, info_lines, overhang_faces=None, thin_faces=No
             y += 18
         if y > y_max:
             break
-    legend = [(OVERHANG, "overhang > 45 deg"), (THIN, "wall under 1.2 mm"), (CUT, "cut material")]
+    legend = [(OVERHANG, "overhang > 45 deg"), (THIN, "thin wall spot (< 1.2 mm)"), (CUT, "cut material")]
     y = 2 * TILE - 24
     for col, text in legend:
         d.rectangle([x0, y, x0 + 12, y + 12], fill=tuple(int(c) for c in col))

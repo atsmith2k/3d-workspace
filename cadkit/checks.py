@@ -76,10 +76,15 @@ def volume(lo, hi):
     return Check("volume", fn)
 
 
-def hole(d, at, axis="z", span=None, tol=0.2):
+def hole(d, at, axis="z", span=None, tol=0.2, csk=None, csk_from="top", csk_face=None):
     """A round hole of diameter `d` (+-tol) whose axis is parallel to `axis` and passes
     through `at` = the two other coordinates. `span` = (lo, hi) along the axis the hole
-    must be clear over (default: the whole part, i.e. a through hole)."""
+    must be clear over (default: the whole part, i.e. a through hole).
+    `csk` = head diameter of a countersink or counterbore that must open at the
+    `csk_from` ("top" or "bottom") end: the mouth is checked to be clear and the
+    material just below the head depth to be solid, which catches an inverted cone.
+    `csk_face` = the axis coordinate of that face when it is not the part's extreme
+    (a plate with a boss standing on it)."""
     ax = M.AXIS[axis]
     others = [i for i in range(3) if i != ax]
 
@@ -89,16 +94,27 @@ def hole(d, at, axis="z", span=None, tol=0.2):
         hs = np.linspace(z0, z1, 7)
         angs = np.linspace(0, 2 * np.pi, 8, endpoint=False)
 
-        def ring(r):
-            pts = np.zeros((len(hs) * len(angs), 3))
+        def ring(r, heights=None):
+            heights = hs if heights is None else heights
+            pts = np.zeros((len(heights) * len(angs), 3))
             k = 0
-            for h in hs:
+            for h in heights:
                 for a in angs:
                     pts[k, ax] = h
                     pts[k, others[0]] = at[0] + r * np.cos(a)
                     pts[k, others[1]] = at[1] + r * np.sin(a)
                     k += 1
             return pts
+        if csk:
+            face = csk_face if csk_face is not None else (hi[ax] if csk_from == "top" else lo[ax])
+            sgn = -1 if csk_from == "top" else 1
+            mouth = ring(csk / 2 - 0.6, [face + sgn * 0.3])
+            if M.contains(c.tm, mouth).any():
+                return False, (f"{csk:.1f} mm head opening at {at} is blocked at the {csk_from} face "
+                               f"(countersink inverted or missing?)")
+            below = ring(csk / 2 - 0.3, [face + sgn * ((csk - d) / 2 + 0.8)])
+            if not M.contains(c.tm, below).all():
+                return False, f"material missing under the {csk:.1f} mm head at {at}: pocket too deep or undercut"
         blocked = M.contains(c.tm, ring(max(d / 2 - tol, 0.1)))
         if blocked.any():
             mean_d, _ = M.hole_diameter(c.tm, at, axis, height=(z0 + z1) / 2)

@@ -138,7 +138,69 @@
           50.0,
           7.0
         ],
-        "volume_cm3": 13.6,
+        "volume_cm3": 13.7,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      }
+    }
+  },
+  "wall_hook": {
+    "model": "wall_hook.py",
+    "set": [],
+    "parts": {
+      "wall_hook": {
+        "size": [
+          40.0,
+          70.0,
+          35.0
+        ],
+        "volume_cm3": 20.2,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      }
+    }
+  },
+  "oak_leaf_coaster_mold": {
+    "model": "oak_leaf_coaster_mold.py",
+    "set": [],
+    "parts": {
+      "oak_leaf_coaster_mold": {
+        "size": [
+          108.2,
+          108.2,
+          13.0
+        ],
+        "volume_cm3": 52.1,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      }
+    }
+  },
+  "sd_card_box": {
+    "model": "sd_card_box.py",
+    "set": [],
+    "parts": {
+      "sd_card_box-tray": {
+        "size": [
+          70.0,
+          45.0,
+          15.0
+        ],
+        "volume_cm3": 12.7,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "sd_card_box-lid": {
+        "size": [
+          68.3,
+          41.6,
+          1.5
+        ],
+        "volume_cm3": 4.2,
         "bodies": 1,
         "watertight": true,
         "checks_ok": true

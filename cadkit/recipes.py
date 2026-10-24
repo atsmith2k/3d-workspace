@@ -85,11 +85,14 @@ def screw_holes(part, size, points, csk=False, cap=False, from_top=True):
         if csk or cap:
             dia, dep = head_pocket(size, "csk" if csk else "cap")
             if csk:
-                cone = Cone(dia / 2 + 0.5, 0, dia / 2 + 0.5, align=(Align.CENTER, Align.CENTER, Align.MIN))
-                z = bb.max.Z - dia / 2 if from_top else bb.min.Z - 0.5
-                if not from_top:
-                    cone = cone.rotate(Axis.X, 180).moved(Location((0, 0, dia / 2 + 0.5)))
-                part -= cone.moved(Location((x, y, z)))
+                # Cone(bottom_radius, top_radius, height): 90 deg, so height = radius
+                R = dia / 2
+                if from_top:   # wide at the top face, narrowing down into the part
+                    cone = Cone(0, R + 0.5, R + 0.5, align=(Align.CENTER, Align.CENTER, Align.MIN))
+                    part -= cone.moved(Location((x, y, bb.max.Z - R)))
+                else:          # wide at the bottom face (a lid printed upside down)
+                    cone = Cone(R + 0.5, 0, R + 0.5, align=(Align.CENTER, Align.CENTER, Align.MIN))
+                    part -= cone.moved(Location((x, y, bb.min.Z - 0.5)))
             else:
                 z = bb.max.Z - dep if from_top else bb.min.Z - 1
                 part -= Cylinder(dia / 2, dep + 1, align=(Align.CENTER, Align.CENTER, Align.MIN)).moved(Location((x, y, z)))

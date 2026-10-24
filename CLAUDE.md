@@ -33,8 +33,8 @@ import the STL into Tinkercad (or any slicer/CAD app), so every STL must import 
    - `<name>.step` (build123d models only; editable in Fusion/FreeCAD/Onshape)
    - `<name>_preview.png`: Iso, Top/Front/Right with overall dimensions, Iso-from-below,
      two section views (cut through the centre, or `--section y=10 --section x=0`), and
-     the stats. Faces are tinted **red** where they overhang and **yellow** where the
-     wall is under 1.2 mm; section tiles show cut material in **orange**.
+     the stats. Faces are tinted **red** where they overhang; **yellow dots** mark spots
+     where the wall is under 1.2 mm; section tiles show cut material in **orange**.
    - `report.txt`
 6. **Read the preview PNG and look at it** before calling a model done. Check proportions,
    that details actually show, nothing is floating, and the print orientation is sane.
@@ -177,9 +177,13 @@ Bambu A1 series design notes (0.4 mm nozzle, 0.42 mm line width, 0.2 mm layers):
 
 - Units are millimetres. Z is up. The part sits on Z=0 **in the orientation it prints**,
   with a flat base. The build reports flat base area and overhang area; aim for 0 overhang.
+  Downward faces in strips under 2.5 mm wide (a groove roof, a lip over a slot, a short
+  bridge) are reported separately as fine and do not fail `no_overhang()`.
 - Minimum wall 1.2 mm (2+ mm for anything structural); minimum embossed detail 0.8 mm wide.
   The build samples wall thickness over the surface and reports the thinnest spots;
   drafted ribs get thinner toward the tip, so check the rib width at the top, not the base.
+  Feather edges of countersinks, chamfers and fillets are not counted as walls. A lip
+  left above a groove is `wall - groove_depth` thick: size the wall for it.
 - Fits: 0.2 mm clearance per side for sliding fits, 0.1 mm for press fits. Holes print
   ~0.2 mm undersize.
 - Molds for cement/plaster/resin are cast face-down: a rib on the mold floor becomes a
@@ -200,6 +204,11 @@ Bambu A1 series design notes (0.4 mm nozzle, 0.42 mm line width, 0.2 mm layers):
   Same for clip boundaries in stacked/drafted slices: move the clip region with the draft
   so slice end faces don't coincide.
 - build123d 0.13: `Sketch & Sketch` returns empty; use `clip(a, b)`.
+- build123d `Cone(bottom_radius, top_radius, height)`: bottom first. A countersink that
+  opens at the top face is `Cone(shank_r, head_r, depth)`; swapping them makes an
+  undercut the screw head cannot seat in, and a 90 deg cone sits just under the 45 deg
+  overhang threshold so only `hole(..., csk=head_d)` catches it. Prefer
+  `recipes.screw_holes(..., csk=True)`.
 - build123d: `extrude(taper>0)` goes through LocOpe_DPrism and can **segfault** on thin or
   traced shapes; use `draft_extrude` from `cadkit.cad`. Spline faces built from clockwise
   points face -Z and won't fuse with other faces; `closed_spline` fixes that.

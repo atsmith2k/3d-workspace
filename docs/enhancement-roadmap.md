@@ -162,6 +162,29 @@ more, earlier, and letting the model script declare what "correct" means.
 | Bambu / PrusaLink | Send the 3MF or G-code straight to the printer | Needs printer network setup |
 | Tinkercad | No API; keep the clean-STL path | n/a |
 
+## Shakedown, 2026-10-24
+
+Three requests run end to end as a user would (wall hook for a 1/2 in dowel, oak leaf
+coaster mold, SD card box with sliding lid). Everything built and sliced; the regression
+suite now covers all three. What it found:
+
+- **Harness bugs fixed:** `cad list` ignored multi-part STLs; countersink and chamfer
+  feather edges were reported as thin walls (now a sample counts as a wall only when the
+  exit face is roughly parallel to the entry face); narrow overhang strips such as a
+  groove roof failed `no_overhang()` (now reported separately as fine when under 2.5 mm
+  wide); one thin sample on a large flat facet tinted the whole facet yellow (now yellow
+  dots at the sample points).
+- **Design bugs the harness caught:** the SD box's groove lip came out 1.0 mm thick
+  (wall minus groove depth); the lid-vs-boss collision in the enclosure; and an inverted
+  countersink in both the hook and `recipes.screw_holes` (build123d `Cone` takes the
+  bottom radius first). The last one slipped past the overhang check because a 90 deg
+  cone sits just under 45 deg, so `hole()` gained `csk=` to verify the head opening.
+- **Still awkward:** `cad new` leaves a template whose Spec block must be rewritten by
+  hand; a `hole()` countersink check on a part with a boss needs `csk_face=`; section
+  cuts default to the centre, which missed the hook's screw holes until `--section`
+  was used; the fit report says "touching" for a lid on a rim, which is correct but
+  reads like a warning.
+
 ## Suggested order and effort
 
 | Step | Items | Effort |

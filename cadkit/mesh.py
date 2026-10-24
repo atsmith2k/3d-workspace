@@ -99,13 +99,63 @@ def body_count(tm):
 
 def wall_thickness(tm, samples=4000, seed=0, face_weight=None):
     """Local wall thickness at area-weighted random surface points: the distance a ray
-    travels through the material from each point along the inward normal.
-    Returns (points, face_index, thickness_mm). About 1-2 s on a 60k-triangle mesh.
-    `face_weight` (per-face, 0 to skip) restricts where samples land; rays still see
-    the whole mesh, so skin over a lattice measures as the skin."""
+    travels through the material from each point along the inward normal, until it
+    leaves through a face roughly parallel to the entry face. Samples whose ray exits
+    through a steeply angled face (the feather edge of a countersink, chamfer or
+    fillet, a wedge) are dropped: that is an edge, not a wall.
+    Returns (points, face_index, thickness_mm). `face_weight` (per-face, 0 to skip)
+    restricts where samples land; rays still see the whole mesh, so skin over a
+    lattice measures as the skin."""
     pts, fi = sample.sample_surface(tm, samples, face_weight=face_weight, seed=seed)
-    th = proximity.thickness(tm, pts, exterior=False, normals=tm.face_normals[fi], method="ray")
-    return pts, fi, np.asarray(th)
+    n = tm.face_normals[fi]
+    origins = pts - n * 1e-3
+    loc, ray_id, hit_face = tm.ray.intersects_location(origins, -n, multiple_hits=True)
+    th = np.full(len(pts), np.nan)
+    if len(loc):
+        dist = np.linalg.norm(loc - origins[ray_id], axis=1)
+        order = np.lexsort((dist, ray_id))             # per ray, first exit hit first
+        ray_sorted, dist_sorted, face_sorted = ray_id[order], dist[order], hit_face[order]
+        first = np.r_[True, ray_sorted[1:] != ray_sorted[:-1]]
+        rays, d, f = ray_sorted[first], dist_sorted[first], face_sorted[first]
+        parallel = np.einsum("ij,ij->i", n[rays], tm.face_normals[f]) < -0.5
+        th[rays[parallel]] = d[parallel]
+    keep = ~np.isnan(th)
+    return pts[keep], fi[keep], th[keep]
+
+
+NARROW_OVERHANG_MM = 2.5   # strips narrower than this (lips, groove roofs, short bridges) print fine
+
+
+def overhang_regions(tm, mask):
+    """Split overhang faces into connected regions and estimate each one's width as
+    2*area/perimeter (exact for a long strip). Returns a per-face width array."""
+    from scipy.sparse import coo_matrix
+    from scipy.sparse.csgraph import connected_components
+    width = np.zeros(len(tm.faces))
+    idx = np.flatnonzero(mask)
+    if len(idx) == 0:
+        return width
+    adj = tm.face_adjacency
+    both = mask[adj[:, 0]] & mask[adj[:, 1]]
+    remap = -np.ones(len(tm.faces), int)
+    remap[idx] = np.arange(len(idx))
+    e = remap[adj[both]]
+    g = coo_matrix((np.ones(len(e)), (e[:, 0], e[:, 1])), shape=(len(idx), len(idx)))
+    _, lab = connected_components(g, directed=False)
+    # region perimeter: adjacency edges with exactly one overhang face (plus open edges)
+    one = mask[adj[:, 0]] ^ mask[adj[:, 1]]
+    edge_len = np.linalg.norm(tm.vertices[tm.face_adjacency_edges[:, 0]] - tm.vertices[tm.face_adjacency_edges[:, 1]], axis=1)
+    region_of_face = np.full(len(tm.faces), -1)
+    region_of_face[idx] = lab
+    per = np.zeros(lab.max() + 1)
+    for k in np.flatnonzero(one):
+        a, b = adj[k]
+        r = region_of_face[a] if mask[a] else region_of_face[b]
+        per[r] += edge_len[k]
+    area = np.bincount(lab, weights=tm.area_faces[idx], minlength=len(per))
+    w = np.where(per > 0, 2 * area / np.maximum(per, 1e-9), 1e9)
+    width[idx] = w[lab]
+    return width
 
 
 def _grow_faces(tm, mask):
@@ -128,10 +178,12 @@ class Report:
     base_area_mm2: float
     overhang_area_mm2: float
     voids: int = 0
+    overhang_minor_mm2: float = 0.0   # narrow strips (lips, bridges) that print without support
     wall_thin_mm: float = 0.0        # ~1st percentile of sampled thickness
     wall_median_mm: float = 0.0
     thin_fraction: float = 0.0       # share of surface samples under MIN_WALL
     thin_points: list = field(default_factory=list)
+    thin_samples: np.ndarray = field(default=None, repr=False)   # every thin sample, for the preview
     stl_bytes: int = 0
     warnings: list = field(default_factory=list)
     overhang_faces: np.ndarray = field(default=None, repr=False)
@@ -151,7 +203,9 @@ class Report:
             f"{self.bodies} bod{'y' if self.bodies == 1 else 'ies'}"
             + (f", {self.voids} enclosed void{'s' if self.voids > 1 else ''}" if self.voids else ""),
             f"base     {self.base_area_mm2:.0f} mm2 flat on the bed",
-            f"overhang {self.overhang_area_mm2:.0f} mm2 steeper than {OVERHANG_DEG} deg",
+            f"overhang {self.overhang_area_mm2:.0f} mm2 steeper than {OVERHANG_DEG} deg"
+            + (f" (plus {self.overhang_minor_mm2:.0f} mm2 of strips under {NARROW_OVERHANG_MM} mm wide, fine)"
+               if self.overhang_minor_mm2 else ""),
         ]
         if self.wall_median_mm:
             out.append(f"wall     thinnest ~{self.wall_thin_mm:.1f} mm, median {self.wall_median_mm:.1f} mm, "
@@ -170,7 +224,9 @@ def check(tm, bed=(256, 256, 256), thickness_samples=4000, bed_name=None):
     down = n[:, 2] < -np.cos(np.radians(90 - OVERHANG_DEG)) - 1e-3   # exactly 45 deg (countersinks) is fine
     bodies, voids, void_faces = body_count(tm)
     # faces of enclosed voids (lattice infill, sealed pockets) are not printed surfaces
-    overhang = down & ~zmin_face & ~void_faces
+    overhang_all = down & ~zmin_face & ~void_faces
+    width = overhang_regions(tm, overhang_all)
+    overhang = overhang_all & (width >= NARROW_OVERHANG_MM)
     rep = Report(
         size=size,
         volume_cm3=abs(tm.volume) / 1000,
@@ -180,6 +236,7 @@ def check(tm, bed=(256, 256, 256), thickness_samples=4000, bed_name=None):
         voids=voids,
         base_area_mm2=float(area[zmin_face & (n[:, 2] < -0.999)].sum()),
         overhang_area_mm2=float(area[overhang].sum()),
+        overhang_minor_mm2=float(area[overhang_all & ~overhang].sum()),
         overhang_faces=overhang,
         void_faces=void_faces,
     )
@@ -197,6 +254,7 @@ def check(tm, bed=(256, 256, 256), thickness_samples=4000, bed_name=None):
         mask = np.zeros(len(tm.faces), bool)
         mask[fi[thin]] = True
         rep.thin_faces = _grow_faces(tm, mask)
+        rep.thin_samples = pts[thin]
         if thin.any():
             # group thin samples into spots 8 mm across, biggest first, so the model
             # knows where to look and how thin that region typically is

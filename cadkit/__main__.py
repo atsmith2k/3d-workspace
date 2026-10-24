@@ -118,6 +118,7 @@ def export(part, name, out, args, title, checks=(), params=None):
         png = out / f"{name}_preview.png"
         render_sheet(tm, png, title, lines, overhang_faces=rep.overhang_faces,
                      thin_faces=rep.thin_faces, hidden_faces=rep.void_faces,
+                     thin_points=rep.thin_samples,
                      sections=parse_sections(getattr(args, "section", None)))
         files.append(png)
     print(f"\n== {name} ({time.time() - t0:.1f}s export)")
@@ -408,7 +409,7 @@ def cmd_list(args):
         print("no models yet; start one with: new <name> \"<description>\"")
     for path in models:
         desc = getattr(load_model(path), "DESCRIPTION", "")
-        built = (ROOT / "output" / path.stem / f"{path.stem}.stl").exists()
+        built = any((ROOT / "output" / path.stem).glob(f"{path.stem}*.stl"))
         print(f"{path.stem:28} {'built ' if built else '      '} {desc}")
     return 0
 

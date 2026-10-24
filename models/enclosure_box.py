@@ -14,7 +14,7 @@ Spec:
 Units: mm. Z is up, both parts sit on z=0 in print pose.
 """
 from cadkit.checks import *
-from cadkit.hardware import clearance
+from cadkit.hardware import clearance, head_pocket
 from cadkit.recipes import *
 
 DESCRIPTION = "Project box with M3 insert bosses and a countersunk, lipped lid (recipes demo)"
@@ -46,7 +46,8 @@ def checks(p):
                  solid((pts[0][0] + 3.0, pts[0][1], p.height - 1)),           # boss wall reaches the top
                  empty((0, 0, p.height / 2))],                                 # box is open inside
         "lid": [dims(x=p.width, y=p.depth, z=p.lid_t + p.lip_h), no_overhang(), single_body(),
-                *[hole(clearance(p.screw), at=pt, span=(0.2, p.lid_t - 1.5)) for pt in pts]],
+                *[hole(clearance(p.screw), at=pt, span=(head_pocket(p.screw, "csk")[0] / 2 - 1.0, p.lid_t - 0.3),
+                       csk=head_pocket(p.screw, "csk")[0], csk_from="bottom") for pt in pts]],
     }
 
 
