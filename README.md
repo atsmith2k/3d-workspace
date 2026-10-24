@@ -69,7 +69,9 @@ you describe it  ->  models/<name>.py  ->  cad build  ->  output/<name>/
 
 `cad build` checks every model before you see it: watertight single solid, flat base,
 overhangs that would need support (red in the preview), walls thinner than 1.2 mm
-(yellow), fits the print bed, under Tinkercad's 25 MB limit. `cad slice` runs
+(yellow), fits the print bed, under Tinkercad's 25 MB limit. Each model also declares
+its own acceptance checks (overall size, hole diameters, material where it should be,
+floor thickness...) written from the request, and the build fails if any of them fails. `cad slice` runs
 PrusaSlicer headlessly for the print time, filament use and whether supports are needed.
 
 Two modeling engines, picked per object:
@@ -89,9 +91,10 @@ Run from the repo root. Windows: `cad ...`; macOS/Linux/Git Bash: `./cad ...`
 | `cad build ... --bed 220 220 250` | Check against a different printer bed (default 256 mm) |
 | `cad build ... --section y=10` | Cut the section views at a chosen place (default: centre) |
 | `cad slice models/<name>.py [--supports] [--layer-height 0.28] [--profile p.ini]` | Print time, filament, layers via PrusaSlicer (`--slice` on build does the same) |
+| `cad measure models/<name>.py --probe 10,5,2 --hole 10,5` | Is a point inside? how thick there? hole diameter? |
+| `cad selftest [--update]` | Regression suite over `tests/expected.json` (`--update` re-records) |
 | `cad new <name> "description"` | Start a model from the template |
 | `cad list` | List models and whether they're built |
-| `cad selftest` | Confirm the install works |
 
 ## Editing a result in Tinkercad
 

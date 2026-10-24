@@ -21,7 +21,7 @@ more, earlier, and letting the model script declare what "correct" means.
 
 ## Tier 1: close the feedback loop (do first)
 
-### 1. Measurement API and spec checks in the model script
+### 1. Measurement API and spec checks in the model script (**done in Sprint 2**: `cadkit/measure.py`, `cadkit/checks.py`, `cad measure`)
 - Add `cadkit.measure`: bounding box, volume, centroid, distance between two faces or
   points, hole finder (cylindrical faces: diameter, axis, depth), thickness at a point,
   min/max Z of a selection. Works on build123d shapes and on the final trimesh.
@@ -124,7 +124,7 @@ more, earlier, and letting the model script declare what "correct" means.
 
 ## Tier 3: prompting and workflow
 
-### 10. Spec sheet before code
+### 10. Spec sheet before code (**done in Sprint 2**: template docstring + CLAUDE.md step 3)
 - Extend `CLAUDE.md` with a short spec template Claude fills in *before* writing the
   script: object, overall dims, mating parts and their exact dims, print orientation,
   tolerances, material, acceptance checks. The checks become `CHECKS`; the spec goes in
@@ -146,7 +146,7 @@ more, earlier, and letting the model script declare what "correct" means.
 - `cad lint`: static checks for the gotchas list (coplanar unions, `extrude(taper=)`,
   `Sketch & Sketch`, missing `align`, parts not on Z=0).
 
-### 13. Regression suite and a local benchmark
+### 13. Regression suite and a local benchmark (**regression suite done in Sprint 2**: `tests/expected.json`, `cad selftest --update`; the prompt benchmark remains)
 - `tests/`: every recipe and every user model with expected volume, dims, and check
   results, run by `cad selftest`. Helper changes then cannot silently break models.
 - Keep a small prompt-to-model benchmark (20 prompts with checks) to measure whether
@@ -167,7 +167,7 @@ more, earlier, and letting the model script declare what "correct" means.
 | Step | Items | Effort |
 |---|---|---|
 | Sprint 1 | 2 thickness, 4 slicer, 3 sections and dimension overlays | done 2026-10-24 |
-| Sprint 2 | 1 measure + CHECKS, 10 spec sheet, 13 regression suite | 2-3 days |
+| Sprint 2 | 1 measure + CHECKS, 10 spec sheet, 13 regression suite | done 2026-10-24 |
 | Sprint 3 | 5 SDF kernel, 6 hardware tables + bd_warehouse, 8 text | 2-3 days |
 | Sprint 4 | 7 image input, 9 fit checks, 11 recipes, 12 sweep/lint | 3-4 days |
 | Later | Tier 4 as demand appears | |

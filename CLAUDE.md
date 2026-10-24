@@ -21,8 +21,14 @@ import the STL into Tinkercad (or any slicer/CAD app), so every STL must import 
 1. Clarify only what changes the geometry (size, what it attaches to, print vs cast,
    printer bed). Otherwise pick sensible defaults and state them.
 2. `cad new <name> "<one-line description>"` creates `models/<name>.py` from the template.
-3. Write the model (see "Model contract" below).
-4. `cad build models/<name>.py` builds it, checks it, and writes to `output/<name>/`:
+3. **Write the spec before the code.** Fill in the `Spec` block in the docstring: what it
+   is, overall size, what it mates with and the exact dimensions used (with clearances),
+   print orientation, every feature the user asked for with a size, tolerances. Then turn
+   each line into a check in `checks(p)` (see "Model contract"): `dims`, `hole`, `solid`,
+   `empty`, `thickness_at`, `flat_base`, `no_overhang`... The build fails when a check
+   fails, which catches "the code ran but the shape is wrong" before you look at a picture.
+4. Write `build(p)`.
+5. `cad build models/<name>.py` builds it, checks it, and writes to `output/<name>/`:
    - `<name>.stl` (binary, mm, the deliverable)
    - `<name>.step` (build123d models only; editable in Fusion/FreeCAD/Onshape)
    - `<name>_preview.png`: Iso, Top/Front/Right with overall dimensions, Iso-from-below,
@@ -30,18 +36,21 @@ import the STL into Tinkercad (or any slicer/CAD app), so every STL must import 
      the stats. Faces are tinted **red** where they overhang and **yellow** where the
      wall is under 1.2 mm; section tiles show cut material in **orange**.
    - `report.txt`
-5. **Read the preview PNG and look at it** before calling a model done. Check proportions,
+6. **Read the preview PNG and look at it** before calling a model done. Check proportions,
    that details actually show, nothing is floating, and the print orientation is sane.
    Use the section tiles to confirm floor and wall thickness, cavities and hidden holes;
    add a `--section` through any feature you cannot see. Fix and rebuild until it looks
    right; the build must report `watertight, 1 body`, and the `wall` line should show
    0% under 1.2 mm unless the thin spots are intentional fine detail (the warning says
-   where they are).
-6. `cad slice models/<name>.py` (or `cad build ... --slice`) runs PrusaSlicer headlessly
+   where they are). Every `check` line must say PASS. When something in the picture is
+   unclear, measure it instead of guessing: `cad measure models/<name>.py --probe x,y,z`
+   says whether a point is inside, how far from the surface, and how thick the material
+   is there; `--hole x,y[,axis]` measures a hole's diameter.
+7. `cad slice models/<name>.py` (or `cad build ... --slice`) runs PrusaSlicer headlessly
    and reports print time, filament grams and metres, layer count, and whether supports
    were generated. Options: `--layer-height 0.28`, `--infill 20`, `--supports`,
    `--profile printer.ini`. Tell the user the print time and filament when you deliver.
-7. Deliver: send the preview PNG and the STL to the user (SendUserFile), and summarize
+8. Deliver: send the preview PNG and the STL to the user (SendUserFile), and summarize
    size, print orientation, print time, supports needed, and anything they should know.
 
 Variants: `cad build models/x.py --set style=square --set thickness=30` writes to
@@ -50,8 +59,13 @@ iteration (skips STEP), `--bed X Y Z` for a different printer (default 256 mm cu
 
 Run `cad` from the repo root: `cad.cmd` on Windows (cmd/PowerShell), `./cad` on macOS,
 Linux and Git Bash. Both wrap `.venv` Python `-m cadkit`. Other commands: `cad list`
-(models and build status), `cad selftest` (install check, says whether a slicer was
-found; set `CAD_SLICER` to the PrusaSlicer console binary if it is somewhere unusual).
+(models and build status), `cad selftest` (regression suite: builds every model in
+`tests/expected.json` and compares size, volume and checks with the recorded values;
+also says whether a slicer was found, set `CAD_SLICER` if it is somewhere unusual).
+After changing anything in `cadkit/` run `cad selftest`. After finishing a new model,
+or deliberately changing an existing one, add or refresh its entry with
+`cad selftest --update` (add the model's key, file and `--set` list to the JSON first)
+so later helper changes cannot silently break it.
 
 When a request is a variation of an existing model, add a parameter or style to that
 model rather than copying it. Name new models in snake_case after the object.
@@ -59,15 +73,27 @@ model rather than copying it. Name new models in snake_case after the object.
 ## Model contract
 
 ```python
-"""Docstring: what it is, how it's oriented, anything non-obvious."""
+"""Docstring: what it is, how it's oriented, the Spec block (see the template)."""
+from cadkit.checks import *
 DESCRIPTION = "one line"
 PARAMS = dict(width=40.0, style="a")   # every tunable dimension; types drive --set parsing
+def checks(p):                         # or a static CHECKS = [...] list
+    return [dims(x=p.width), hole(6.4, at=(10, 10)), solid((0, 0, 1)), no_overhang()]
 def build(p):                          # p.width, p.style ...
     return part                        # or {"lid": a, "base": b} for multi-part prints
 ```
 
 `build` may return a build123d Part/Solid, a manifold3d `Manifold`, or a `trimesh.Trimesh`.
-A dict exports each part as its own STL (`<name>-<part>.stl`).
+A dict exports each part as its own STL (`<name>-<part>.stl`); then `checks` may return
+a dict of part name to list (a plain list applies to every part).
+
+Checks (`cadkit/checks.py`) run on the exported mesh, so they work for either kernel:
+`dims(x=, y=, z=)` (number = +-0.5 mm, tuple = range), `volume(lo, hi)` cm3,
+`hole(d, at=(a, b), axis="z", span=(lo, hi), tol=0.2)` (through hole unless `span`),
+`solid(*points)`, `empty(*points)`, `thickness_at(point, min_mm)`, `wall_min(mm)`,
+`flat_base(mm2)`, `no_overhang()`, `single_body()`, `fits_bed()`, and
+`custom(name, fn)` with `fn(ctx)` seeing `ctx.tm`, `ctx.report`, `ctx.params`.
+The same measurements are available in `cadkit/measure.py` and from `cad measure`.
 
 ## Which kernel
 

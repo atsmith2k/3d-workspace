@@ -19,11 +19,14 @@ import time
 from pathlib import Path
 from types import SimpleNamespace
 
+from . import checks as checksmod
+from . import measure as measuremod
 from . import mesh as meshmod
 from . import slicer
 from .render import render_sheet
 
 ROOT = Path(__file__).resolve().parent.parent
+EXPECTED = ROOT / "tests" / "expected.json"
 
 
 def load_model(path):
@@ -69,7 +72,15 @@ def resolve_output(args):
     return path, name, Path(args.out or ROOT / "output") / name
 
 
-def export(part, name, out, args, title):
+def model_checks(mod, p, part_name, single):
+    """CHECKS list / dict, or checks(p) function, resolved for one part."""
+    spec = mod.checks(p) if callable(getattr(mod, "checks", None)) else getattr(mod, "CHECKS", None)
+    if isinstance(spec, dict):
+        return spec.get(part_name, []) if not single else next(iter(spec.values()), [])
+    return spec or []
+
+
+def export(part, name, out, args, title, checks=(), params=None):
     t0 = time.time()
     tol = 0.05 if args.fast else 0.01
     tm = meshmod.to_trimesh(part, tolerance=tol)
@@ -85,7 +96,12 @@ def export(part, name, out, args, title):
     rep.stl_bytes = stl.stat().st_size
     if rep.stl_bytes > meshmod.TINKERCAD_MAX_BYTES:
         rep.warnings.append("STL is over Tinkercad's 25 MB import limit; rebuild with --fast")
-    lines = rep.lines()
+    ctx = SimpleNamespace(tm=tm, report=rep, params=params, name=name)
+    rep.checks_ok, check_lines = checksmod.run_checks(checks, ctx)
+    if not rep.checks_ok:
+        failed = [l.split("FAIL ", 1)[1] for l in check_lines if "FAIL" in l]
+        rep.warnings.append(f"{len(failed)} check{'s' if len(failed) > 1 else ''} failed: " + "; ".join(failed))
+    lines = rep.lines() + check_lines
     if not args.no_render:
         png = out / f"{name}_preview.png"
         render_sheet(tm, png, title, lines, overhang_faces=rep.overhang_faces,
@@ -114,14 +130,18 @@ def cmd_build(args):
     report = [f"# {name}", getattr(mod, "DESCRIPTION", "").strip(), "",
               "params: " + ", ".join(f"{k}={v}" for k, v in p.items()), ""]
     all_ok = True
+    reports = {}
     for part_name, part in parts.items():
         fname = part_name if part_name == name else f"{name}-{part_name}"
-        lines, rep = export(part, fname, out, args, fname)
+        chk = model_checks(mod, SimpleNamespace(**p), part_name, not isinstance(result, dict))
+        lines, rep = export(part, fname, out, args, fname, checks=chk, params=SimpleNamespace(**p))
         report += [f"## {fname}", *lines, ""]
-        all_ok &= rep.ok
+        all_ok &= rep.ok and rep.checks_ok
+        reports[fname] = rep
     (out / "report.txt").write_text("\n".join(report), encoding="utf-8")
     if getattr(args, "slice", False) and all_ok:
         slice_folder(out, name, args)
+    args.reports = reports
     return 0 if all_ok else 1
 
 
@@ -168,6 +188,37 @@ def cmd_slice(args):
     return 0 if slice_folder(out, name, args) else 1
 
 
+def cmd_measure(args):
+    """Numbers about a built part: size, bounds, volume, centroid, plus --probe points
+    (inside? distance to surface? thickness?) and --hole diameter measurements."""
+    import trimesh
+    path, name, out = resolve_output(args)
+    stls = sorted(out.glob(f"{name}*.stl"))
+    if not stls:
+        print(f"{name} not built yet; building first")
+        args.fast, args.no_render, args.slice = True, True, False
+        cmd_build(args)
+        stls = sorted(out.glob(f"{name}*.stl"))
+    for stl in stls:
+        tm = trimesh.load(stl)
+        print(f"== {stl.stem}")
+        for line in measuremod.summary(tm):
+            print("  " + line)
+        for spec in args.probe or []:
+            pt = [float(v) for v in spec.split(",")]
+            r = measuremod.probe(tm, pt)
+            print(f"  probe    {r['point']}: {'INSIDE' if r['inside'] else 'outside'}, "
+                  f"{r['distance_to_surface']} mm to surface, thickness {r['thickness']} mm")
+        for spec in args.hole or []:
+            parts = spec.split(",")
+            at = (float(parts[0]), float(parts[1]))
+            axis = parts[2] if len(parts) > 2 else "z"
+            mean_d, min_d = measuremod.hole_diameter(tm, at, axis)
+            print(f"  hole     at {at} along {axis}: diameter {mean_d:.2f} mm (min {min_d:.2f})"
+                  if mean_d else f"  hole     at {at} along {axis}: material there, no hole")
+    return 0
+
+
 def cmd_new(args):
     dest = ROOT / "models" / f"{args.name}.py"
     if dest.exists():
@@ -189,27 +240,55 @@ def cmd_list(args):
 
 
 def cmd_selftest(args):
-    """Build the template (build123d) and the butterfly mold (manifold3d) into a temp
-    folder and confirm both come out as single watertight solids with previews.
-    Slices the template too if a slicer is installed."""
+    """Regression suite: build every model listed in tests/expected.json (fast mode)
+    into a temp folder and compare size, volume, body count and check results with
+    the recorded values. `--update` re-records them. Slices the template too if a
+    slicer is installed."""
+    import json
     from importlib.metadata import version
     print(f"python {sys.version.split()[0]}, " + ", ".join(
         f"{pkg} {version(pkg)}" for pkg in ("build123d", "manifold3d", "trimesh", "rtree", "numpy", "pillow")))
     exe = slicer.find_slicer()
     print(f"slicer {exe or 'not found (cad slice will be unavailable)'}")
-    failures = []
+    expected = json.loads(EXPECTED.read_text(encoding="utf-8")) if EXPECTED.exists() else {}
+    if not expected:
+        expected = {"_template": {"model": "_template.py", "set": []},
+                    "butterfly_paver_mold": {"model": "butterfly_paver_mold.py", "set": []}}
+    failures, recorded = [], {}
     with tempfile.TemporaryDirectory() as tmp:
-        for model in ("_template.py", "butterfly_paver_mold.py"):
-            ns = argparse.Namespace(model=str(ROOT / "models" / model), set=[], name=None,
-                                    fast=True, no_render=False, bed=[256, 256, 256], out=tmp,
+        for key, exp in expected.items():
+            ns = argparse.Namespace(model=str(ROOT / "models" / exp["model"]), set=exp.get("set", []),
+                                    name=key, fast=True, no_render=False, bed=[256, 256, 256], out=tmp,
                                     section=None, slice=False)
             try:
-                if cmd_build(ns) != 0:
-                    failures.append(f"{model}: not a single watertight solid")
-                elif not list(Path(tmp).rglob("*_preview.png")):
-                    failures.append(f"{model}: no preview rendered")
+                rc = cmd_build(ns)
             except Exception as e:
-                failures.append(f"{model}: {type(e).__name__}: {e}")
+                failures.append(f"{key}: {type(e).__name__}: {e}")
+                continue
+            if not list((Path(tmp) / key).glob("*_preview.png")):
+                failures.append(f"{key}: no preview rendered")
+            got = {}
+            for part, rep in ns.reports.items():
+                got[part] = dict(size=[round(float(v), 1) for v in rep.size],
+                                 volume_cm3=round(rep.volume_cm3, 1), bodies=rep.bodies,
+                                 watertight=rep.watertight, checks_ok=rep.checks_ok)
+            recorded[key] = dict(exp, parts=got)
+            if rc != 0:
+                failures.append(f"{key}: build reported failure (see WARNING/FAIL lines above)")
+            for part, want in exp.get("parts", {}).items():
+                have = got.get(part)
+                if have is None:
+                    failures.append(f"{key}: part {part} missing")
+                    continue
+                if any(abs(a - b) > 0.5 for a, b in zip(have["size"], want["size"])):
+                    failures.append(f"{key}/{part}: size {have['size']} != expected {want['size']}")
+                if abs(have["volume_cm3"] - want["volume_cm3"]) > 0.02 * max(want["volume_cm3"], 0.1):
+                    failures.append(f"{key}/{part}: volume {have['volume_cm3']} != expected {want['volume_cm3']} (+-2%)")
+                if have["bodies"] != want["bodies"] or have["watertight"] != want["watertight"]:
+                    failures.append(f"{key}/{part}: {have['bodies']} bodies, watertight={have['watertight']}; "
+                                    f"expected {want['bodies']}, {want['watertight']}")
+            if "parts" not in exp:
+                print(f"  (no recorded expectation for {key} yet; run selftest --update)")
         if exe:
             ns = argparse.Namespace(model=str(ROOT / "models" / "_template.py"), set=[], name=None,
                                     out=tmp, profile=None, layer_height=0.2, infill=15, supports=False)
@@ -219,10 +298,14 @@ def cmd_selftest(args):
                     failures.append("slice: no print time in G-code")
             except Exception as e:
                 failures.append(f"slice: {type(e).__name__}: {e}")
+    if getattr(args, "update", False):
+        EXPECTED.parent.mkdir(exist_ok=True)
+        EXPECTED.write_text(json.dumps(recorded, indent=2), encoding="utf-8")
+        print(f"\nrecorded expectations for {len(recorded)} models in {EXPECTED.relative_to(ROOT)}")
     if failures:
         print("\nSELFTEST FAILED\n  " + "\n  ".join(failures))
         return 1
-    print("\nSELFTEST OK: both CAD kernels build, export, check and render"
+    print(f"\nSELFTEST OK: {len(expected)} models build, export, check and render as recorded"
           + (", and the slicer works" if exe else ""))
     return 0
 
@@ -258,13 +341,22 @@ def main():
     add_slice_args(s)
     s.add_argument("--bed", type=float, nargs=3, default=[256, 256, 256], metavar=("X", "Y", "Z"))
     s.add_argument("--section", action="append", metavar="AXIS=MM", help=argparse.SUPPRESS)
+    m = sub.add_parser("measure", help="numbers about a built part; probe points and holes")
+    add_model_args(m)
+    m.add_argument("--probe", action="append", metavar="X,Y,Z", help="inside? thickness? (repeatable)")
+    m.add_argument("--hole", action="append", metavar="A,B[,AXIS]",
+                   help="measure a hole through (A, B) along AXIS (default z)")
+    m.add_argument("--bed", type=float, nargs=3, default=[256, 256, 256], help=argparse.SUPPRESS)
+    m.add_argument("--section", action="append", help=argparse.SUPPRESS)
     n = sub.add_parser("new", help="start a model from the template")
     n.add_argument("name")
     n.add_argument("description", nargs="?", default="")
     sub.add_parser("list", help="list models and whether they have been built")
-    sub.add_parser("selftest", help="check the install works end to end")
+    t = sub.add_parser("selftest", help="regression suite: build every recorded model and compare")
+    t.add_argument("--update", action="store_true", help="re-record tests/expected.json from this run")
     args = ap.parse_args()
-    commands = dict(build=cmd_build, slice=cmd_slice, new=cmd_new, list=cmd_list, selftest=cmd_selftest)
+    commands = dict(build=cmd_build, slice=cmd_slice, measure=cmd_measure, new=cmd_new,
+                    list=cmd_list, selftest=cmd_selftest)
     sys.exit(commands[args.cmd](args))
 
 

@@ -1,0 +1,83 @@
+{
+  "_template": {
+    "model": "_template.py",
+    "set": [],
+    "parts": {
+      "_template": {
+        "size": [
+          40.0,
+          30.0,
+          20.0
+        ],
+        "volume_cm3": 23.8,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      }
+    }
+  },
+  "butterfly_paver_mold": {
+    "model": "butterfly_paver_mold.py",
+    "set": [],
+    "parts": {
+      "butterfly_paver_mold": {
+        "size": [
+          137.3,
+          128.7,
+          30.4
+        ],
+        "volume_cm3": 137.2,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      }
+    }
+  },
+  "butterfly_paver_mold_square": {
+    "model": "butterfly_paver_mold.py",
+    "set": [
+      "style=square"
+    ],
+    "parts": {
+      "butterfly_paver_mold_square": {
+        "size": [
+          136.8,
+          136.8,
+          30.4
+        ],
+        "volume_cm3": 140.7,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      }
+    }
+  },
+  "pumpkin_clay_cutter": {
+    "model": "pumpkin_clay_cutter.py",
+    "set": [],
+    "parts": {
+      "pumpkin_clay_cutter-cutter": {
+        "size": [
+          32.1,
+          30.7,
+          12.0
+        ],
+        "volume_cm3": 2.8,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "pumpkin_clay_cutter-pusher": {
+        "size": [
+          32.1,
+          30.7,
+          14.2
+        ],
+        "volume_cm3": 3.5,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      }
+    }
+  }
+}

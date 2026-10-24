@@ -9,9 +9,24 @@ The paver is cast face-down, so a rib on the mold floor becomes a groove in the 
 and a pocket in the floor becomes a raised area. Every wall and rib is tapered (draft)
 so the cured paver releases. Prints opening-up with no supports.
 """
+from cadkit.checks import *
 from cadkit.relief import *
 
 DESCRIPTION = "5 in cement paver mold with butterfly relief (shaped or square)"
+
+
+def checks(p):
+    wing = (30, 30)   # a point well inside the right forewing
+    return [
+        dims(z=p.floor + p.thickness),
+        solid((*wing, 1.0)),                                   # floor under the wing
+        thickness_at((*wing, 1.0), p.floor - p.detail_depth),  # floor left under a pocket
+        empty((*wing, p.floor + p.detail_depth + 5)),          # cavity above the art
+        empty((0, 0, p.floor + p.thickness - 1)),              # opening is open at the top
+        flat_base(5000),
+        no_overhang(),
+        single_body(),
+    ]
 
 PARAMS = dict(
     style="shaped",       # shaped | square
