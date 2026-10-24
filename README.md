@@ -63,16 +63,21 @@ you describe it  ->  models/<name>.py  ->  cad build  ->  output/<name>/
                      (Claude writes)       (checks it)    <name>.stl          print or import into Tinkercad
                                                           <name>.step         editable CAD (engineered parts)
                                                           <name>_preview.png  7 views incl. dimensions + sections, stats, warnings
-                                                          <name>.gcode        print time + filament (cad slice, needs PrusaSlicer)
+                                                          <name>_a1.3mf       sliced Bambu Studio project (cad slice), open and print
                                                           report.txt
 ```
+
+Built for Bambu Lab printers: the A1 is the default and `--printer a1mini` targets the
+A1 mini. `cad slice` drives Bambu Studio's own CLI with its system presets, so the print
+time and filament match what the slicer shows, and the 3MF it writes is ready to print.
+PrusaSlicer is used as a fallback when Bambu Studio is not installed.
 
 `cad build` checks every model before you see it: watertight single solid, flat base,
 overhangs that would need support (red in the preview), walls thinner than 1.2 mm
 (yellow), fits the print bed, under Tinkercad's 25 MB limit. Each model also declares
 its own acceptance checks (overall size, hole diameters, material where it should be,
 floor thickness...) written from the request, and the build fails if any of them fails. `cad slice` runs
-PrusaSlicer headlessly for the print time, filament use and whether supports are needed.
+Bambu Studio headlessly for the print time, filament use and whether supports are needed.
 
 Two modeling engines, picked per object:
 
@@ -88,9 +93,9 @@ Run from the repo root. Windows: `cad ...`; macOS/Linux/Git Bash: `./cad ...`
 | `cad build models/<name>.py` | Build, check, export STL (+STEP), render preview |
 | `cad build models/<name>.py --set thickness=30` | Build a variant with a parameter changed |
 | `cad build ... --fast` | Quicker, coarser build for iterating |
-| `cad build ... --bed 220 220 250` | Check against a different printer bed (default 256 mm) |
+| `cad build ... --printer a1mini` | Target the A1 mini (180 mm bed) instead of the A1; `--bed X Y Z` for anything else |
 | `cad build ... --section y=10` | Cut the section views at a chosen place (default: centre) |
-| `cad slice models/<name>.py [--supports] [--layer-height 0.28] [--profile p.ini]` | Print time, filament, layers via PrusaSlicer (`--slice` on build does the same) |
+| `cad slice models/<name>.py [--printer a1mini] [--supports] [--layer-height 0.28] [--filament "Bambu PETG Basic"]` | Slice with Bambu Studio: print time, filament, layers, and a ready-to-print 3MF (`--slice` on build does the same) |
 | `cad measure models/<name>.py --probe 10,5,2 --hole 10,5` | Is a point inside? how thick there? hole diameter? |
 | `cad selftest [--update]` | Regression suite over `tests/expected.json` (`--update` re-records) |
 | `cad new <name> "description"` | Start a model from the template |
@@ -105,6 +110,6 @@ the model script as the source of truth.
 ## Requirements
 
 Python 3.12, 3.13 or 3.14 on Windows, macOS or Linux. Setup installs the rest into `.venv`.
-`cad slice` is optional and needs [PrusaSlicer](https://www.prusa3d.com/page/prusaslicer_424/)
-installed; it is found automatically in the default location, or set `CAD_SLICER` to the
-console binary.
+`cad slice` is optional and needs [Bambu Studio](https://bambulab.com/en/download/studio)
+installed (or PrusaSlicer as a fallback); both are found automatically in their default
+locations, or set `CAD_BAMBU` / `CAD_SLICER` to the binary.

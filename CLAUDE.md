@@ -19,7 +19,7 @@ import the STL into Tinkercad (or any slicer/CAD app), so every STL must import 
 ## Workflow
 
 1. Clarify only what changes the geometry (size, what it attaches to, print vs cast,
-   printer bed). Otherwise pick sensible defaults and state them.
+   A1 or A1 mini). Otherwise pick sensible defaults and state them.
 2. `cad new <name> "<one-line description>"` creates `models/<name>.py` from the template.
 3. **Write the spec before the code.** Fill in the `Spec` block in the docstring: what it
    is, overall size, what it mates with and the exact dimensions used (with clearances),
@@ -46,22 +46,25 @@ import the STL into Tinkercad (or any slicer/CAD app), so every STL must import 
    unclear, measure it instead of guessing: `cad measure models/<name>.py --probe x,y,z`
    says whether a point is inside, how far from the surface, and how thick the material
    is there; `--hole x,y[,axis]` measures a hole's diameter.
-7. `cad slice models/<name>.py` (or `cad build ... --slice`) runs PrusaSlicer headlessly
-   and reports print time, filament grams and metres, layer count, and whether supports
-   were generated. Options: `--layer-height 0.28`, `--infill 20`, `--supports`,
-   `--profile printer.ini`. Tell the user the print time and filament when you deliver.
-8. Deliver: send the preview PNG and the STL to the user (SendUserFile), and summarize
-   size, print orientation, print time, supports needed, and anything they should know.
+7. `cad slice models/<name>.py` (or `cad build ... --slice`) slices with Bambu Studio for
+   the target printer (see "Printers") and reports print time, filament grams and metres,
+   layer count, whether supports were generated, and writes the sliced project 3MF.
+   Options: `--printer a1mini`, `--layer-height 0.28`, `--infill 20`, `--supports`,
+   `--filament "Bambu PETG Basic"`. Tell the user the print time and filament on delivery.
+8. Deliver: send the preview PNG, the STL and the `_<printer>.3mf` project to the user
+   (SendUserFile), and summarize size, print orientation, print time, supports needed,
+   and anything they should know.
 
 Variants: `cad build models/x.py --set style=square --set thickness=30` writes to
 `output/x_square_30/`. Use `--name` to pick the folder name, `--fast` for a quick coarse
-iteration (skips STEP), `--bed X Y Z` for a different printer (default 256 mm cube).
+iteration (skips STEP), `--printer a1mini` for the smaller printer, `--bed X Y Z` for
+any other bed size.
 
 Run `cad` from the repo root: `cad.cmd` on Windows (cmd/PowerShell), `./cad` on macOS,
 Linux and Git Bash. Both wrap `.venv` Python `-m cadkit`. Other commands: `cad list`
 (models and build status), `cad selftest` (regression suite: builds every model in
 `tests/expected.json` and compares size, volume and checks with the recorded values;
-also says whether a slicer was found, set `CAD_SLICER` if it is somewhere unusual).
+also says which slicers were found; set `CAD_BAMBU` / `CAD_SLICER` for unusual installs).
 After changing anything in `cadkit/` run `cad selftest`. After finishing a new model,
 or deliberately changing an existing one, add or refresh its entry with
 `cad selftest --update` (add the model's key, file and `--set` list to the JSON first)
@@ -104,6 +107,31 @@ The same measurements are available in `cadkit/measure.py` and from `cad measure
 
 `models/butterfly_paver_mold.py` is the worked manifold example; `models/_template.py` is
 the build123d starting point.
+
+## Printers
+
+The user prints on a **Bambu Lab A1** (default, 256 x 256 x 256 mm bed) and an
+**A1 mini** (180 x 180 x 180 mm). Pass `--printer a1mini` to build, slice and measure
+when a part is for the mini; it sets the bed check and the Bambu Studio presets.
+Definitions live in `cadkit/printers.py`. When the user doesn't say which printer, use
+the A1 and keep parts under 175 mm so they also fit the mini when possible.
+
+`cad slice` uses Bambu Studio's own CLI and system presets, so the time and filament are
+what Bambu Studio will show, and it writes `output/<name>/<name>_<printer>.3mf`: a sliced
+project the user opens in Bambu Studio and sends to the printer as is. Hand that 3MF to
+the user along with the STL. `--filament "Bambu PETG Basic"` picks another Bambu filament
+preset; `--layer-height` picks the matching Bambu quality preset (0.08 Extra Fine, 0.12
+Fine, 0.16 Optimal, 0.20 Standard, 0.24 Draft, 0.28 Extra Draft).
+
+Bambu A1 series design notes (0.4 mm nozzle, 0.42 mm line width, 0.2 mm layers):
+- Wall thicknesses at multiples of 0.42 mm print cleanest: 0.84, 1.26, 1.68, 2.10.
+  Heights at multiples of 0.2 mm; put fine horizontal detail on top faces.
+- Textured PEI plate: the bed face comes out matte-textured; it is not a show face.
+  Elephant's foot compensation (0.075 mm) is on, so no need to chamfer the bottom edge
+  for that reason alone.
+- No enclosure: design for PLA/PETG/TPU; ABS/ASA warp over ~100 mm.
+- Bambu's default 15% sparse infill, 2 walls, 3 top/bottom layers. Structural parts:
+  raise `--infill` or design thicker walls rather than relying on infill.
 
 ## Design rules (3D printing)
 

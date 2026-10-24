@@ -120,7 +120,7 @@ class Report:
         return out + [f"WARNING  {w}" for w in self.warnings]
 
 
-def check(tm, bed=(256, 256, 256), thickness_samples=4000):
+def check(tm, bed=(256, 256, 256), thickness_samples=4000, bed_name=None):
     lo, hi = tm.bounds
     size = hi - lo
     n = tm.face_normals
@@ -176,5 +176,6 @@ def check(tm, bed=(256, 256, 256), thickness_samples=4000):
         where = ", ".join(f"({x}, {y}, {z}) {t} mm" for (x, y, z), t in rep.thin_points)
         rep.warnings.append(f"walls under {MIN_WALL} mm (yellow in preview) near {where}")
     if any(s > b for s, b in zip(sorted(size), sorted(bed))):
-        rep.warnings.append(f"larger than the {bed[0]}x{bed[1]}x{bed[2]} mm bed")
+        rep.warnings.append(f"larger than the {bed_name + ' ' if bed_name else ''}bed "
+                            f"({bed[0]:g} x {bed[1]:g} x {bed[2]:g} mm)")
     return rep

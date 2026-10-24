@@ -60,7 +60,7 @@ more, earlier, and letting the model script declare what "correct" means.
   (`<name>_view.html`) so the user can orbit it in the browser pane, and Claude can
   screenshot arbitrary angles there.
 
-### 4. Slicer integration (**verified**, **`cad slice` done in Sprint 1**; 3MF export remains)
+### 4. Slicer integration (**done**: Sprint 1 added `cad slice` via PrusaSlicer; the Bambu pass replaced the default backend with Bambu Studio's CLI and system presets for the A1 / A1 mini, writing a sliced project 3MF; `cadkit/printers.py` holds the printer table and `--printer` selects it)
 - PrusaSlicer's console binary slices headlessly in about 5 s and the G-code header
   carries the key numbers:
   ```

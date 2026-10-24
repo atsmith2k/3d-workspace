@@ -22,6 +22,7 @@ from types import SimpleNamespace
 from . import checks as checksmod
 from . import measure as measuremod
 from . import mesh as meshmod
+from . import printers
 from . import slicer
 from .render import render_sheet
 
@@ -62,6 +63,14 @@ def parse_sections(specs):
     return out
 
 
+def printer_of(args):
+    """(key, definition, bed) for --printer, with --bed overriding the bed size."""
+    key = getattr(args, "printer", None) or printers.DEFAULT
+    pr = printers.get(key)
+    bed = tuple(args.bed) if getattr(args, "bed", None) else pr["bed"]
+    return key, pr, bed
+
+
 def resolve_output(args):
     """Output folder name for a model + overrides: variants get their own folder,
     e.g. butterfly_paver_mold_square."""
@@ -92,7 +101,8 @@ def export(part, name, out, args, title, checks=(), params=None):
         step = out / f"{name}.step"
         export_step(part, str(step))
         files.append(step)
-    rep = meshmod.check(tm, bed=tuple(args.bed), thickness_samples=2000 if args.fast else 4000)
+    _, pr, bed = printer_of(args)
+    rep = meshmod.check(tm, bed=bed, thickness_samples=2000 if args.fast else 4000, bed_name=pr["name"])
     rep.stl_bytes = stl.stat().st_size
     if rep.stl_bytes > meshmod.TINKERCAD_MAX_BYTES:
         rep.warnings.append("STL is over Tinkercad's 25 MB import limit; rebuild with --fast")
@@ -127,8 +137,10 @@ def cmd_build(args):
     print(f"built {name} in {time.time() - t0:.1f}s")
     parts = result if isinstance(result, dict) else {name: result}
 
+    _, pr, bed = printer_of(args)
     report = [f"# {name}", getattr(mod, "DESCRIPTION", "").strip(), "",
-              "params: " + ", ".join(f"{k}={v}" for k, v in p.items()), ""]
+              "params: " + ", ".join(f"{k}={v}" for k, v in p.items()),
+              f"printer: {pr['name']}, bed {bed[0]:g} x {bed[1]:g} x {bed[2]:g} mm", ""]
     all_ok = True
     reports = {}
     for part_name, part in parts.items():
@@ -150,29 +162,33 @@ def slice_folder(out, name, args):
     stls = sorted(out.glob(f"{name}*.stl"))
     if not stls:
         sys.exit(f"nothing built in {out}; run build first")
+    key, pr, _ = printer_of(args)
     if not slicer.find_slicer():
-        print("  slice    skipped: no PrusaSlicer found (set CAD_SLICER to the console binary)")
+        print("  slice    skipped: no Bambu Studio or PrusaSlicer found (set CAD_BAMBU / CAD_SLICER)")
         return None
     report = (out / "report.txt").read_text(encoding="utf-8").split("\n") if (out / "report.txt").exists() else []
     report = [l for l in report if not l.startswith("## slice")]  # keep it idempotent
     results = []
     for stl in stls:
         t0 = time.time()
-        gcode = stl.with_suffix(".gcode")
         try:
-            res = slicer.slice_stl(stl, gcode, profile=getattr(args, "profile", None),
+            res = slicer.slice_stl(stl, out, printer_key=key,
                                    layer_height=getattr(args, "layer_height", 0.2),
                                    infill=getattr(args, "infill", 15),
-                                   supports=getattr(args, "supports", False))
+                                   supports=getattr(args, "supports", False),
+                                   filament=getattr(args, "filament", None),
+                                   profile=getattr(args, "profile", None),
+                                   prefer=getattr(args, "slicer", "auto"))
         except Exception as e:
             print(f"  slice    FAILED for {stl.name}: {e}")
             continue
         lines = res.lines()
-        print(f"\n== slice {stl.stem} ({time.time() - t0:.1f}s)")
+        print(f"\n== slice {stl.stem} with {res.slicer} ({time.time() - t0:.1f}s)")
         for line in lines:
             print("  " + line)
-        print(f"  -> {gcode.relative_to(ROOT) if gcode.is_relative_to(ROOT) else gcode}")
-        report += [f"## slice {stl.stem}", *lines, ""]
+        f = res.project or res.gcode
+        print(f"  -> {f.relative_to(ROOT) if f.is_relative_to(ROOT) else f}")
+        report += [f"## slice {stl.stem} ({res.slicer})", *lines, ""]
         results.append(res)
     (out / "report.txt").write_text("\n".join(report), encoding="utf-8")
     return results
@@ -248,8 +264,9 @@ def cmd_selftest(args):
     from importlib.metadata import version
     print(f"python {sys.version.split()[0]}, " + ", ".join(
         f"{pkg} {version(pkg)}" for pkg in ("build123d", "manifold3d", "trimesh", "rtree", "numpy", "pillow")))
-    exe = slicer.find_slicer()
-    print(f"slicer {exe or 'not found (cad slice will be unavailable)'}")
+    bambu, prusa = slicer.find_bambu(), slicer.find_prusa()
+    print(f"slicers: Bambu Studio {bambu or 'not found'}; PrusaSlicer {prusa or 'not found'}")
+    exe = bambu or prusa
     expected = json.loads(EXPECTED.read_text(encoding="utf-8")) if EXPECTED.exists() else {}
     if not expected:
         expected = {"_template": {"model": "_template.py", "set": []},
@@ -258,7 +275,7 @@ def cmd_selftest(args):
     with tempfile.TemporaryDirectory() as tmp:
         for key, exp in expected.items():
             ns = argparse.Namespace(model=str(ROOT / "models" / exp["model"]), set=exp.get("set", []),
-                                    name=key, fast=True, no_render=False, bed=[256, 256, 256], out=tmp,
+                                    name=key, fast=True, no_render=False, bed=None, printer="a1", out=tmp,
                                     section=None, slice=False)
             try:
                 rc = cmd_build(ns)
@@ -291,7 +308,8 @@ def cmd_selftest(args):
                 print(f"  (no recorded expectation for {key} yet; run selftest --update)")
         if exe:
             ns = argparse.Namespace(model=str(ROOT / "models" / "_template.py"), set=[], name=None,
-                                    out=tmp, profile=None, layer_height=0.2, infill=15, supports=False)
+                                    out=tmp, profile=None, layer_height=0.2, infill=15, supports=False,
+                                    printer="a1", bed=None, filament=None, slicer="auto")
             try:
                 res = slice_folder(Path(tmp) / "_template", "_template", ns)
                 if not res or not res[0].time_s:
@@ -315,13 +333,20 @@ def add_model_args(sp):
     sp.add_argument("--set", action="append", default=[], metavar="NAME=VALUE")
     sp.add_argument("--name", help="output name (default: model name + override values)")
     sp.add_argument("--out", help="output root folder (default: output/)")
+    sp.add_argument("--printer", default=printers.DEFAULT, choices=list(printers.PRINTERS),
+                    help=f"target printer: sets the bed and the slicer presets (default {printers.DEFAULT})")
+    sp.add_argument("--bed", type=float, nargs=3, default=None, metavar=("X", "Y", "Z"),
+                    help="override the printer's bed size in mm")
 
 
 def add_slice_args(sp):
-    sp.add_argument("--profile", help="PrusaSlicer .ini (printer/filament/print) to load")
-    sp.add_argument("--layer-height", type=float, default=0.2)
+    sp.add_argument("--layer-height", type=float, default=0.2,
+                    help="0.08/0.12/0.16/0.20/0.24/0.28 pick the matching Bambu preset")
     sp.add_argument("--infill", type=int, default=15, help="percent")
     sp.add_argument("--supports", action="store_true", help="let the slicer add supports")
+    sp.add_argument("--filament", help=f"Bambu filament preset, e.g. 'Bambu PETG Basic' (default {printers.DEFAULT_FILAMENT})")
+    sp.add_argument("--slicer", default="auto", choices=["auto", "bambu", "prusa"])
+    sp.add_argument("--profile", help="PrusaSlicer .ini to load (prusa backend only)")
 
 
 def main():
@@ -331,7 +356,6 @@ def main():
     add_model_args(b)
     b.add_argument("--fast", action="store_true", help="coarser mesh, skip STEP")
     b.add_argument("--no-render", action="store_true")
-    b.add_argument("--bed", type=float, nargs=3, default=[256, 256, 256], metavar=("X", "Y", "Z"))
     b.add_argument("--section", action="append", metavar="AXIS=MM",
                    help="where to cut the section views, e.g. y=10 (default: centre)")
     b.add_argument("--slice", action="store_true", help="also slice with PrusaSlicer")
@@ -339,14 +363,12 @@ def main():
     s = sub.add_parser("slice", help="slice a built model: print time, filament, supports")
     add_model_args(s)
     add_slice_args(s)
-    s.add_argument("--bed", type=float, nargs=3, default=[256, 256, 256], metavar=("X", "Y", "Z"))
     s.add_argument("--section", action="append", metavar="AXIS=MM", help=argparse.SUPPRESS)
     m = sub.add_parser("measure", help="numbers about a built part; probe points and holes")
     add_model_args(m)
     m.add_argument("--probe", action="append", metavar="X,Y,Z", help="inside? thickness? (repeatable)")
     m.add_argument("--hole", action="append", metavar="A,B[,AXIS]",
                    help="measure a hole through (A, B) along AXIS (default z)")
-    m.add_argument("--bed", type=float, nargs=3, default=[256, 256, 256], help=argparse.SUPPRESS)
     m.add_argument("--section", action="append", help=argparse.SUPPRESS)
     n = sub.add_parser("new", help="start a model from the template")
     n.add_argument("name")
