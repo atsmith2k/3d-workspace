@@ -14,7 +14,7 @@ yourself, import the STL into Tinkercad, a slicer, or any CAD app.
 
 Open Claude Code (terminal, desktop app, or IDE) in any folder and say:
 
-> Set up this project: `<this repo's URL>`
+> Set up this project: https://github.com/atsmith2k/3d-workspace
 
 Claude clones it, installs everything, runs a self-test, and asks what you want to make.
 Then just describe it:
