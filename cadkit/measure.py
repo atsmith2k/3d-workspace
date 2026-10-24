@@ -93,6 +93,36 @@ def probe(tm, point):
                 thickness=round(thickness_at(tm, point), 2))
 
 
+def posed(tm, pose):
+    """Copy of a mesh moved from print pose to assembled pose by
+    (dx, dy, dz, rx, ry, rz): rotations in degrees about the part's own origin
+    (x, then y, then z), then translation."""
+    import trimesh.transformations as tf
+    dx, dy, dz, rx, ry, rz = pose
+    M = tf.translation_matrix((dx, dy, dz))
+    for ang, axis in ((rz, (0, 0, 1)), (ry, (0, 1, 0)), (rx, (1, 0, 0))):
+        if ang:
+            M = M @ tf.rotation_matrix(np.radians(ang), axis)
+    out = tm.copy()
+    out.apply_transform(M)
+    return out
+
+
+def fit(a, b, samples=3000):
+    """How two assembled parts relate: interference volume (mm3) where they overlap,
+    and the smallest gap between their surfaces (mm) if they do not."""
+    from manifold3d import Manifold, Mesh
+
+    def manifold(tm):
+        return Manifold(Mesh(vert_properties=tm.vertices.astype(np.float32),
+                             tri_verts=tm.faces.astype(np.uint32)))
+    inter = (manifold(a) ^ manifold(b)).volume()
+    pa, _ = a.sample(samples, return_index=True)
+    pb, _ = b.sample(samples, return_index=True)
+    gap = min(proximity.closest_point(b, pa)[1].min(), proximity.closest_point(a, pb)[1].min())
+    return dict(interference_mm3=float(inter), clearance_mm=float(gap))
+
+
 def summary(tm):
     lo, hi, size = extents(tm)
     cen = tm.center_mass if tm.is_watertight else tm.centroid

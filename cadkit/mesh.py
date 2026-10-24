@@ -167,7 +167,7 @@ def check(tm, bed=(256, 256, 256), thickness_samples=4000, bed_name=None):
     n = tm.face_normals
     area = tm.area_faces
     zmin_face = tm.triangles[:, :, 2].max(axis=1) <= lo[2] + 0.05   # level-set bottoms wobble ~0.01
-    down = n[:, 2] < -np.cos(np.radians(90 - OVERHANG_DEG))
+    down = n[:, 2] < -np.cos(np.radians(90 - OVERHANG_DEG)) - 1e-3   # exactly 45 deg (countersinks) is fine
     bodies, voids, void_faces = body_count(tm)
     # faces of enclosed voids (lattice infill, sealed pockets) are not printed surfaces
     overhang = down & ~zmin_face & ~void_faces

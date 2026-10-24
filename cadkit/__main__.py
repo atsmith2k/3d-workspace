@@ -12,6 +12,7 @@ output/<model>/<model>.stl (+ .step for B-rep models), preview.png and report.tx
 filament and whether supports were generated.
 """
 import argparse
+import numpy as np
 import importlib.util
 import sys
 import tempfile
@@ -107,6 +108,7 @@ def export(part, name, out, args, title, checks=(), params=None):
     if rep.stl_bytes > meshmod.TINKERCAD_MAX_BYTES:
         rep.warnings.append("STL is over Tinkercad's 25 MB import limit; rebuild with --fast")
     ctx = SimpleNamespace(tm=tm, report=rep, params=params, name=name)
+    rep.tm = tm
     rep.checks_ok, check_lines = checksmod.run_checks(checks, ctx)
     if not rep.checks_ok:
         failed = [l.split("FAIL ", 1)[1] for l in check_lines if "FAIL" in l]
@@ -143,7 +145,7 @@ def cmd_build(args):
               "params: " + ", ".join(f"{k}={v}" for k, v in p.items()),
               f"printer: {pr['name']}, bed {bed[0]:g} x {bed[1]:g} x {bed[2]:g} mm", ""]
     all_ok = True
-    reports = {}
+    reports, meshes = {}, {}
     for part_name, part in parts.items():
         fname = part_name if part_name == name else f"{name}-{part_name}"
         chk = model_checks(mod, SimpleNamespace(**p), part_name, not isinstance(result, dict))
@@ -151,11 +153,43 @@ def cmd_build(args):
         report += [f"## {fname}", *lines, ""]
         all_ok &= rep.ok and rep.checks_ok
         reports[fname] = rep
+        meshes[part_name] = rep.tm
+    if len(parts) > 1:
+        fit_lines, fit_ok = fit_report(mod, SimpleNamespace(**p), meshes)
+        report += ["## fit", *fit_lines, ""]
+        print("\n== fit")
+        for line in fit_lines:
+            print("  " + line)
+        all_ok &= fit_ok
     (out / "report.txt").write_text("\n".join(report), encoding="utf-8")
     if getattr(args, "slice", False) and all_ok:
         slice_folder(out, name, args)
     args.reports = reports
     return 0 if all_ok else 1
+
+
+def fit_report(mod, p, meshes, min_clearance=0.1):
+    """For multi-part models with an assembly(p) function: move each part from print
+    pose to assembled pose and measure every pair for interference and clearance."""
+    if not callable(getattr(mod, "assembly", None)):
+        return ["(define assembly(p) -> {part: (dx, dy, dz, rx, ry, rz)} to check how the parts fit)"], True
+    poses = mod.assembly(p)
+    placed = {n: (measuremod.posed(tm, poses[n]) if n in poses else tm) for n, tm in meshes.items()}
+    names = list(placed)
+    lines, ok = [], True
+    for i, a in enumerate(names):
+        for b in names[i + 1:]:
+            r = measuremod.fit(placed[a], placed[b])
+            if r["interference_mm3"] > 0.5:
+                lines.append(f"fit      {a} vs {b}: INTERFERE by {r['interference_mm3']:.1f} mm3")
+                ok = False
+            elif r["clearance_mm"] < min_clearance:
+                lines.append(f"fit      {a} vs {b}: touching (gap {r['clearance_mm']:.2f} mm)")
+            else:
+                lines.append(f"fit      {a} vs {b}: clear, smallest gap {r['clearance_mm']:.2f} mm")
+    if not ok:
+        lines.append("WARNING  parts overlap when assembled; check the fit lines")
+    return lines, ok
 
 
 def slice_folder(out, name, args):
@@ -193,6 +227,129 @@ def slice_folder(out, name, args):
         results.append(res)
     (out / "report.txt").write_text("\n".join(report), encoding="utf-8")
     return results
+
+
+def cmd_sweep(args):
+    """Build one variant per value of --sweep name=v1,v2,... (combined with any --set)
+    and write a comparison sheet of iso views plus the key numbers."""
+    import trimesh
+    from PIL import Image, ImageDraw, ImageFont
+    from . import render
+    key, _, vals = args.sweep.partition("=")
+    values = [v for v in vals.split(",") if v]
+    if not key or not values:
+        sys.exit("--sweep wants name=v1,v2,...")
+    base_set = list(args.set)
+    rows = []
+    for v in values:
+        ns = argparse.Namespace(**vars(args))
+        ns.set = base_set + [f"{key}={v}"]
+        ns.name = None
+        ns.slice = False
+        rc = cmd_build(ns)
+        _, vname, vout = resolve_output(ns)
+        stls = sorted(vout.glob(f"{vname}*.stl"))
+        rows.append((v, vname, stls, rc, ns.reports))
+    path, name, _ = resolve_output(argparse.Namespace(model=args.model, set=base_set, name=None, out=args.out))
+    sheet_dir = Path(args.out or ROOT / "output") / f"{name}_sweep_{key}"
+    sheet_dir.mkdir(parents=True, exist_ok=True)
+    T = render.TILE
+    sheet = Image.new("RGB", (T * len(rows), T + 120), render.BG)
+    font = ImageFont.load_default(size=14)
+    for k, (v, vname, stls, rc, reps) in enumerate(rows):
+        if not stls:
+            continue
+        tm = trimesh.load(stls[0]) if len(stls) == 1 else trimesh.util.concatenate([trimesh.load(s) for s in stls])
+        size = T * render.SS
+        scale = size * 0.44 / (np.linalg.norm(tm.extents) / 2)
+        img = render._render_view(tm, (1, -1, 0.9), scale, size, tm.bounds.mean(axis=0))
+        sheet.paste(render._tile(img), (k * T, 0))
+        d = ImageDraw.Draw(sheet)
+        d.text((k * T + 10, 8), f"{key} = {v}", fill=(40, 40, 40), font=ImageFont.load_default(size=17))
+        rep = next(iter(reps.values()))
+        info = [rep.lines()[0], rep.lines()[1], rep.lines()[4],
+                "checks " + ("ok" if rc == 0 else "FAILED"), *[w[:70] for w in rep.warnings[:2]]]
+        for i, line in enumerate(info):
+            d.text((k * T + 10, T + 8 + i * 18), line, fill=(180, 60, 20) if "WARN" in line or "FAIL" in line else (60, 60, 60), font=font)
+    png = sheet_dir / "sweep.png"
+    sheet.save(png)
+    print(f"\n== sweep {key}: {', '.join(values)}\n  -> {png.relative_to(ROOT)}")
+    return 0
+
+
+LINT_RULES = [
+    (r"extrude\([^)]*taper\s*=", "extrude(taper=) can segfault on thin shapes; use draft_extrude from cadkit.cad"),
+    (r"\bSketch\b[^\n]*&[^\n]*\bSketch\b|\)\s*&\s*\w+\.sketch", "Sketch & Sketch returns empty in build123d 0.13; use clip(a, b) from cadkit.cad"),
+    (r"^(?!.*PARAMS\s*=)", None),
+]
+
+
+def cmd_lint(args):
+    """Static checks for the gotchas list, before a build is even attempted."""
+    import re
+    path = Path(args.model).resolve()
+    text = path.read_text(encoding="utf-8")
+    problems = []
+    try:
+        compile(text, str(path), "exec")
+    except SyntaxError as e:
+        problems.append(f"line {e.lineno}: syntax error: {e.msg}")
+    for pattern, msg in LINT_RULES:
+        if msg and re.search(pattern, text):
+            problems.append(msg)
+    if "PARAMS" not in text:
+        problems.append("no PARAMS dict: every tunable dimension should be a parameter")
+    if "DESCRIPTION" not in text:
+        problems.append("no DESCRIPTION string")
+    if "def checks(" not in text and "CHECKS" not in text:
+        problems.append("no checks: add checks(p) so the build can confirm the geometry matches the spec")
+    if re.search(r"\bextrude\(", text) and "from cadkit.relief import" not in text and "build123d" in text \
+            and re.search(r"amount\s*=\s*-", text):
+        problems.append("negative extrude amount: make sure the part still sits on z=0")
+    if re.search(r"\.(step|stl)['\"]", text):
+        problems.append("model writes files itself; return the part and let cad build export it")
+    if "Spec" not in text and "spec" not in text.lower():
+        problems.append("no Spec block in the docstring (object, overall, mates with, orientation, must have, tolerances)")
+    if problems:
+        print(f"{path.name}:")
+        for pr in problems:
+            print(f"  - {pr}")
+        return 1
+    print(f"{path.name}: no lint findings")
+    return 0
+
+
+def cmd_trace(args):
+    """Trace an image to an SVG and draw the outline so it can be checked before use."""
+    from PIL import Image, ImageDraw
+    from .image import trace
+    src = Path(args.image).resolve()
+    out = Path(args.out or ROOT / "output") / "traces"
+    out.mkdir(parents=True, exist_ok=True)
+    svg = out / f"{src.stem}.svg"
+    cs = trace(src, width=args.width, threshold=args.threshold, invert=args.invert, out_svg=svg)
+    lo_x, lo_y, hi_x, hi_y = cs.bounds()
+    W = 800
+    s = (W - 40) / max(hi_x - lo_x, hi_y - lo_y, 1e-6)
+    H = int((hi_y - lo_y) * s) + 40
+    from PIL import ImageChops
+    mask = Image.new("1", (W, H), 0)
+    outline = Image.new("1", (W, H), 0)
+    for poly in cs.to_polygons():
+        pts = [(20 + (x - lo_x) * s, H - 20 - (y - lo_y) * s) for x, y in poly]
+        m = Image.new("1", (W, H), 0)
+        ImageDraw.Draw(m).polygon(pts, fill=1)
+        mask = ImageChops.logical_xor(mask, m)          # even-odd: holes stay empty
+        ImageDraw.Draw(outline).line(pts + pts[:1], fill=1, width=2)
+    im = Image.new("RGB", (W, H), "white")
+    im.paste((200, 220, 245), mask=mask)
+    im.paste((30, 90, 200), mask=outline)
+    png = out / f"{src.stem}_trace.png"
+    im.save(png)
+    print(f"traced {src.name}: {cs.num_contour()} contours, {hi_x - lo_x:.1f} x {hi_y - lo_y:.1f} mm, "
+          f"area {cs.area():.0f} mm2\n  -> {svg.relative_to(ROOT)}\n  -> {png.relative_to(ROOT)}\n"
+          f"  use it with: from cadkit.image import svg_shape; svg_shape('{svg.relative_to(ROOT).as_posix()}', width={args.width})")
+    return 0
 
 
 def cmd_slice(args):
@@ -359,7 +516,8 @@ def main():
     b.add_argument("--no-render", action="store_true")
     b.add_argument("--section", action="append", metavar="AXIS=MM",
                    help="where to cut the section views, e.g. y=10 (default: centre)")
-    b.add_argument("--slice", action="store_true", help="also slice with PrusaSlicer")
+    b.add_argument("--slice", action="store_true", help="also slice for the target printer")
+    b.add_argument("--sweep", metavar="NAME=V1,V2,...", help="build one variant per value and compare")
     add_slice_args(b)
     s = sub.add_parser("slice", help="slice a built model: print time, filament, supports")
     add_model_args(s)
@@ -371,6 +529,14 @@ def main():
     m.add_argument("--hole", action="append", metavar="A,B[,AXIS]",
                    help="measure a hole through (A, B) along AXIS (default z)")
     m.add_argument("--section", action="append", help=argparse.SUPPRESS)
+    lt = sub.add_parser("lint", help="static checks for known pitfalls in a model script")
+    lt.add_argument("model")
+    tr = sub.add_parser("trace", help="trace an image into an SVG outline for a model")
+    tr.add_argument("image")
+    tr.add_argument("--width", type=float, default=60.0, help="output width in mm")
+    tr.add_argument("--threshold", type=int, default=128)
+    tr.add_argument("--invert", action="store_true", help="light artwork on dark background")
+    tr.add_argument("--out")
     n = sub.add_parser("new", help="start a model from the template")
     n.add_argument("name")
     n.add_argument("description", nargs="?", default="")
@@ -378,8 +544,10 @@ def main():
     t = sub.add_parser("selftest", help="regression suite: build every recorded model and compare")
     t.add_argument("--update", action="store_true", help="re-record tests/expected.json from this run")
     args = ap.parse_args()
+    if args.cmd == "build" and args.sweep:
+        sys.exit(cmd_sweep(args))
     commands = dict(build=cmd_build, slice=cmd_slice, measure=cmd_measure, new=cmd_new,
-                    list=cmd_list, selftest=cmd_selftest)
+                    list=cmd_list, selftest=cmd_selftest, lint=cmd_lint, trace=cmd_trace)
     sys.exit(commands[args.cmd](args))
 
 

@@ -102,7 +102,7 @@ more, earlier, and letting the model script declare what "correct" means.
 - Pin `gridfinity_build123d` for bins, baseplates and lips; Gridfinity requests are
   frequent and the spec is finicky.
 
-### 7. Image and SVG input
+### 7. Image and SVG input (**done in Sprint 4**: `cadkit/image.py` trace/svg_shape/heightmap, `cad trace`)
 - `import_svg` already works in build123d 0.13 (**verified**), and `svgpathtools` is
   installed. Add `cadkit.image`: `trace(png) -> CrossSection` via `vtracer` (handles
   colour and photos) with a Potrace fallback, and `heightmap(png, height) -> Manifold`
@@ -116,7 +116,7 @@ more, earlier, and letting the model script declare what "correct" means.
   rasterise with Pillow, trace, mirror automatically for molds. Engraved and
   embossed text is the second most common decorative request.
 
-### 9. Multi-part fit and assembly checks
+### 9. Multi-part fit and assembly checks (**done in Sprint 4**: `assembly(p)` poses, interference and clearance in the report)
 - For dict returns, compute pairwise intersection volume (manifold `^`) and minimum
   clearance between parts, render an assembled and an exploded view, and fail the
   build on interference. Lids, hinges, snap fits, and sliding drawers stop relying on
@@ -130,7 +130,7 @@ more, earlier, and letting the model script declare what "correct" means.
   tolerances, material, acceptance checks. The checks become `CHECKS`; the spec goes in
   the docstring. This is cheap and directly attacks "code ran, shape is wrong".
 
-### 11. Recipe library
+### 11. Recipe library (**started in Sprint 4**: `cadkit/recipes.py` box/lid/boss/holes + enclosure example; hook, knob, clip, lofted and swept recipes remain)
 - Ship 8-10 worked models that cover the common shapes and the hard operations:
   enclosure with snap lid, wall bracket with ribs, hook, knob with D-shaft, cable
   clip, mold with draft and relief, lofted handle, swept channel, threaded cap,
@@ -139,7 +139,7 @@ more, earlier, and letting the model script declare what "correct" means.
   `cadkit.recipes` for reuse. Text2CAD-Bench says loft/sweep/shell are where LLMs
   fail, so those recipes matter most.
 
-### 12. Faster iteration
+### 12. Faster iteration (**sweep and lint done in Sprint 4**; build caching remains)
 - `--sweep thickness=2,3,4` builds variants in parallel and writes one comparison
   sheet.
 - Cache builds by (script hash, params) so re-rendering or re-slicing skips the build.
@@ -169,7 +169,7 @@ more, earlier, and letting the model script declare what "correct" means.
 | Sprint 1 | 2 thickness, 4 slicer, 3 sections and dimension overlays | done 2026-10-24 |
 | Sprint 2 | 1 measure + CHECKS, 10 spec sheet, 13 regression suite | done 2026-10-24 |
 | Sprint 3 | 5 SDF kernel, 6 hardware tables + bd_warehouse, 8 text | done 2026-10-24 |
-| Sprint 4 | 7 image input, 9 fit checks, 11 recipes, 12 sweep/lint | 3-4 days |
+| Sprint 4 | 7 image input, 9 fit checks, 11 recipes, 12 sweep/lint | done 2026-10-24 |
 | Later | Tier 4 as demand appears | |
 
 Dependency status: build123d 0.13.0 is the latest release (verified on GitHub), so no

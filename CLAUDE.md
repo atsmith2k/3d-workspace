@@ -58,7 +58,10 @@ import the STL into Tinkercad (or any slicer/CAD app), so every STL must import 
 Variants: `cad build models/x.py --set style=square --set thickness=30` writes to
 `output/x_square_30/`. Use `--name` to pick the folder name, `--fast` for a quick coarse
 iteration (skips STEP), `--printer a1mini` for the smaller printer, `--bed X Y Z` for
-any other bed size.
+any other bed size. `--sweep thickness=2,3,4` builds every value and writes one
+comparison sheet (`output/x_sweep_thickness/sweep.png`) to choose from.
+`cad lint models/x.py` flags known pitfalls (taper extrudes, sketch `&`, missing
+PARAMS/checks/Spec) before building; run it on any model that fails oddly.
 
 Run `cad` from the repo root: `cad.cmd` on Windows (cmd/PowerShell), `./cad` on macOS,
 Linux and Git Bash. Both wrap `.venv` Python `-m cadkit`. Other commands: `cad list`
@@ -119,6 +122,25 @@ board dimension: `from cadkit.hardware import *` has `clearance("M3")`, `insert(
 gears use `bd_warehouse` (`from bd_warehouse.thread import IsoThread`,
 `from bd_warehouse.fastener import SocketHeadCapScrew, HexNut, HeatSetNut, ClearanceHole,
 InsertHole`; heat-set sizes are like `"M3-0.5-Standard"`, type `"McMaster-Carr"`).
+
+**Recipes** (`from cadkit.recipes import *`, build123d): `rounded_box`, `shell_box` (open
+box), `lid` (plate with inner lip, returned in print pose), `boss` / `add_bosses` /
+`boss_corners` (insert standoffs), `screw_holes` (clearance, countersunk or counterbored),
+`slot`, `hex_pocket`, `chamfer_bottom`. `models/enclosure_box.py` shows them together.
+Reach for these before building a box or standoff from primitives.
+
+**Images and SVGs** (`from cadkit.image import *`): `trace("logo.png", width=60)` turns a
+logo, sketch or photo silhouette into a CrossSection (holes kept); `svg_shape("x.svg",
+width=80)` loads an SVG's paths; `heightmap("photo.jpg", width=100, height=3, base=1)`
+makes a relief slab or lithophane (`invert=True`) as a Manifold. When the user gives an
+image, run `cad trace image.png --width 60` first and look at the outline preview it
+writes before modeling with it. build123d models can also use `import_svg`.
+
+**Multi-part fit.** For a dict return, define `assembly(p)` giving each part's move from
+print pose to assembled pose, `{"lid": (dx, dy, dz, rx, ry, rz)}` (degrees, rotation about
+the part's own origin first). The build then reports interference volume or the smallest
+gap for every pair, and fails on overlap. Model lids and covers in their print pose and
+let `assembly` flip them.
 
 **Text.** build123d: `emboss_text(part, "M3", size, depth, at=(x, y, z_top), engrave=False,
 mirror=False)` from `cadkit.cad`, or `text_solid(...)` to place yourself. manifold:

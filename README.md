@@ -87,6 +87,10 @@ Two modeling engines, picked per object:
 - **manifold3d**: decorative and organic work: reliefs, molds with artwork, patterns, text.
 - **SDF** (implicit modeling): smooth blends, gyroid lattice infill, shells, twists.
 
+Images come in too: a logo or sketch is traced into an outline, an SVG is loaded directly,
+and a photo becomes a relief or lithophane. Multi-part models declare how they assemble
+and the build measures interference and clearance between the parts.
+
 ## Commands
 
 Run from the repo root. Windows: `cad ...`; macOS/Linux/Git Bash: `./cad ...`
@@ -100,6 +104,9 @@ Run from the repo root. Windows: `cad ...`; macOS/Linux/Git Bash: `./cad ...`
 | `cad build ... --section y=10` | Cut the section views at a chosen place (default: centre) |
 | `cad slice models/<name>.py [--printer a1mini] [--supports] [--layer-height 0.28] [--filament "Bambu PETG Basic"]` | Slice with Bambu Studio: print time, filament, layers, and a ready-to-print 3MF (`--slice` on build does the same) |
 | `cad measure models/<name>.py --probe 10,5,2 --hole 10,5` | Is a point inside? how thick there? hole diameter? |
+| `cad build ... --sweep thickness=2,3,4` | Build every value and write one comparison sheet |
+| `cad trace logo.png --width 60` | Trace an image to an SVG outline (plus a preview) for use in a model |
+| `cad lint models/<name>.py` | Static checks for known pitfalls |
 | `cad selftest [--update]` | Regression suite over `tests/expected.json` (`--update` re-records) |
 | `cad new <name> "description"` | Start a model from the template |
 | `cad list` | List models and whether they're built |

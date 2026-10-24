@@ -116,5 +116,33 @@
         "checks_ok": true
       }
     }
+  },
+  "enclosure_box": {
+    "model": "enclosure_box.py",
+    "set": [],
+    "parts": {
+      "enclosure_box-base": {
+        "size": [
+          80.0,
+          50.0,
+          30.0
+        ],
+        "volume_cm3": 27.1,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "enclosure_box-lid": {
+        "size": [
+          80.0,
+          50.0,
+          7.0
+        ],
+        "volume_cm3": 13.6,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      }
+    }
   }
 }
