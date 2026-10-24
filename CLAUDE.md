@@ -5,6 +5,17 @@ looks at the renders, iterates, and hands back an STL. Modeling is fully generat
 the user does not model by hand here. If they want to tweak something themselves they
 import the STL into Tinkercad (or any slicer/CAD app), so every STL must import cleanly.
 
+## Session start
+
+- If `.venv` is missing, or `cad selftest` fails, run setup first (README, "For Claude:
+  setting up this project"): `py scripts/setup.py` on Windows, `python3 scripts/setup.py`
+  elsewhere, and wait for `READY`.
+- If the user opens with no specific request ("set up", "what can this do", a greeting),
+  confirm it's ready, mention any existing models (`cad list`), and invite them:
+  **"Give me instructions for the model you want to make."** Ask for the object, rough
+  size, and whether it's printed directly or used as a mold.
+- If they open with a model request, just start the workflow below.
+
 ## Workflow
 
 1. Clarify only what changes the geometry (size, what it attaches to, print vs cast,
@@ -26,8 +37,12 @@ Variants: `cad build models/x.py --set style=square --set thickness=30` writes t
 `output/x_square_30/`. Use `--name` to pick the folder name, `--fast` for a quick coarse
 iteration (skips STEP), `--bed X Y Z` for a different printer (default 256 mm cube).
 
-`cad` is `cad.cmd` in the repo root (Windows) and wraps `.venv/Scripts/python -m cadkit`.
-From Git Bash use `./cad.cmd ...` or `.venv/Scripts/python -m cadkit ...`.
+Run `cad` from the repo root: `cad.cmd` on Windows (cmd/PowerShell), `./cad` on macOS,
+Linux and Git Bash. Both wrap `.venv` Python `-m cadkit`. Other commands: `cad list`
+(models and build status), `cad selftest` (install check).
+
+When a request is a variation of an existing model, add a parameter or style to that
+model rather than copying it. Name new models in snake_case after the object.
 
 ## Model contract
 
@@ -84,11 +99,13 @@ the build123d starting point.
 ## Layout
 
 ```
-cadkit/        harness: __main__ (CLI), mesh (convert/clean/check), render (preview), cad + relief helpers
-models/        one script per object (_template.py is the starting point)
-output/        generated files, safe to delete; rebuilt from models/
-cad.cmd        CLI wrapper
+cadkit/          harness: __main__ (CLI), mesh (convert/clean/check), render (preview), cad + relief helpers
+models/          one script per object (_template.py is the starting point); commit these
+output/          generated files (gitignored); rebuilt from models/
+scripts/setup.py one-step install + self-test
+cad, cad.cmd     CLI wrappers (macOS/Linux/Git Bash, Windows)
+docs/            README images
 ```
 
-Setup on a new machine: `py -3.12 -m venv .venv` then
-`.venv\Scripts\python -m pip install -r requirements.txt`.
+Python 3.12-3.14 (numpy 2.5 needs >=3.12, build123d needs <3.15). Dependencies are
+pinned in `requirements.txt`; when upgrading, re-run `cad selftest` and update the pins.

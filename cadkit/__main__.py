@@ -2,14 +2,16 @@
 
   python -m cadkit build models/foo.py [--set name=value ...] [--fast] [--no-render]
   python -m cadkit new foo "one-line description"
+  python -m cadkit list
+  python -m cadkit selftest
 
 `build` runs the model's build(p), checks the result is printable, and writes
 output/<model>/<model>.stl (+ .step for B-rep models), preview.png and report.txt.
 """
 import argparse
 import importlib.util
-import shutil
 import sys
+import tempfile
 import time
 from pathlib import Path
 from types import SimpleNamespace
@@ -80,7 +82,7 @@ def cmd_build(args):
     suffix = "_".join(pair.partition("=")[2] for pair in args.set)
     name = args.name or path.stem + (f"_{suffix}" if suffix else "")
     name = "".join(c if c.isalnum() or c in "-_." else "-" for c in name)
-    out = ROOT / "output" / name
+    out = Path(args.out or ROOT / "output") / name
     out.mkdir(parents=True, exist_ok=True)
 
     t0 = time.time()
@@ -109,6 +111,42 @@ def cmd_new(args):
     print(f"created {dest.relative_to(ROOT)}")
 
 
+def cmd_list(args):
+    models = sorted(p for p in (ROOT / "models").glob("*.py") if not p.name.startswith("_"))
+    if not models:
+        print("no models yet; start one with: new <name> \"<description>\"")
+    for path in models:
+        desc = getattr(load_model(path), "DESCRIPTION", "")
+        built = (ROOT / "output" / path.stem / f"{path.stem}.stl").exists()
+        print(f"{path.stem:28} {'built ' if built else '      '} {desc}")
+    return 0
+
+
+def cmd_selftest(args):
+    """Build the template (build123d) and the butterfly mold (manifold3d) into a temp
+    folder and confirm both come out as single watertight solids with previews."""
+    from importlib.metadata import version
+    print(f"python {sys.version.split()[0]}, " + ", ".join(
+        f"{pkg} {version(pkg)}" for pkg in ("build123d", "manifold3d", "trimesh", "numpy", "pillow")))
+    failures = []
+    with tempfile.TemporaryDirectory() as tmp:
+        for model in ("_template.py", "butterfly_paver_mold.py"):
+            ns = argparse.Namespace(model=str(ROOT / "models" / model), set=[], name=None,
+                                    fast=True, no_render=False, bed=[256, 256, 256], out=tmp)
+            try:
+                if cmd_build(ns) != 0:
+                    failures.append(f"{model}: not a single watertight solid")
+                elif not list(Path(tmp).rglob("*_preview.png")):
+                    failures.append(f"{model}: no preview rendered")
+            except Exception as e:
+                failures.append(f"{model}: {type(e).__name__}: {e}")
+    if failures:
+        print("\nSELFTEST FAILED\n  " + "\n  ".join(failures))
+        return 1
+    print("\nSELFTEST OK: both CAD kernels build, export, check and render")
+    return 0
+
+
 def main():
     ap = argparse.ArgumentParser(prog="cadkit")
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -119,11 +157,15 @@ def main():
     b.add_argument("--fast", action="store_true", help="coarser mesh, skip STEP")
     b.add_argument("--no-render", action="store_true")
     b.add_argument("--bed", type=float, nargs=3, default=[256, 256, 256], metavar=("X", "Y", "Z"))
+    b.add_argument("--out", help="output root folder (default: output/)")
     n = sub.add_parser("new", help="start a model from the template")
     n.add_argument("name")
     n.add_argument("description", nargs="?", default="")
+    sub.add_parser("list", help="list models and whether they have been built")
+    sub.add_parser("selftest", help="check the install works end to end")
     args = ap.parse_args()
-    sys.exit(cmd_build(args) if args.cmd == "build" else cmd_new(args))
+    commands = dict(build=cmd_build, new=cmd_new, list=cmd_list, selftest=cmd_selftest)
+    sys.exit(commands[args.cmd](args))
 
 
 if __name__ == "__main__":

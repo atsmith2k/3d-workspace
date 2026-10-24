@@ -1,0 +1,8 @@
+#!/bin/sh
+# Wrapper so models can be built with:  ./cad build models/name.py   (macOS, Linux, Git Bash)
+here="$(cd "$(dirname "$0")" && pwd)"
+if [ -x "$here/.venv/bin/python" ]; then py="$here/.venv/bin/python"
+elif [ -x "$here/.venv/Scripts/python.exe" ]; then py="$here/.venv/Scripts/python.exe"
+else echo "Not set up yet. Run: python3 scripts/setup.py" >&2; exit 1
+fi
+cd "$here" && exec "$py" -m cadkit "$@"

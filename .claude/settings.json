@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(./cad *)",
+      "Bash(./cad.cmd *)",
+      "Bash(cad.cmd *)",
+      "Bash(python scripts/setup.py)",
+      "Bash(python3 scripts/setup.py)",
+      "Bash(py scripts/setup.py)",
+      "PowerShell(.\\cad.cmd *)",
+      "PowerShell(cad.cmd *)",
+      "PowerShell(py scripts/setup.py)",
+      "PowerShell(python scripts/setup.py)"
+    ]
+  }
+}
