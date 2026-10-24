@@ -123,7 +123,7 @@ def wall_thickness(tm, samples=4000, seed=0, face_weight=None):
     return pts[keep], fi[keep], th[keep]
 
 
-NARROW_OVERHANG_MM = 2.5   # strips narrower than this (lips, groove roofs, short bridges) print fine
+NARROW_OVERHANG_MM = 4.0   # strips narrower than this (lips, groove roofs, short bridges, ceilings of holes up to ~8 mm) print fine
 
 
 def overhang_regions(tm, mask):

@@ -126,8 +126,14 @@ InsertHole`; heat-set sizes are like `"M3-0.5-Standard"`, type `"McMaster-Carr"`
 **Recipes** (`from cadkit.recipes import *`, build123d): `rounded_box`, `shell_box` (open
 box), `lid` (plate with inner lip, returned in print pose), `boss` / `add_bosses` /
 `boss_corners` (insert standoffs), `screw_holes` (clearance, countersunk or counterbored),
-`slot`, `hex_pocket`, `chamfer_bottom`. `models/enclosure_box.py` shows them together.
-Reach for these before building a box or standoff from primitives.
+`slot`, `hex_pocket`, `chamfer_bottom`, `j_hook` (coat/J hook lying on its side),
+`knob` (scalloped grip, D-shaft socket or bolt + nut), `cable_clip` (press-in C-clips),
+`lofted_bar` / `u_handle` (loft through sections; drawer pull), `swept_channel`
+(U-channel along a spline). Worked models: `enclosure_box`, `coat_hook`, `shaft_knob`,
+`cable_clip`, `drawer_pull`, `cable_raceway`. Reach for these before building a box,
+standoff, hook, knob, clip, handle or channel from primitives, and copy their loft and
+sweep setup (section planes from `Plane(origin, x_dir, z_dir)`, `path @ 0` / `path % 0`
+for the sweep start) rather than improvising.
 
 **Images and SVGs** (`from cadkit.image import *`): `trace("logo.png", width=60)` turns a
 logo, sketch or photo silhouette into a CrossSection (holes kept); `svg_shape("x.svg",

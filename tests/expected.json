@@ -206,5 +206,109 @@
         "checks_ok": true
       }
     }
+  },
+  "coat_hook": {
+    "model": "coat_hook.py",
+    "set": [],
+    "parts": {
+      "coat_hook": {
+        "size": [
+          35.0,
+          50.0,
+          20.0
+        ],
+        "volume_cm3": 8.7,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      }
+    }
+  },
+  "shaft_knob": {
+    "model": "shaft_knob.py",
+    "set": [],
+    "parts": {
+      "shaft_knob": {
+        "size": [
+          28.5,
+          30.0,
+          18.0
+        ],
+        "volume_cm3": 10.6,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      }
+    }
+  },
+  "cable_clip": {
+    "model": "cable_clip.py",
+    "set": [],
+    "parts": {
+      "cable_clip": {
+        "size": [
+          30.6,
+          9.2,
+          8.8
+        ],
+        "volume_cm3": 1.2,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      }
+    }
+  },
+  "drawer_pull": {
+    "model": "drawer_pull.py",
+    "set": [],
+    "parts": {
+      "drawer_pull": {
+        "size": [
+          110.0,
+          43.0,
+          10.0
+        ],
+        "volume_cm3": 23.6,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      }
+    }
+  },
+  "cable_raceway": {
+    "model": "cable_raceway.py",
+    "set": [],
+    "parts": {
+      "cable_raceway": {
+        "size": [
+          146.0,
+          46.8,
+          8.0
+        ],
+        "volume_cm3": 5.6,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      }
+    }
+  },
+  "shaft_knob_bolt": {
+    "model": "shaft_knob.py",
+    "set": [
+      "style=bolt"
+    ],
+    "parts": {
+      "shaft_knob_bolt": {
+        "size": [
+          28.5,
+          30.0,
+          18.0
+        ],
+        "volume_cm3": 10.5,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      }
+    }
   }
 }

@@ -130,7 +130,7 @@ more, earlier, and letting the model script declare what "correct" means.
   tolerances, material, acceptance checks. The checks become `CHECKS`; the spec goes in
   the docstring. This is cheap and directly attacks "code ran, shape is wrong".
 
-### 11. Recipe library (**started in Sprint 4**: `cadkit/recipes.py` box/lid/boss/holes + enclosure example; hook, knob, clip, lofted and swept recipes remain)
+### 11. Recipe library (**done**: `cadkit/recipes.py` box/lid/boss/holes, j_hook, knob, cable_clip, lofted_bar/u_handle, swept_channel, each with a worked model in the regression suite)
 - Ship 8-10 worked models that cover the common shapes and the hard operations:
   enclosure with snap lid, wall bracket with ribs, hook, knob with D-shaft, cable
   clip, mold with draft and relief, lofted handle, swept channel, threaded cap,
