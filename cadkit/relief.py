@@ -91,6 +91,26 @@ def drafted(section_at, z, height, steps=8):
     return out
 
 
+def text(string, size, font="Arial", bold=False, font_path=None, mirror=False):
+    """Text as a 2D CrossSection centred on the origin, for reliefs and molds: use it
+    like any other shape here (extrude, grow, drafted, mirror_x...). `size` is the
+    cap height in mm. `mirror=True` flips it so a casting reads correctly.
+    Glyph outlines come from build123d's font engine, via a 1 mm extrusion sliced
+    at mid-height."""
+    import numpy as np
+    from build123d import Align, FontStyle, Text, extrude as _extrude
+    from manifold3d import Mesh
+    from .mesh import to_trimesh
+    sk = Text(string, font_size=size, font=font, font_path=font_path,
+              font_style=FontStyle.BOLD if bold else FontStyle.REGULAR,
+              align=(Align.CENTER, Align.CENTER))
+    tm = to_trimesh(_extrude(sk, amount=1.0), tolerance=0.02)
+    m = Manifold(Mesh(vert_properties=tm.vertices.astype(np.float32),
+                      tri_verts=tm.faces.astype(np.uint32)))
+    cs = m.slice(0.5)
+    return cs.mirror((1, 0)) if mirror else cs
+
+
 def draft_offset(height, degrees):
     """How far a wall of this height moves sideways at this draft angle."""
     return height * math.tan(math.radians(degrees))

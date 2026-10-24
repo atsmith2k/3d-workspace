@@ -52,6 +52,43 @@
       }
     }
   },
+  "insert_test_block": {
+    "model": "insert_test_block.py",
+    "set": [],
+    "parts": {
+      "insert_test_block": {
+        "size": [
+          64.0,
+          56.0,
+          12.6
+        ],
+        "volume_cm3": 40.6,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      }
+    }
+  },
+  "lattice_coaster": {
+    "model": "lattice_coaster.py",
+    "set": [
+      "size=60",
+      "edge=0.7"
+    ],
+    "parts": {
+      "lattice_coaster": {
+        "size": [
+          60.0,
+          60.0,
+          8.6
+        ],
+        "volume_cm3": 21.2,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      }
+    }
+  },
   "pumpkin_clay_cutter": {
     "model": "pumpkin_clay_cutter.py",
     "set": [],

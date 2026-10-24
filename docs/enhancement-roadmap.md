@@ -78,7 +78,7 @@ more, earlier, and letting the model script declare what "correct" means.
 
 ## Tier 2: expand what can be modeled accurately
 
-### 5. SDF / implicit kernel via manifold3d `level_set` (**verified**)
+### 5. SDF / implicit kernel via manifold3d `level_set` (**done in Sprint 3**: `cadkit/sdf.py`, vectorised grid + trilinear lookup into `level_set`)
 - A 40 mm gyroid lattice (half-mm edge length, 518k triangles) built in 3.1 s and
   came out as a valid manifold. No new dependency.
 - Add `cadkit.sdf`: sphere/box/capsule/torus primitives, smooth union/subtract/
@@ -89,7 +89,7 @@ more, earlier, and letting the model script declare what "correct" means.
 - Keep the triangle budget in check: resolution parameter defaults to the Tinkercad
   300k-triangle guideline, and `--fast` coarsens it.
 
-### 6. Standard parts and hardware tables
+### 6. Standard parts and hardware tables (**done in Sprint 3**: bd_warehouse pinned, `cadkit/hardware.py`; gggears and gridfinity remain)
 - Pin `bd_warehouse` (ISO/Acme/trapezoidal/bottle threads, nuts, screws, washers,
   bearings, gears, O-rings, pipes, flanges) and `gggears` (helical, bevel, planetary,
   cycloid, rack and pinion). Tapped threads and real hardware fits are the most
@@ -111,7 +111,7 @@ more, earlier, and letting the model script declare what "correct" means.
 - `cad trace image.png --threshold 50` writes the SVG and a preview of the outline so
   Claude can confirm the trace before modeling.
 
-### 8. Text and fonts for both kernels
+### 8. Text and fonts for both kernels (**done in Sprint 3**: `emboss_text`/`text_solid` in cad.py, `text` in relief.py)
 - build123d `Text` works today. Add `relief.text(string, font, size)` for manifold:
   rasterise with Pillow, trace, mirror automatically for molds. Engraved and
   embossed text is the second most common decorative request.
@@ -168,7 +168,7 @@ more, earlier, and letting the model script declare what "correct" means.
 |---|---|---|
 | Sprint 1 | 2 thickness, 4 slicer, 3 sections and dimension overlays | done 2026-10-24 |
 | Sprint 2 | 1 measure + CHECKS, 10 spec sheet, 13 regression suite | done 2026-10-24 |
-| Sprint 3 | 5 SDF kernel, 6 hardware tables + bd_warehouse, 8 text | 2-3 days |
+| Sprint 3 | 5 SDF kernel, 6 hardware tables + bd_warehouse, 8 text | done 2026-10-24 |
 | Sprint 4 | 7 image input, 9 fit checks, 11 recipes, 12 sweep/lint | 3-4 days |
 | Later | Tier 4 as demand appears | |
 

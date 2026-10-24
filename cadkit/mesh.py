@@ -3,6 +3,7 @@ from dataclasses import dataclass, field
 
 import numpy as np
 import trimesh
+from manifold3d import Manifold
 from trimesh import proximity, sample
 
 PLA_DENSITY = 1.24          # g/cm3
@@ -16,14 +17,24 @@ def to_trimesh(obj, tolerance=0.01, angular_tolerance=0.1):
     if isinstance(obj, trimesh.Trimesh):
         v, f = obj.vertices, obj.faces
     elif type(obj).__module__.startswith("manifold3d"):
+        obj = drop_crumbs(obj)
         # booleans can leave microscopic slivers that collapse when rounded to STL's
-        # float32; try a few simplify tolerances until the result is a clean solid
-        for tol in (0.01, 0.02, 0.005, 0.03):
+        # float32; simplify first, then weld. Big meshes (lattices) get one pass.
+        big = obj.num_tri() > 400_000
+        best = None
+        for tol in ((0.05,) if big else (0.01, 0.02, 0.005, 0.03)):
             m = obj.simplify(tol).to_mesh()
-            tm = clean(np.asarray(m.vert_properties)[:, :3], np.asarray(m.tri_verts))
+            v, f = np.asarray(m.vert_properties)[:, :3], np.asarray(m.tri_verts)
+            # thin geometry can lose watertightness to vertex welding; the un-welded
+            # mesh (float32-rounded only) is often sound, and cheaper to test first
+            raw = trimesh.Trimesh(v.astype(np.float32).astype(np.float64), f, process=False)
+            if raw.is_watertight and raw.is_winding_consistent:
+                return raw
+            tm = clean(v, f)
             if tm.is_watertight and tm.is_winding_consistent:
                 return tm
-        return tm
+            best = best or tm
+        return best
     elif hasattr(obj, "tessellate"):
         verts, tris = obj.tessellate(tolerance, angular_tolerance)
         v = np.array([(p.X, p.Y, p.Z) for p in verts])
@@ -32,6 +43,20 @@ def to_trimesh(obj, tolerance=0.01, angular_tolerance=0.1):
         raise TypeError(f"build() returned {type(obj).__name__}; expected a build123d "
                         "Part/Solid, manifold3d.Manifold or trimesh.Trimesh")
     return clean(np.asarray(v, float), np.asarray(f))
+
+
+def drop_crumbs(manifold, min_volume_mm3=1.0):
+    """Remove disconnected fragments smaller than a grain of filament (lattice
+    meshing and tight booleans leave them); says so when it does."""
+    parts = manifold.decompose()
+    if len(parts) <= 1:
+        return manifold
+    crumbs = [p for p in parts if 0 < p.volume() < min_volume_mm3]   # voids have negative volume
+    if not crumbs:
+        return manifold
+    print(f"  note: dropped {len(crumbs)} floating crumbs under {min_volume_mm3} mm3")
+    # subtract rather than recompose: recomposing loses enclosed voids
+    return manifold - Manifold.compose(crumbs)
 
 
 def clean(v, f):
@@ -47,26 +72,38 @@ def clean(v, f):
 
 
 def body_count(tm):
-    """Connected pieces, via union-find over face edges (no scipy needed)."""
-    parent = np.arange(len(tm.vertices))
+    """(bodies, voids): connected surface shells with positive volume are separate
+    pieces; negative-volume shells are enclosed cavities (lattice infill, sealed
+    pockets), which slicers handle as part of the solid."""
+    from scipy.sparse import coo_matrix
+    from scipy.sparse.csgraph import connected_components
+    n = len(tm.vertices)
+    e = tm.edges_unique
+    graph = coo_matrix((np.ones(len(e)), (e[:, 0], e[:, 1])), shape=(n, n))
+    _, labels = connected_components(graph, directed=False)
+    comp = labels[tm.faces[:, 0]]
+    # signed volume per component from the divergence theorem (tetrahedra to origin)
+    t = tm.triangles
+    signed = np.einsum("ij,ij->i", t[:, 0], np.cross(t[:, 1], t[:, 2])) / 6
+    bodies = voids = 0
+    void_faces = np.zeros(len(tm.faces), bool)
+    for c in np.unique(comp):
+        sel = comp == c
+        if signed[sel].sum() > 0:
+            bodies += 1
+        else:
+            voids += 1
+            void_faces |= sel
+    return bodies, voids, void_faces
 
-    def find(a):
-        while parent[a] != a:
-            parent[a] = parent[parent[a]]
-            a = parent[a]
-        return a
-    for a, b in tm.edges_unique:
-        ra, rb = find(a), find(b)
-        if ra != rb:
-            parent[ra] = rb
-    return len({find(i) for i in np.unique(tm.faces)})
 
-
-def wall_thickness(tm, samples=4000, seed=0):
+def wall_thickness(tm, samples=4000, seed=0, face_weight=None):
     """Local wall thickness at area-weighted random surface points: the distance a ray
     travels through the material from each point along the inward normal.
-    Returns (points, face_index, thickness_mm). About 1-2 s on a 60k-triangle mesh."""
-    pts, fi = sample.sample_surface(tm, samples, seed=seed)
+    Returns (points, face_index, thickness_mm). About 1-2 s on a 60k-triangle mesh.
+    `face_weight` (per-face, 0 to skip) restricts where samples land; rays still see
+    the whole mesh, so skin over a lattice measures as the skin."""
+    pts, fi = sample.sample_surface(tm, samples, face_weight=face_weight, seed=seed)
     th = proximity.thickness(tm, pts, exterior=False, normals=tm.face_normals[fi], method="ray")
     return pts, fi, np.asarray(th)
 
@@ -75,7 +112,8 @@ def _grow_faces(tm, mask):
     """One ring of adjacent faces, so flagged spots are visible in the preview."""
     out = mask.copy()
     adj = tm.face_adjacency
-    hit = mask[adj[:, 0]] | mask[adj[:, 1]]
+    small = tm.area_faces < 4.0   # never spill onto a big flat facet next to fine detail
+    hit = (mask[adj[:, 0]] | mask[adj[:, 1]]) & small[adj[:, 0]] & small[adj[:, 1]]
     out[adj[hit].ravel()] = True
     return out
 
@@ -89,6 +127,7 @@ class Report:
     bodies: int
     base_area_mm2: float
     overhang_area_mm2: float
+    voids: int = 0
     wall_thin_mm: float = 0.0        # ~1st percentile of sampled thickness
     wall_median_mm: float = 0.0
     thin_fraction: float = 0.0       # share of surface samples under MIN_WALL
@@ -97,6 +136,7 @@ class Report:
     warnings: list = field(default_factory=list)
     overhang_faces: np.ndarray = field(default=None, repr=False)
     thin_faces: np.ndarray = field(default=None, repr=False)
+    void_faces: np.ndarray = field(default=None, repr=False)
 
     @property
     def ok(self):
@@ -108,7 +148,8 @@ class Report:
             f"size     {x:.1f} x {y:.1f} x {z:.1f} mm  ({x/25.4:.2f} x {y/25.4:.2f} x {z/25.4:.2f} in)",
             f"volume   {self.volume_cm3:.1f} cm3  (~{self.volume_cm3 * PLA_DENSITY:.0f} g PLA if solid)",
             f"mesh     {self.triangles} triangles, {'watertight' if self.watertight else 'NOT watertight'}, "
-            f"{self.bodies} bod{'y' if self.bodies == 1 else 'ies'}",
+            f"{self.bodies} bod{'y' if self.bodies == 1 else 'ies'}"
+            + (f", {self.voids} enclosed void{'s' if self.voids > 1 else ''}" if self.voids else ""),
             f"base     {self.base_area_mm2:.0f} mm2 flat on the bed",
             f"overhang {self.overhang_area_mm2:.0f} mm2 steeper than {OVERHANG_DEG} deg",
         ]
@@ -125,21 +166,26 @@ def check(tm, bed=(256, 256, 256), thickness_samples=4000, bed_name=None):
     size = hi - lo
     n = tm.face_normals
     area = tm.area_faces
-    zmin_face = tm.triangles[:, :, 2].max(axis=1) <= lo[2] + 1e-3
+    zmin_face = tm.triangles[:, :, 2].max(axis=1) <= lo[2] + 0.05   # level-set bottoms wobble ~0.01
     down = n[:, 2] < -np.cos(np.radians(90 - OVERHANG_DEG))
-    overhang = down & ~zmin_face
+    bodies, voids, void_faces = body_count(tm)
+    # faces of enclosed voids (lattice infill, sealed pockets) are not printed surfaces
+    overhang = down & ~zmin_face & ~void_faces
     rep = Report(
         size=size,
         volume_cm3=abs(tm.volume) / 1000,
         triangles=len(tm.faces),
         watertight=bool(tm.is_watertight and tm.is_winding_consistent),
-        bodies=body_count(tm),
+        bodies=bodies,
+        voids=voids,
         base_area_mm2=float(area[zmin_face & (n[:, 2] < -0.999)].sum()),
         overhang_area_mm2=float(area[overhang].sum()),
         overhang_faces=overhang,
+        void_faces=void_faces,
     )
     if thickness_samples and rep.watertight:
-        pts, fi, th = wall_thickness(tm, thickness_samples)
+        weight = area * ~void_faces if voids else None
+        pts, fi, th = wall_thickness(tm, thickness_samples, face_weight=weight)
         # a sample sitting right on a convex edge exits through the neighbouring
         # face almost immediately; those sub-0.15 mm readings are noise, not walls
         keep = th >= 0.15

@@ -103,10 +103,28 @@ The same measurements are available in `cadkit/measure.py` and from `cad measure
 | Kernel | Use for | Helpers |
 |---|---|---|
 | **build123d** (OpenCascade B-rep) | Engineered parts: enclosures, brackets, adapters, anything with fillets, chamfers, holes, threads, exact fits. Exports STEP too. | `from cadkit.cad import *`: `closed_spline`, `clip`, `draft_extrude`, `faces_of` |
-| **manifold3d** (mesh CSG) | Decorative and organic work: reliefs, molds with artwork, patterns, lots of strokes/spots, lattices. Fast and never fails on intricate booleans. STL only. | `from cadkit.relief import *`: `smooth_shape`, `stroke`, `bezier`, `circle`, `ellipse`, `mirror_x`, `grow`, `extrude`, `drafted`, `draft_offset` |
+| **manifold3d** (mesh CSG) | Decorative and organic work: reliefs, molds with artwork, patterns, lots of strokes/spots. Fast and never fails on intricate booleans. STL only. | `from cadkit.relief import *`: `smooth_shape`, `stroke`, `bezier`, `circle`, `ellipse`, `mirror_x`, `grow`, `extrude`, `drafted`, `draft_offset`, `text` |
+| **SDF** (implicit, meshed by manifold) | Blends, lattices and gyroid infill, shells, twists, repeats: `smooth_union` instead of fillets, `lattice_fill` to lighten a part. Returns a Manifold, so it combines with relief shapes and `text`. | `from cadkit.sdf import *`: `sphere`, `box`, `cylinder`, `capsule`, `torus`, `plane`, `union`, `intersect`, `subtract`, `smooth_*`, `twist`, `bend`, `repeat`, `shell`, `gyroid`, `schwarz_p`, `diamond`, `lattice_fill`, `build_sdf`, `to_sdf` |
 
-`models/butterfly_paver_mold.py` is the worked manifold example; `models/_template.py` is
-the build123d starting point.
+Worked examples: `models/butterfly_paver_mold.py` (manifold relief mold),
+`models/insert_test_block.py` (build123d + hardware table + embossed text),
+`models/lattice_coaster.py` (SDF lattice + mesh text), `models/_template.py` (build123d start).
+
+**Hardware and standard parts.** Never guess a fastener, insert, magnet, bearing, port or
+board dimension: `from cadkit.hardware import *` has `clearance("M3")`, `insert("M3")`
+(hole, depth, boss), `nut_pocket`, `head_pocket`, `magnet_pocket(6, 3)`, `bearing("608")`,
+`dowel_hole("1/2")`, `board("pi4")`, `port("usb_c")` and the raw tables (`HEAT_SET`,
+`CLEARANCE`, `BOARDS`, `BATTERIES`, `LUMBER`...). Helper results already include the
+0.2 mm print allowance. For real thread geometry, screws, nuts, washers, bearings and
+gears use `bd_warehouse` (`from bd_warehouse.thread import IsoThread`,
+`from bd_warehouse.fastener import SocketHeadCapScrew, HexNut, HeatSetNut, ClearanceHole,
+InsertHole`; heat-set sizes are like `"M3-0.5-Standard"`, type `"McMaster-Carr"`).
+
+**Text.** build123d: `emboss_text(part, "M3", size, depth, at=(x, y, z_top), engrave=False,
+mirror=False)` from `cadkit.cad`, or `text_solid(...)` to place yourself. manifold:
+`text("Mold 7", size, bold=True, mirror=True)` from `cadkit.relief` gives a CrossSection
+for `extrude`/`grow`/`drafted`. Cap height >= 5 mm, raised 0.6 mm (3 layers), bold for
+small sizes; mirror text on mold floors.
 
 ## Printers
 
@@ -147,7 +165,11 @@ Bambu A1 series design notes (0.4 mm nozzle, 0.42 mm line width, 0.2 mm layers):
   touches: about 2° on walls and 8-10° on ribs. Mirror any text or asymmetric art, since
   the casting is the mirror image of the mold floor.
 - Keep STLs under 25 MB (Tinkercad's import limit). Under 300k triangles keeps Tinkercad
-  responsive; use `--fast` or coarser curves if a model gets heavier.
+  responsive; use `--fast` or coarser curves if a model gets heavier. Lattice-filled
+  parts are inherently heavy (hundreds of thousands of triangles); Bambu Studio copes,
+  Tinkercad may not.
+- The report's `enclosed voids` (sealed pockets, lattice cells) are fine: slicers print
+  them hollow. `bodies` > 1 means genuinely separate pieces.
 
 ## Gotchas (learned the hard way)
 
@@ -161,6 +183,10 @@ Bambu A1 series design notes (0.4 mm nozzle, 0.42 mm line width, 0.2 mm layers):
   points face -Z and won't fuse with other faces; `closed_spline` fixes that.
 - build123d tapers on large, intricate art (many joined strokes) are slow (minutes) and
   fail often. Do that kind of work in manifold3d instead.
+- SDF: write functions with numpy ufuncs (`np.sqrt`, `np.maximum`...) so the grid is
+  evaluated at once; `math` functions force a slow point-by-point path. An open lattice
+  band thinner than ~2 cells breaks into pieces; closed-skin `lattice_fill` is robust.
+  `from build123d import *` shadows single-letter names like `M` (it is a unit).
 - Mesh cleanup and float32 rounding are handled in `cadkit/mesh.py`; if a build reports
   NOT watertight, look for coplanar or touching geometry in the model first.
 

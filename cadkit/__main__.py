@@ -115,7 +115,8 @@ def export(part, name, out, args, title, checks=(), params=None):
     if not args.no_render:
         png = out / f"{name}_preview.png"
         render_sheet(tm, png, title, lines, overhang_faces=rep.overhang_faces,
-                     thin_faces=rep.thin_faces, sections=parse_sections(getattr(args, "section", None)))
+                     thin_faces=rep.thin_faces, hidden_faces=rep.void_faces,
+                     sections=parse_sections(getattr(args, "section", None)))
         files.append(png)
     print(f"\n== {name} ({time.time() - t0:.1f}s export)")
     for line in lines:

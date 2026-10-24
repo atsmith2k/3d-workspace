@@ -105,6 +105,29 @@ def _render_view(tm, cam, scale, size, center, tint=None, cut=None):
     return img
 
 
+SECTION_DEPTH = 10.0   # mm of enclosed-void geometry kept behind a cut plane
+
+
+def _subset(tm, keep):
+    """Mesh of the kept faces; same vertices, so projections stay identical."""
+    import trimesh
+    return trimesh.Trimesh(tm.vertices, tm.faces[keep], face_normals=tm.face_normals[keep], process=False)
+
+
+def _view(tm, cam, scale, size, center, tint=None, cut=None, hidden=None):
+    """Faces of enclosed voids (`hidden`) can never be seen from outside, so they are
+    dropped from exterior views (a lattice-filled part is 98% void faces). Section
+    views keep the ones just behind the cut, where the lattice shows."""
+    if hidden is not None and hidden.any():
+        keep = ~hidden
+        if cut is not None:
+            depth = _project(tm.vertices, cam, scale, size, center)[2][tm.faces].max(axis=1)
+            keep |= (depth <= cut) & (depth >= cut - SECTION_DEPTH * scale)
+        tm = _subset(tm, keep)
+        tint = tint[keep] if tint is not None else None
+    return _render_view(tm, cam, scale, size, center, tint, cut)
+
+
 def _tile(img):
     return Image.fromarray(img.astype(np.uint8)).resize((TILE, TILE), Image.LANCZOS)
 
@@ -142,7 +165,7 @@ def _draw_dims(im, tm, cam, scale, center, font):
 
 
 def render_sheet(tm, path, title, info_lines, overhang_faces=None, thin_faces=None,
-                 sections=None):
+                 sections=None, hidden_faces=None):
     """`sections`: list of (axis_index, position_mm) cuts; default both through the
     bounding-box centre."""
     size = TILE * SS
@@ -159,7 +182,7 @@ def render_sheet(tm, path, title, info_lines, overhang_faces=None, thin_faces=No
 
     tiles = []
     for name, cam in VIEWS:
-        im = _tile(_render_view(tm, cam, scale, size, center, tint))
+        im = _tile(_view(tm, cam, scale, size, center, tint, hidden=hidden_faces))
         if name in ("Top", "Front", "Right"):
             _draw_dims(im, tm, cam, scale, center, small)
         tiles.append((name, im))
@@ -169,7 +192,7 @@ def render_sheet(tm, path, title, info_lines, overhang_faces=None, thin_faces=No
         origin = center.copy()
         origin[axis] = pos
         depth = float((origin - center) @ _basis(cam)[2])
-        im = _tile(_render_view(tm, cam, scale, size, center, cut=depth))
+        im = _tile(_view(tm, cam, scale, size, center, cut=depth, hidden=hidden_faces))
         tiles.append((f"{label} at {AXES[axis]}={pos:.1f}", im))
 
     sheet = Image.new("RGB", (TILE * 4, TILE * 2), BG)
@@ -180,11 +203,21 @@ def render_sheet(tm, path, title, info_lines, overhang_faces=None, thin_faces=No
     x0, y0 = 3 * TILE + 16, TILE + 16
     d.text((x0, y0), title, fill=(20, 20, 20), font=ImageFont.load_default(size=19))
     y = y0 + 34
-    for line in info_lines:
-        warn = line.startswith("WARNING")
+    passed = [l for l in info_lines if l.startswith("check    PASS")]
+    shown = [l for l in info_lines if not l.startswith("check    PASS")]
+    if passed:
+        shown.append(f"checks   {len(passed)} passed" + (", failures above" if any("FAIL" in l for l in shown) else ""))
+    y_max = 2 * TILE - 24 - 3 * 18 - 10   # keep clear of the legend
+    for line in shown:
+        warn = line.startswith("WARNING") or "FAIL" in line
         for chunk in _wrap(line, 62):
+            if y > y_max:
+                d.text((x0, y), "...", font=small, fill=(50, 50, 50))
+                break
             d.text((x0, y), chunk, font=small, fill=(180, 60, 20) if warn else (50, 50, 50))
             y += 18
+        if y > y_max:
+            break
     legend = [(OVERHANG, "overhang > 45 deg"), (THIN, "wall under 1.2 mm"), (CUT, "cut material")]
     y = 2 * TILE - 24
     for col, text in legend:

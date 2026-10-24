@@ -82,7 +82,10 @@ Bambu Studio headlessly for the print time, filament use and whether supports ar
 Two modeling engines, picked per object:
 
 - **build123d** (OpenCascade): engineered parts with fillets, holes, exact fits; also exports STEP.
-- **manifold3d**: decorative and organic work: reliefs, molds with artwork, patterns.
+  Threads, fasteners, bearings and gears come from bd_warehouse; a hardware table supplies
+  insert, screw, magnet, port and board dimensions so nothing is guessed.
+- **manifold3d**: decorative and organic work: reliefs, molds with artwork, patterns, text.
+- **SDF** (implicit modeling): smooth blends, gyroid lattice infill, shells, twists.
 
 ## Commands
 

@@ -4,7 +4,8 @@ Import in a model with:  from cadkit.cad import *
 """
 from math import radians, tan
 
-from build123d import Edge, Face, Kind, Location, Sketch, Solid, Vector, Wire, extrude, offset
+from build123d import (Align, Edge, Face, FontStyle, Kind, Location, Plane, Sketch, Solid,
+                       Text, Vector, Wire, extrude, offset)
 
 
 def closed_spline(points):
@@ -52,6 +53,33 @@ def draft_extrude(face, height, draft_deg):
     except Exception:
         print(f"  note: draft failed on a {face.area:.0f} mm2 face; extruded it straight")
         return extrude(face, amount=height)
+
+
+def text_solid(string, size, height, font="Arial", bold=False, font_path=None,
+               align=(Align.CENTER, Align.CENTER), mirror=False):
+    """Text as a solid standing on the XY plane (z = 0 .. height), centred on the
+    origin by default. `size` is the cap height in mm; keep it >= 5 mm for a 0.4 mm
+    nozzle, and strokes come out about size/7 wide. `mirror=True` flips it for mold
+    floors. Move it into place with .moved(Location((x, y, z)))."""
+    sk = Text(string, font_size=size, font=font, font_path=font_path,
+              font_style=FontStyle.BOLD if bold else FontStyle.REGULAR, align=align)
+    if mirror:
+        sk = sk.mirror(Plane.YZ) if hasattr(sk, "mirror") else sk
+    return extrude(sk, amount=height)
+
+
+def emboss_text(part, string, size, depth, at=(0, 0, None), font="Arial", bold=False,
+                engrave=False, mirror=False):
+    """Raised (or engraved) text on a face parallel to XY at height `at[2]` (default:
+    the top of the part). The text is sunk 0.1 mm into the surface so the union has
+    no coplanar faces; engraving cuts `depth` into the surface."""
+    x, y, z = at
+    if z is None:
+        z = part.bounding_box().max.Z
+    t = text_solid(string, size, depth + 0.1, font=font, bold=bold, mirror=mirror)
+    if engrave:
+        return part - t.moved(Location((x, y, z - depth)))
+    return part + t.moved(Location((x, y, z - 0.1)))
 
 
 def faces_of(shapes):
