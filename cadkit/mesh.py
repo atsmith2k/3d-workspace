@@ -22,16 +22,22 @@ def to_trimesh(obj, tolerance=0.01, angular_tolerance=0.1):
         # float32; simplify first, then weld. Big meshes (lattices) get one pass.
         big = obj.num_tri() > 400_000
         best = None
-        for tol in ((0.05,) if big else (0.01, 0.02, 0.005, 0.03)):
+        for k, tol in enumerate((0.05,) if big else (0.01, 0.02, 0.005, 0.03)):
             m = obj.simplify(tol).to_mesh()
             v, f = np.asarray(m.vert_properties)[:, :3], np.asarray(m.tri_verts)
+            # manifold3d may leave the solid touching itself at a vertex (two indices,
+            # one position). Slicers weld by position and then see a non-manifold
+            # pinch ("reversed faces" in Bambu Studio), so pull such vertices apart.
+            v, pinched = unpinch(v, f)
+            if pinched and k == 0:
+                print(f"  note: separated {pinched} self-touching vertices by {UNPINCH_MM} mm")
             # thin geometry can lose watertightness to vertex welding; the un-welded
             # mesh (float32-rounded only) is often sound, and cheaper to test first
             raw = trimesh.Trimesh(v.astype(np.float32).astype(np.float64), f, process=False)
-            if raw.is_watertight and raw.is_winding_consistent:
+            if sound_as_sliced(raw):
                 return raw
             tm = clean(v, f)
-            if tm.is_watertight and tm.is_winding_consistent:
+            if sound_as_sliced(tm):
                 return tm
             best = best or tm
         return best
@@ -57,6 +63,51 @@ def drop_crumbs(manifold, min_volume_mm3=1.0):
     print(f"  note: dropped {len(crumbs)} floating crumbs under {min_volume_mm3} mm3")
     # subtract rather than recompose: recomposing loses enclosed voids
     return manifold - Manifold.compose(crumbs)
+
+
+UNPINCH_MM = 0.004   # how far self-touching vertices are pulled apart (invisible on a print)
+
+
+def unpinch(v, f, step=UNPINCH_MM):
+    """Separate vertices that share a float32 position but not an index: a solid that
+    touches itself at a point or edge. Each extra vertex moves `step` toward the mean
+    of its own incident face centres, i.e. into its own surface, so the two sheets
+    no longer coincide and position-welding (what every slicer does) stays manifold.
+    Returns (vertices, number moved)."""
+    v = np.array(v, float)
+    moved = 0
+    for attempt in range(3):
+        key = v.astype(np.float32)
+        _, first, inv, cnt = np.unique(key, axis=0, return_index=True,
+                                       return_inverse=True, return_counts=True)
+        inv = inv.ravel()
+        extra = np.where(cnt[inv] > 1)[0]
+        extra = extra[extra != first[inv[extra]]]      # keep one vertex of each group in place
+        if len(extra) == 0:
+            break
+        centres = v[f].mean(axis=1)
+        for vi in extra:
+            fi = np.where((f == vi).any(axis=1))[0]
+            d = centres[fi].mean(axis=0) - v[vi] if len(fi) else np.zeros(3)
+            n = np.linalg.norm(d)
+            if n < 1e-12:
+                d = np.array([1.0, 0, 0]) * (attempt + 1)
+                n = np.linalg.norm(d)
+            v[vi] += d / n * step * (attempt + 1)
+        moved += len(extra)
+    return v, moved
+
+
+def sound_as_sliced(tm):
+    """Watertight and consistently wound after welding vertices by position, which is
+    how slicers read an STL (an index-level check alone misses self-touching solids)."""
+    if not (tm.is_watertight and tm.is_winding_consistent):
+        return False
+    if len(tm.vertices) == len(np.unique(tm.vertices.astype(np.float32), axis=0)):
+        return True
+    w = tm.copy()
+    w.merge_vertices()
+    return bool(w.is_watertight and w.is_winding_consistent)
 
 
 def clean(v, f):
@@ -231,7 +282,7 @@ def check(tm, bed=(256, 256, 256), thickness_samples=4000, bed_name=None):
         size=size,
         volume_cm3=abs(tm.volume) / 1000,
         triangles=len(tm.faces),
-        watertight=bool(tm.is_watertight and tm.is_winding_consistent),
+        watertight=sound_as_sliced(tm),
         bodies=bodies,
         voids=voids,
         base_area_mm2=float(area[zmin_face & (n[:, 2] < -0.999)].sum()),

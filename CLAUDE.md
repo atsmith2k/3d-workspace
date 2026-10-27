@@ -226,6 +226,11 @@ Bambu A1 series design notes (0.4 mm nozzle, 0.42 mm line width, 0.2 mm layers):
   `from build123d import *` shadows single-letter names like `M` (it is a unit).
 - Mesh cleanup and float32 rounding are handled in `cadkit/mesh.py`; if a build reports
   NOT watertight, look for coplanar or touching geometry in the model first.
+- manifold3d can return a solid that touches itself at a vertex or edge (two indices,
+  one position): valid for manifold, but slicers weld by position and then flag
+  "reversed faces" / non-manifold edges. `mesh.unpinch` pulls such vertices 0.004 mm
+  apart before export and the watertight check welds by position like a slicer; a
+  `note: separated N self-touching vertices` line in the build output means it fired.
 
 ## Layout
 
