@@ -1,13 +1,14 @@
-"""Cement paver mold with a butterfly design (5 in / 127 mm).
+"""Mold for a 5 in (127 mm) cement garden paver in the shape of a butterfly.
 
-style=shaped : the paver itself is butterfly-shaped; its face gets grooved veins,
-               a border line, spots and eyespots, and a raised body.
-style=square : a 5 x 5 in square paver with a raised butterfly whose veins and spots
-               are grooved into it, plus grooved antennae.
+The finished paver is a butterfly silhouette about 1 in thick, its face carrying a fine
+border line, wing veins, two spots on each forewing and an eyespot on each hindwing,
+all cast as crisp grooves, with the body standing slightly proud. Pour cement, let it
+cure, flex the mold and lift it off. Every wall and rib is drafted so the paver releases
+cleanly, and the mold prints opening-up with no supports in about ten hours on a Bambu
+A1 or A1 mini.
 
-The paver is cast face-down, so a rib on the mold floor becomes a groove in the paver
-and a pocket in the floor becomes a raised area. Every wall and rib is tapered (draft)
-so the cured paver releases. Prints opening-up with no supports.
+A square variant (`style=square`, 5 x 5 in) raises the whole butterfly on a square
+paver and adds grooved antennae.
 
 Spec:
   object:       open-top mold for a 5 in cement paver shaped like a butterfly (or a

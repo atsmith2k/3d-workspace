@@ -258,7 +258,7 @@ def test_parse_spec_oak_leaf():
 
 def test_parse_spec_butterfly():
     description, spec = publish.parse_spec(_doc("butterfly_paver_mold.py"))
-    assert "style=shaped" in description
+    assert "butterfly silhouette" in description and "style=shaped" not in description
     assert spec["orientation"].startswith("flat base on the bed")
     assert "webbed over" in spec["must_have"]
     assert "127 mm wide" in spec["casting"]
