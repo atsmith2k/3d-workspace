@@ -81,7 +81,9 @@ class SliceResult:
     gcode: Path = None
     project: Path = None           # Bambu sliced 3MF, ready to open and print
     printer: str = "generic"
+    printer_key: str = "generic"   # cadkit printer key (a1, a1mini, generic)
     slicer: str = ""
+    material: str = ""             # PLA / PETG / ... as the slicer recorded it
     time_text: str = "?"
     time_s: int = 0
     filament_mm: float = 0.0
@@ -92,6 +94,29 @@ class SliceResult:
     supports_enabled: bool = False
     support_lines: int = 0
     settings: dict = field(default_factory=dict)
+
+    def to_dict(self):
+        """Plain JSON-able numbers for slice.json / manifest.json."""
+        return dict(
+            printer=self.printer_key,
+            printer_name=self.printer,
+            slicer=self.slicer,
+            filament_preset=self.filament_name,
+            material=self.material,
+            layer_height_mm=_num(self.settings.get("layer_height")),
+            infill_pct=_num(str(self.settings.get("fill_density", "")).rstrip("%")),
+            process=self.settings.get("process", ""),
+            supports=dict(enabled=bool(self.supports_enabled), generated=bool(self.support_lines)),
+            print_time_s=int(self.time_s),
+            print_time_text=self.time_text,
+            layers=int(self.layers),
+            filament_g=round(float(self.filament_g), 1),
+            filament_m=round(float(self.filament_mm) / 1000, 2),
+            cost=round(float(self.cost), 2),
+            file=self.project.name if self.project else None,
+            gcode=self.gcode.name if self.gcode else None,
+            lines=self.lines(),
+        )
 
     def lines(self):
         if self.supports_enabled:
@@ -195,7 +220,8 @@ def slice_bambu(exe, stl, out_dir, printer_key, layer_height, infill, supports, 
         info = json.loads(result.read_text(encoding="utf-8")) if result.exists() else {}
         if info.get("return_code", r.returncode) != 0 or not (tmp / "out.3mf").exists():
             raise RuntimeError(f"Bambu Studio failed: {info.get('error_string', r.stderr[-500:] or 'unknown')}")
-        res = SliceResult(printer=pr["name"], slicer="Bambu Studio", filament_name=filament)
+        res = SliceResult(printer=pr["name"], printer_key=printer_key, slicer="Bambu Studio",
+                          filament_name=filament)
         res.project = Path(out_dir) / f"{stl.stem}_{printer_key}.3mf"
         shutil.move(tmp / "out.3mf", res.project)
         gcode = next(tmp.glob("plate_*.gcode"), None)
@@ -207,8 +233,10 @@ def slice_bambu(exe, stl, out_dir, printer_key, layer_height, infill, supports, 
     res.layers = int(_grab(text, "total layer number", "0") or 0)
     res.supports_enabled = supports
     res.support_lines = text.count(";TYPE:Support") + text.count("; FEATURE: Support")
-    m = re.search(r'used_m="([\d.]+)"', _slice_info(res.project))
+    slice_info = _slice_info(res.project)
+    m = re.search(r'used_m="([\d.]+)"', slice_info)
     res.filament_mm = float(m.group(1)) * 1000 if m else 0.0
+    res.material = material_of(slice_info, filament)
     dens = _preset_density(profiles, filament_name)
     res.filament_g = res.filament_mm / 10 * 3.14159 * (1.75 / 20) ** 2 * dens   # cm3 * g/cm3
     used_h = _grab(text, "layer_height", f"{layer_height:g}")
@@ -216,6 +244,41 @@ def slice_bambu(exe, stl, out_dir, printer_key, layer_height, infill, supports, 
                         fill_density=_grab(text, "sparse_infill_density", f"{infill}%"),
                         layer_height=used_h, printer=pr["name"])
     return res
+
+
+MATERIALS = ("PLA", "PETG", "TPU", "ABS", "ASA", "PA", "PC", "PVA", "PET", "HIPS")
+
+
+def material_of(slice_info, preset_name=""):
+    """Filament material: the `type=` the slicer wrote into slice_info.config, unless
+    the preset name clearly says otherwise (Bambu Studio's CLI has written PLA into
+    a PETG project), else the preset name, else ''."""
+    m = re.search(r'<filament [^>]*\btype="([^"]+)"', slice_info or "")
+    recorded = m.group(1).strip() if m else ""
+    named = next((t for t in MATERIALS if re.search(rf"\b{t}\b", preset_name or "", re.I)), "")
+    if named and recorded and named.upper() != recorded.upper():
+        return named
+    return recorded or named
+
+
+def extract_plate_png(project, dest, which="plate_1.png"):
+    """Copy the slicer's rendered plate picture out of a sliced 3MF to `dest`.
+    Returns dest, or None when the project has no such picture."""
+    import zipfile
+    try:
+        with zipfile.ZipFile(project) as z:
+            data = z.read(f"Metadata/{which}")
+    except (KeyError, OSError, zipfile.BadZipFile):
+        return None
+    Path(dest).write_bytes(data)
+    return Path(dest)
+
+
+def _num(v):
+    try:
+        return float(v) if v not in (None, "", "?") else None
+    except (TypeError, ValueError):
+        return None
 
 
 def _slice_info(project):
@@ -251,6 +314,8 @@ def slice_prusa(exe, stl, out_dir, printer_key, layer_height, infill, supports, 
         raise RuntimeError(f"PrusaSlicer failed ({r.returncode}):\n{r.stdout[-800:]}\n{r.stderr[-800:]}")
     res = parse_prusa_gcode(gcode)
     res.printer, res.slicer = pr["name"] + " (PrusaSlicer generic profile)", "PrusaSlicer"
+    res.printer_key = printer_key
+    res.material = "PLA"   # the generic profile's filament
     res.settings["process"] = f"{layer_height} mm layers"
     return res
 

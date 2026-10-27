@@ -31,6 +31,16 @@ from cadkit.recipes import chamfer_bottom
 
 DESCRIPTION = "Slide-in storage cubby replacing the 2001-2007 Toyota Sequoia dash ashtray"
 
+# Not for sale until the licence of the design it borrows fit dimensions from is
+# checked: the housing opening (82.3 x 67.0 mm) comes from a published third-party model.
+PRODUCT = dict(sellable=False, category="parts", tags=["automotive", "toyota", "sequoia", "tundra"])
+LICENSE_NOTES = (
+    "Fit dimensions (housing opening 82.3 x 67.0 mm, 150 mm depth) are taken from the "
+    "Toyota Sequoia ashtray insert by KJE3DESIGNS, MakerWorld model 1163944. That "
+    "model's licence has not been reviewed; this part must not be sold or redistributed "
+    "until it is, and any release must credit the source."
+)
+
 PARAMS = dict(
     width=81.6,        # body width; crush ribs add 2 x rib
     height=66.6,       # in-car height

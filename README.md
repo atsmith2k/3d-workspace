@@ -64,7 +64,8 @@ you describe it  ->  models/<name>.py  ->  cad build  ->  output/<name>/
                                                           <name>.step         editable CAD (engineered parts)
                                                           <name>_preview.png  7 views incl. dimensions + sections, stats, warnings
                                                           <name>_a1.3mf       sliced Bambu Studio project (cad slice), open and print
-                                                          report.txt
+                                                          build.json, slice.json, report.txt
+                                                          manifest.json, _product.png, _print_notes.txt   (cad publish)
 ```
 
 Built for Bambu Lab printers: the A1 is the default and `--printer a1mini` targets the
@@ -107,6 +108,7 @@ Run from the repo root. Windows: `cad ...`; macOS/Linux/Git Bash: `./cad ...`
 | `cad build ... --sweep thickness=2,3,4` | Build every value and write one comparison sheet |
 | `cad trace logo.png --width 60` | Trace an image to an SVG outline (plus a preview) for use in a model |
 | `cad lint models/<name>.py` | Static checks for known pitfalls |
+| `cad publish models/<name>.py [--refresh] [--printers a1,a1mini]` | Shop-ready folder: full build, a 3MF per printer, clean product renders, print notes and `manifest.json` (`--refresh` rebuilds and re-slices) |
 | `cad selftest [--update]` | Regression suite over `tests/expected.json` (`--update` re-records) |
 | `cad new <name> "description"` | Start a model from the template |
 | `cad list` | List models and whether they're built |

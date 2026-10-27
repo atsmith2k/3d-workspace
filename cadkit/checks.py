@@ -29,20 +29,26 @@ import numpy as np
 from . import measure as M
 
 __all__ = ["dims", "volume", "hole", "solid", "empty", "thickness_at", "wall_min",
-           "flat_base", "no_overhang", "single_body", "fits_bed", "custom", "run_checks"]
+           "flat_base", "no_overhang", "single_body", "fits_bed", "custom", "run_checks",
+           "check_results", "format_check"]
 
 
 class Check:
     def __init__(self, name, fn):
         self.name, self.fn = name, fn
 
-    def run(self, ctx):
+    def result(self, ctx):
+        """{name, ok, detail}; an exception in the check is a failure, not a crash."""
         try:
             res = self.fn(ctx)
         except Exception as e:
-            return False, f"{self.name}: error {type(e).__name__}: {e}"
+            return dict(name=self.name, ok=False, detail=f"error {type(e).__name__}: {e}")
         ok, detail = res if isinstance(res, tuple) else (bool(res), "")
-        return bool(ok), f"{self.name}{': ' + detail if detail else ''}"
+        return dict(name=self.name, ok=bool(ok), detail=str(detail))
+
+    def run(self, ctx):
+        r = self.result(ctx)
+        return r["ok"], f"{r['name']}{': ' + r['detail'] if r['detail'] else ''}"
 
 
 def _range(spec, tol):
@@ -197,11 +203,18 @@ def custom(name, fn):
     return Check(name, fn)
 
 
-def run_checks(checks, ctx):
-    """Returns (all_ok, lines) with one 'check    PASS/FAIL name: detail' line each."""
-    lines, ok = [], True
-    for chk in checks or []:
-        passed, text = chk.run(ctx)
-        ok &= passed
-        lines.append(f"check    {'PASS' if passed else 'FAIL'} {text}")
-    return ok, lines
+def check_results(checks, ctx):
+    """Run every check; returns a list of {name, ok, detail} in declaration order."""
+    return [chk.result(ctx) for chk in checks or []]
+
+
+def format_check(r):
+    """One 'check    PASS/FAIL name: detail' report line for a check result."""
+    return f"check    {'PASS' if r['ok'] else 'FAIL'} {r['name']}{': ' + r['detail'] if r['detail'] else ''}"
+
+
+def run_checks(checks, ctx, results=None):
+    """Returns (all_ok, lines) with one 'check    PASS/FAIL name: detail' line each.
+    Formatting wrapper over check_results (pass `results` to format a finished run)."""
+    results = check_results(checks, ctx) if results is None else results
+    return all(r["ok"] for r in results), [format_check(r) for r in results]

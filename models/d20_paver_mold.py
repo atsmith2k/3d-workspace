@@ -28,6 +28,15 @@ from cadkit.relief import *
 
 DESCRIPTION = "5 in square cement paver mold with a raised D20 dice relief"
 
+PRODUCT = dict(
+    title="D20 Paver Mold",
+    category="molds",
+    tags=["mold", "paver", "cement", "dice", "d20", "tabletop"],
+    printers=["a1", "a1mini"],
+    cast_material="cement",
+)
+LICENSE_NOTES = None   # the D20 layout is derived from icosahedron geometry, not a third-party icon
+
 PARAMS = dict(
     size=127.0,           # paver width (mm)
     thickness=19.0,       # paver thickness = cavity depth (3/4 in; butterfly was 25.4)

@@ -6,3 +6,4 @@ rtree==1.4.1
 numpy==2.5.4
 pillow==13.0.0
 vtracer==0.6.15
+pytest==8.4.2

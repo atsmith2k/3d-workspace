@@ -44,12 +44,19 @@ def _project(v, cam, scale, size, center):
     return v @ r * scale + size / 2, size / 2 - v @ u * scale, v @ c
 
 
-def _render_view(tm, cam, scale, size, center, tint=None, cut=None, marks=None):
-    """Returns the RGB tile as a float array. `tint` is an (F, 3) per-face colour.
-    `cut` is a view-space depth: everything nearer the camera than that plane is
-    clipped away per pixel, back faces are drawn too, and wherever the nearest
-    surviving face is a back face the ray entered material at the cut, so that pixel
-    is painted flat orange. The camera must look straight along the cut normal."""
+SHADE = (0.28, 0.55, 0.22)   # ambient, key light, camera fill
+EDGE = 0.35                  # how dark silhouette/crease lines are drawn (1 = none)
+
+
+def _render_view(tm, cam, scale, size, center, tint=None, cut=None, marks=None,
+                 bg=BG, shade=SHADE, edge=EDGE):
+    """Returns the RGB tile as a float array. `tint` is an (F, 3) per-face colour or
+    one RGB for every face. `cut` is a view-space depth: everything nearer the camera
+    than that plane is clipped away per pixel, back faces are drawn too, and wherever
+    the nearest surviving face is a back face the ray entered material at the cut, so
+    that pixel is painted flat orange. The camera must look straight along the cut
+    normal. `bg` is the background colour, `shade` the (ambient, key, fill) light
+    weights and `edge` the darkening factor for depth-jump lines."""
     r, u, c = _basis(cam)
     sx, sy, sz = _project(tm.vertices, cam, scale, size, center)
     n = tm.face_normals
@@ -57,7 +64,8 @@ def _render_view(tm, cam, scale, size, center, tint=None, cut=None, marks=None):
     vis = np.abs(facing) > 1e-6 if cut is not None else facing > 1e-6
     key = np.array([0.4, -0.3, 0.85]) + c
     key /= np.linalg.norm(key)
-    shade = 0.28 + 0.55 * np.clip(n @ key, 0, 1) + 0.22 * np.clip(n @ c, 0, 1)
+    amb, kw, fw = shade
+    shade = amb + kw * np.clip(n @ key, 0, 1) + fw * np.clip(n @ c, 0, 1)
 
     zb = np.full((size, size), -np.inf)
     fid = np.full((size, size), -1, np.int64)
@@ -86,22 +94,26 @@ def _render_view(tm, cam, scale, size, center, tint=None, cut=None, marks=None):
 
     empty = fid < 0
     img = np.empty((size, size, 3))
-    img[:] = BG
+    img[:] = bg
     f = fid[~empty]
-    colour = (tint[f] if tint is not None else BASE) * 1.25
+    if tint is None:
+        colour = BASE * 1.25
+    else:
+        tint = np.asarray(tint, float)
+        colour = (tint[f] if tint.ndim == 2 else tint) * 1.25
     px = np.clip(shade[f, None] * colour, 0, 255)
     if cut is not None:
         px[facing[f] < 0] = CUT
     img[~empty] = px
     # dark silhouette/crease lines where depth jumps
     z = np.where(empty, zb[~empty].min() - 1 if (~empty).any() else 0, zb)
-    edge = np.zeros_like(empty)
+    lines = np.zeros_like(empty)
     jump = 4 / scale  # depth step bigger than ~4 pixels' worth of mm
-    edge[:-1] |= np.abs(np.diff(z, axis=0)) > jump
-    edge[:, :-1] |= np.abs(np.diff(z, axis=1)) > jump
-    edge[:-1] |= empty[:-1] != empty[1:]
-    edge[:, :-1] |= empty[:, :-1] != empty[:, 1:]
-    img[edge] = img[edge] * 0.35
+    lines[:-1] |= np.abs(np.diff(z, axis=0)) > jump
+    lines[:, :-1] |= np.abs(np.diff(z, axis=1)) > jump
+    lines[:-1] |= empty[:-1] != empty[1:]
+    lines[:, :-1] |= empty[:, :-1] != empty[:, 1:]
+    img[lines] = img[lines] * edge
     if marks is not None and len(marks):
         # yellow dots at sample points that are visible in this view (depth test)
         mx, my, mz = _project(np.asarray(marks, float), cam, scale, size, center)
@@ -247,3 +259,42 @@ def _wrap(line, width):
         else:
             cur = f"{cur} {w}" if cur else w
     return out + [cur]
+
+
+# ---------------------------------------------------------------- product render
+
+PRODUCT_CAM = (1, -1, 0.9)          # the preview's iso view
+HERO_CAM = (0.55, -1, 0.42)         # lower and more frontal, for the shop hero image
+PRODUCT_BG = (255, 255, 255)
+PRODUCT_TINT = np.array([186, 188, 192], float)   # neutral light grey, x1.25 in the shader
+PRODUCT_SHADE = (0.36, 0.5, 0.2)
+PRODUCT_EDGE = 0.55
+PRODUCT_SS = 2
+
+
+def render_product(tm, path, cam=PRODUCT_CAM, size=1600, ss=PRODUCT_SS, fill=0.80):
+    """A clean single-view product picture: square `size` px, white background, one
+    neutral tint, soft edge lines, no overlays, dimensions or marks. `tm` may be a
+    list of meshes (a multi-part model), drawn together in print pose. Renders at
+    `ss` x supersampling and downsamples; returns the time it took in seconds."""
+    import time
+    import trimesh
+    t0 = time.time()
+    if isinstance(tm, (list, tuple)):
+        tm = tm[0] if len(tm) == 1 else trimesh.util.concatenate(list(tm))
+    px = int(size * ss)
+    # frame by the projected silhouette, not the bounding sphere, so the part fills
+    # `fill` of the picture whichever way it is viewed
+    center = tm.bounds.mean(axis=0)
+    r, u, _ = _basis(cam)
+    sx, sy, _ = _project(tm.vertices, cam, 1.0, 0, center)
+    w, h = sx.max() - sx.min(), sy.max() - sy.min()
+    scale = px * fill / max(w, h, 1e-6)
+    center = center + r * (sx.max() + sx.min()) / 2 - u * (sy.max() + sy.min()) / 2
+    img = _render_view(tm, cam, scale, px, center, tint=PRODUCT_TINT, bg=PRODUCT_BG,
+                       shade=PRODUCT_SHADE, edge=PRODUCT_EDGE)
+    im = Image.fromarray(img.astype(np.uint8))
+    if px != size:
+        im = im.resize((size, size), Image.LANCZOS)
+    im.save(path)
+    return time.time() - t0

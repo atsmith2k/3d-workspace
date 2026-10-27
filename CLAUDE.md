@@ -35,7 +35,7 @@ import the STL into Tinkercad (or any slicer/CAD app), so every STL must import 
      two section views (cut through the centre, or `--section y=10 --section x=0`), and
      the stats. Faces are tinted **red** where they overhang; **yellow dots** mark spots
      where the wall is under 1.2 mm; section tiles show cut material in **orange**.
-   - `report.txt`
+   - `build.json` (every number above, structured) and `report.txt` (composed from it)
 6. **Read the preview PNG and look at it** before calling a model done. Check proportions,
    that details actually show, nothing is floating, and the print orientation is sane.
    Use the section tiles to confirm floor and wall thickness, cavities and hidden holes;
@@ -51,9 +51,22 @@ import the STL into Tinkercad (or any slicer/CAD app), so every STL must import 
    layer count, whether supports were generated, and writes the sliced project 3MF.
    Options: `--printer a1mini`, `--layer-height 0.28`, `--infill 20`, `--supports`,
    `--filament "Bambu PETG Basic"`. Tell the user the print time and filament on delivery.
+   Each slice is recorded in `output/<name>/slice.json` (keyed by the 3MF stem, so A1
+   and A1 mini slices coexist) and `report.txt` is recomposed from `build.json` +
+   `slice.json`; a slice whose STL has since changed is marked STALE there.
 8. Deliver: send the preview PNG, the STL and the `_<printer>.3mf` project to the user
    (SendUserFile), and summarize size, print orientation, print time, supports needed,
    and anything they should know.
+
+Selling a model: `cad publish models/<name>.py --refresh` rebuilds it in full, slices
+it for every printer in `PRODUCT["printers"]` whose bed it fits, renders a clean
+`<name>_product.png` and `<name>_hero.png` (1600 px, white, no overlays), pulls the
+slicer's plate pictures out of the 3MFs, writes `<name>_print_notes.txt` and a
+`manifest.json` (schema `cadkit-product/1`) the shop ingests. The manifest's `sellable`
+gate wants: watertight single body, every check PASS, no WARNING lines, no fit
+interference, a fresh 3MF per supported printer, the product render and notes.
+Without `--refresh` it reuses the existing build and slices and only re-slices what
+is missing or stale.
 
 Variants: `cad build models/x.py --set style=square --set thickness=30` writes to
 `output/x_square_30/`. Use `--name` to pick the folder name, `--fast` for a quick coarse
@@ -68,7 +81,8 @@ Linux and Git Bash. Both wrap `.venv` Python `-m cadkit`. Other commands: `cad l
 (models and build status), `cad selftest` (regression suite: builds every model in
 `tests/expected.json` and compares size, volume and checks with the recorded values;
 also says which slicers were found; set `CAD_BAMBU` / `CAD_SLICER` for unusual installs).
-After changing anything in `cadkit/` run `cad selftest`. After finishing a new model,
+After changing anything in `cadkit/` run `cad selftest` and
+`.venv/Scripts/python -m pytest tests -q`. After finishing a new model,
 or deliberately changing an existing one, add or refresh its entry with
 `cad selftest --update` (add the model's key, file and `--set` list to the JSON first)
 so later helper changes cannot silently break it.
@@ -83,11 +97,23 @@ model rather than copying it. Name new models in snake_case after the object.
 from cadkit.checks import *
 DESCRIPTION = "one line"
 PARAMS = dict(width=40.0, style="a")   # every tunable dimension; types drive --set parsing
+PRODUCT = dict(title="...", category="molds", tags=[...], printers=["a1", "a1mini"],
+               cast_material="cement", post_processing=None, sellable=None)  # optional
+LICENSE_NOTES = "..."                  # optional; replaces the default licence text
 def checks(p):                         # or a static CHECKS = [...] list
     return [dims(x=p.width), hole(6.4, at=(10, 10)), solid((0, 0, 1)), no_overhang()]
 def build(p):                          # p.width, p.style ...
     return part                        # or {"lid": a, "base": b} for multi-part prints
 ```
+
+`PRODUCT` and `LICENSE_NOTES` are read by `cad publish` only; every key is optional.
+`sellable=None` lets the gate decide, `True` sells despite caveats (they stay listed
+as reasons), `False` keeps the model off the shop. The `Spec:` block is parsed into the
+manifest, so keep its `key: value` lines (`orientation` ends up in the print notes).
+**Cite external dimension sources.** When a fit dimension comes from someone else's
+published model, a datasheet or a teardown, say so in the Spec and in `LICENSE_NOTES`,
+and set `sellable=False` until that source's licence has been checked
+(`models/sequoia_ashtray_bin.py` is the pattern).
 
 `build` may return a build123d Part/Solid, a manifold3d `Manifold`, or a `trimesh.Trimesh`.
 A dict exports each part as its own STL (`<name>-<part>.stl`); then `checks` may return
@@ -235,9 +261,11 @@ Bambu A1 series design notes (0.4 mm nozzle, 0.42 mm line width, 0.2 mm layers):
 ## Layout
 
 ```
-cadkit/          harness: __main__ (CLI), mesh (convert/clean/check), render (preview), cad + relief helpers
+cadkit/          harness: __main__ (CLI), mesh (convert/clean/check), render (preview + product),
+                 outputs (build.json / slice.json / report.txt), publish (manifest, notes, gate)
 models/          one script per object (_template.py is the starting point); commit these
 output/          generated files (gitignored); rebuilt from models/
+tests/           expected.json (selftest) and pytest suite (`.venv/Scripts/python -m pytest tests -q`)
 scripts/setup.py one-step install + self-test
 cad, cad.cmd     CLI wrappers (macOS/Linux/Git Bash, Windows)
 docs/            README images

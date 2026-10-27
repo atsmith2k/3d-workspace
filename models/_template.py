@@ -17,6 +17,21 @@ from cadkit.checks import *
 
 DESCRIPTION = "DESCRIPTION_HERE"
 
+# Optional, read by `cad publish`: how this model is sold. Every key is optional.
+# category "molds" or "parts"; printers it is sliced for; sellable None = let the
+# gate decide, True = sell despite caveats, False = never list it.
+PRODUCT = dict(
+    title=None,                 # default: the model name, title-cased
+    category="parts",
+    tags=[],
+    printers=["a1", "a1mini"],
+    cast_material=None,         # molds: "cement", "plaster", "resin"...
+    post_processing=None,       # molds: replaces the default release/cure notes
+    sellable=None,
+)
+# LICENSE_NOTES = "..."        # replaces the default licence text in the print notes;
+#                              # cite any external design or dimension source here
+
 # Every tunable dimension lives here so it can be changed with --set name=value.
 PARAMS = dict(
     width=40.0,

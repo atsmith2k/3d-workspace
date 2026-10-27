@@ -245,6 +245,34 @@ class Report:
     def ok(self):
         return self.watertight and self.bodies >= 1
 
+    @property
+    def est_grams_pla(self):
+        """Mass if printed solid in PLA; a sliced estimate is in the slice data."""
+        return self.volume_cm3 * PLA_DENSITY
+
+    def to_dict(self):
+        """Plain JSON-able numbers for build.json / manifest.json (no mesh arrays)."""
+        size = [round(float(v), 2) for v in self.size]
+        return dict(
+            size_mm=size,
+            size_in=[round(v / 25.4, 3) for v in size],
+            volume_cm3=round(float(self.volume_cm3), 2),
+            est_grams_pla=round(float(self.est_grams_pla), 1),
+            triangles=int(self.triangles),
+            watertight=bool(self.watertight),
+            bodies=int(self.bodies),
+            voids=int(self.voids),
+            flat_base_mm2=round(float(self.base_area_mm2), 1),
+            overhang_mm2=round(float(self.overhang_area_mm2), 1),
+            overhang_minor_mm2=round(float(self.overhang_minor_mm2), 1),
+            thinnest_wall_mm=round(float(self.wall_thin_mm), 2),
+            wall_median_mm=round(float(self.wall_median_mm), 2),
+            thin_fraction=round(float(self.thin_fraction), 4),
+            thin_points=[dict(at=[float(v) for v in q], mm=float(t)) for q, t in self.thin_points],
+            stl_bytes=int(self.stl_bytes),
+            warnings=list(self.warnings),
+        )
+
     def lines(self):
         x, y, z = self.size
         out = [
