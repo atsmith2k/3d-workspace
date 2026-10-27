@@ -310,5 +310,39 @@
         "checks_ok": true
       }
     }
+  },
+  "sequoia_ashtray_bin": {
+    "model": "sequoia_ashtray_bin.py",
+    "set": [],
+    "parts": {
+      "sequoia_ashtray_bin": {
+        "size": [
+          82.4,
+          66.6,
+          140.0
+        ],
+        "volume_cm3": 105.3,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      }
+    }
+  },
+  "d20_paver_mold": {
+    "model": "d20_paver_mold.py",
+    "set": [],
+    "parts": {
+      "d20_paver_mold": {
+        "size": [
+          136.3,
+          136.3,
+          24.0
+        ],
+        "volume_cm3": 124.3,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      }
+    }
   }
 }
