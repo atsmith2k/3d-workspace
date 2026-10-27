@@ -344,5 +344,33 @@
         "checks_ok": true
       }
     }
+  },
+  "alarm_light_prop": {
+    "model": "alarm_light_prop.py",
+    "set": [],
+    "parts": {
+      "alarm_light_prop-bezel": {
+        "size": [
+          100.0,
+          100.0,
+          13.0
+        ],
+        "volume_cm3": 69.4,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "alarm_light_prop-lens": {
+        "size": [
+          59.6,
+          59.6,
+          23.0
+        ],
+        "volume_cm3": 43.9,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      }
+    }
   }
 }
