@@ -460,6 +460,8 @@ def cmd_publish(args):
         ss = 1.5 if t > 30 else 2
         render_product(meshes, out / f"{name}_hero.png", cam=HERO_CAM, ss=ss)
         print(f"  render    {name}_product.png, {name}_hero.png ({t:.1f}s" + (", hero at 1.5x" if ss != 2 else "") + ")")
+        nf, nb = publishmod.preview_glb(meshes, out / f"{name}_preview.glb")
+        print(f"  viewer    {name}_preview.glb ({nf} faces, {nb / 1024:.0f} KB, unit-scaled)")
     manifest = publishmod.compose_manifest(out, build, slices, info, printers=requested)
     (out / f"{name}_print_notes.txt").write_text(publishmod.print_notes_text(manifest), encoding="utf-8", newline="\n")
     manifest = publishmod.compose_manifest(out, build, slices, info, printers=requested)

@@ -76,6 +76,7 @@ def make_folder(tmp_path, name="d20_paver_mold", printers=("a1", "a1mini"), part
     _write(out / "zoom.png", b"\x89PNG ad hoc")
     if notes:
         _write(out / f"{name}_print_notes.txt", b"notes placeholder")
+    _write(out / f"{name}_preview.glb", b"glTF viewer placeholder")
     return out, build, slices
 
 
@@ -118,11 +119,12 @@ def test_files_whitelist_roles_and_hashes(tmp_path):
     assert set(paths) == {"d20_paver_mold.stl", "d20_paver_mold_a1.3mf", "d20_paver_mold_a1mini.3mf",
                           "d20_paver_mold_product.png", "d20_paver_mold_hero.png", "d20_paver_mold_preview.png",
                           "d20_paver_mold_a1_plate.png", "d20_paver_mold_a1mini_plate.png",
-                          "d20_paver_mold_print_notes.txt"}
+                          "d20_paver_mold_print_notes.txt", "d20_paver_mold_preview.glb"}
     assert "zoom.png" not in paths and "report.txt" not in paths and "d20_paver_mold.gcode" not in paths
     assert paths["d20_paver_mold.stl"]["role"] == "stl" and paths["d20_paver_mold.stl"]["part"] == "d20_paver_mold"
     assert paths["d20_paver_mold_a1mini.3mf"]["role"] == "3mf" and paths["d20_paver_mold_a1mini.3mf"]["printer"] == "a1mini"
     assert paths["d20_paver_mold_print_notes.txt"]["role"] == "txt"
+    assert paths["d20_paver_mold_preview.glb"]["role"] == "glb" and paths["d20_paver_mold_preview.glb"]["kind"] == "viewer"
     f = paths["d20_paver_mold.stl"]
     assert f["bytes"] == len(b"solid d20_paver_mold\nendsolid\n")
     assert f["sha256"] == _sha(b"solid d20_paver_mold\nendsolid\n")
@@ -162,12 +164,39 @@ def test_validate_catches_broken_manifests(tmp_path):
     bad["files"][0]["sha256"] = "nope"
     bad["slices"][0]["file"] = "missing.3mf"
     del bad["parts"][0]["checks_ok"]
+    bad["files"].append(dict(role="gcode", path="x.gcode", bytes=1, sha256="0" * 64))
+    bad["files"].append(dict(role="glb", path="y.glb", bytes=1, sha256="0" * 64))
     problems = publish.validate_manifest(bad)
     assert any("schema" in p for p in problems)
     assert any("slug" in p for p in problems)
     assert any("sha256" in p for p in problems)
     assert any("missing.3mf" in p for p in problems)
     assert any("checks_ok" in p for p in problems)
+    assert any("role 'gcode'" in p for p in problems)
+    assert any("glb must be kind viewer" in p for p in problems)
+
+
+# ---------------------------------------------------------------- viewer mesh
+
+def test_preview_glb_is_low_poly_unit_scaled_and_loads(tmp_path):
+    import numpy as np
+    import trimesh
+    # a 136 x 90 x 24 mm box-ish blob with far more faces than the cap, off-centre like a print
+    tm = trimesh.creation.icosphere(subdivisions=6)        # 81920 faces
+    tm.apply_scale([68.0, 45.0, 12.0])
+    tm.apply_translation([30.0, -10.0, 12.0])
+    assert len(tm.faces) > 15000
+    faces, nbytes = publish.preview_glb([tm, tm.copy()], tmp_path / "x_preview.glb")
+    data = (tmp_path / "x_preview.glb").read_bytes()
+    assert data[:4] == b"glTF" and len(data) == nbytes
+    scene = trimesh.load(tmp_path / "x_preview.glb", file_type="glb")
+    geoms = list(scene.geometry.values())
+    total = sum(len(g.faces) for g in geoms)
+    assert total == faces and total < 15000 and total >= 2000
+    lo, hi = scene.bounds
+    assert np.allclose(lo + hi, 0, atol=0.02), "centred on the origin"
+    assert abs(max(hi - lo) - 1.0) < 0.02, "longest side is one unit"
+    assert max(hi - lo) < 2.0, "no millimetre scale left in the file"
 
 
 # ---------------------------------------------------------------- gate

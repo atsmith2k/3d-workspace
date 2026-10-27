@@ -5,6 +5,7 @@ Writes into output/<name>/:
     <name>_hero.png         same, lower and more frontal camera
     <stem>_plate.png        the slicer's own plate picture per sliced 3MF
     <name>_print_notes.txt  what the buyer needs to know (deterministic bytes)
+    <name>_preview.glb      low-poly, unit-scaled viewer mesh for the shop's 3D canvas
     manifest.json           schema cadkit-product/1, everything the shop ingests
 
 A model can steer it with two optional constants:
@@ -27,7 +28,8 @@ from . import printers as printersmod
 
 SCHEMA = "cadkit-product/1"
 DEFAULT_PRINTERS = ["a1", "a1mini"]
-FILE_ROLES = ("stl", "3mf", "step", "png", "txt")
+FILE_ROLES = ("stl", "3mf", "step", "png", "txt", "glb")
+GLB_FACES = (8000, 12000)   # face band for the viewer mesh; the hard cap is 15k
 SPEC_KEYS = ("object", "overall", "mates_with", "orientation", "must_have", "tolerances",
              "casting", "material")
 
@@ -117,6 +119,53 @@ def model_info(mod, path):
     )
 
 
+# ---------------------------------------------------------------- viewer mesh
+
+def preview_glb(meshes, path, faces=GLB_FACES):
+    """Write a binary glTF preview of `meshes` (trimesh.Trimesh, print pose) for the
+    shop's 3D viewer. Not printable on purpose: the parts are concatenated, simplified
+    into the `faces` band (8-12k by default) and normalised to a unit bounding box
+    centred on the origin, so the real millimetre size is not in the file. One neutral
+    PBR material, no normals (the viewer computes them). Returns (faces, bytes).
+
+    Simplification is manifold3d's tolerance-bounded edge collapse (every vertex stays
+    within the tolerance of the original surface), which keeps 1.7 mm mold walls and
+    relief lines intact where quadric decimators collapse them; the tolerance is
+    searched so the count lands in the band."""
+    import numpy as np
+    import trimesh
+    import manifold3d as m3
+    tm = trimesh.util.concatenate([m.copy() for m in meshes]) if len(meshes) > 1 else meshes[0].copy()
+    lo, hi = faces
+    if len(tm.faces) > hi:
+        man = m3.Manifold(m3.Mesh(np.ascontiguousarray(tm.vertices, np.float32),
+                                  np.ascontiguousarray(tm.faces, np.uint32)))
+        if man.status() == m3.Error.NoError and man.num_tri() > 0:
+            best, t_lo, t_hi = None, 0.01, 4.0          # mm; bisect in log space
+            for _ in range(14):
+                tol = float(np.sqrt(t_lo * t_hi))
+                n = man.simplify(tol).num_tri()
+                if n > hi:
+                    t_lo = tol
+                else:
+                    t_hi = tol
+                    if n >= lo or best is None or n > best[1]:
+                        best = (tol, n)
+                    if n >= lo:
+                        break
+            mg = man.simplify(best[0] if best else t_hi).to_mesh()
+            tm = trimesh.Trimesh(vertices=np.asarray(mg.vert_properties)[:, :3],
+                                 faces=np.asarray(mg.tri_verts), process=False)
+    tm.apply_translation(-tm.bounds.mean(axis=0))
+    tm.apply_scale(1.0 / float(np.max(tm.extents)))
+    tm = trimesh.Trimesh(vertices=np.asarray(tm.vertices, dtype=np.float32), faces=tm.faces, process=False)
+    tm.visual = trimesh.visual.TextureVisuals(material=trimesh.visual.material.PBRMaterial(
+        name="preview", baseColorFactor=[205, 205, 205, 255], metallicFactor=0.0, roughnessFactor=0.65))
+    data = tm.export(file_type="glb")
+    Path(path).write_bytes(data)
+    return len(tm.faces), len(data)
+
+
 # ---------------------------------------------------------------- printers and files
 
 def fits_bed(size_mm, bed):
@@ -162,6 +211,7 @@ def collect_files(out, name, parts, printers):
         for key in printers:
             add(out / f"{fname}_{key}_plate.png", "png", kind="plate", part=parts[fname].get("part", fname), printer=key)
     add(out / f"{name}_print_notes.txt", "txt", kind="print_notes")
+    add(out / f"{name}_preview.glb", "glb", kind="viewer")
     return files
 
 
@@ -354,6 +404,7 @@ def print_notes_text(m):
     for f in m.get("files", []):
         what = {"stl": "mesh for any slicer", "3mf": f"sliced Bambu Studio project for the {names.get(f.get('printer'), f.get('printer'))}, open and print",
                 "step": "editable CAD (Fusion, FreeCAD, Onshape)", "txt": "these notes",
+                "glb": "low-poly preview for the shop's 3D viewer (not printable)",
                 "png": {"product": "product picture", "hero": "product picture", "check_sheet": "engineering check sheet",
                         "plate": "slicer plate preview"}.get(f.get("kind"), "picture")}[f["role"]]
         lines.append(f"    {f['path']}  ({what})")
@@ -455,6 +506,8 @@ def validate_manifest(m):
         paths.add(f.get("path"))
         if f.get("role") == "3mf" and not f.get("printer"):
             bad.append(tag + "3mf without printer")
+        if f.get("role") == "glb" and f.get("kind") != "viewer":
+            bad.append(tag + "glb must be kind viewer")
     for i, s in enumerate(m.get("slices") or []):
         tag = f"slices[{i}] "
         for key, types in (("part", str), ("printer", str), ("printer_name", str), ("material", str),
