@@ -27,7 +27,7 @@ from cadkit.relief import *
 DESCRIPTION = "Concrete candle holder mold, tealight or taper, fluted/hex/round"
 
 PRODUCT = dict(
-    title="Candle Holder Mold",
+    title="{shape} {candle} Candle Holder Mold",   # filled from params per variant
     category="molds",
     tags=["mold", "concrete", "cement", "jesmonite", "candle holder", "tealight", "taper candle",
           "fluted", "home decor"],

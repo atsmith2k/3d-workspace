@@ -391,3 +391,10 @@ def test_material_of_prefers_preset_when_slicer_mislabels():
     assert slicer.material_of("", "Bambu TPU 95A") == "TPU"
     assert slicer.material_of(info, "Generic") == "PLA"
     assert slicer.material_of("", "") == ""
+
+
+def test_title_fills_param_placeholders_per_variant():
+    product = dict(title="{shape} {candle} Candle Holder Mold")
+    assert publish.title_of("x", product, dict(shape="hex", candle="tealight")) == "Hex Tealight Candle Holder Mold"
+    assert publish.title_of("x", dict(title="Plain Title"), dict(shape="hex")) == "Plain Title"
+    assert publish.title_of("oak_leaf_coaster_mold") == "Oak Leaf Coaster Mold"

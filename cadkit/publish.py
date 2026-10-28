@@ -87,9 +87,15 @@ def slug_of(name):
     return re.sub(r"-+", "-", re.sub(r"[^a-z0-9]+", "-", name.lower())).strip("-") or "model"
 
 
-def title_of(name, product=None):
+def title_of(name, product=None, params=None):
+    """PRODUCT["title"] if set, with `{param}` placeholders filled from the build's
+    params (title-cased) so `--set` variants get their own titles; else the name."""
     if product and product.get("title"):
-        return product["title"]
+        title = product["title"]
+        if "{" in title:
+            values = {k: str(v).replace("_", " ").title() for k, v in (params or {}).items()}
+            title = title.format_map(values)
+        return title
     words = name.replace("-", "_").split("_")
     return " ".join(w.upper() if w in ("d20", "sd", "usb") else w.capitalize() for w in words if w)
 
@@ -269,7 +275,7 @@ def compose_manifest(out, build, slices, info, printers=None, git=None, generate
         schema=SCHEMA,
         name=name,
         slug=slug_of(name),
-        title=title_of(name, product),
+        title=title_of(name, product, build.get("params")),
         summary=info.get("summary", ""),
         description=info.get("description", ""),
         category=category_of(name, info.get("summary", ""), product),
