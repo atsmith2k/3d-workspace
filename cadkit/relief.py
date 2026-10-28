@@ -148,10 +148,41 @@ def cast_of(mold, minus=None, flip=True):
     cast = Manifold.batch_boolean([c for c in cast.decompose() if c.bounding_box()[2] > lo + 0.01] or [Manifold()],
                                   OpType.Add)
     if flip:
-        cast = cast.rotate((180, 0, 0))
+        cast = cast.rotate((0, 180, 0))      # about Y: a heart keeps its notch up
     return cast.translate((0, 0, -cast.bounding_box()[2]))
 
 
 def _signed_area(q):
     q = np.asarray(q, float)
     return 0.5 * np.sum(q[:, 0] * np.roll(q[:, 1], -1) - np.roll(q[:, 0], -1) * q[:, 1])
+
+
+def heart(width, soften=0.035):
+    """Heart outline `width` mm across, centred on its bounding box, notch up and tip
+    down, with the tip and the notch rounded (radius `soften` x width) so neither is a
+    knife edge in a mold or a casting."""
+    t = np.linspace(0, 2 * math.pi, 240, endpoint=False)
+    x = 16 * np.sin(t) ** 3
+    y = 13 * np.cos(t) - 5 * np.cos(2 * t) - 2 * np.cos(3 * t) - np.cos(4 * t)
+    s = width / (x.max() - x.min())
+    cs = poly(np.c_[x * s, (y - (y.max() + y.min()) / 2) * s])
+    r = soften * width
+    cs = grow(grow(grow(grow(cs, -r), r), r), -r)
+    x0, y0, x1, y1 = cs.bounds()
+    return cs.translate((-(x0 + x1) / 2, -(y0 + y1) / 2))
+
+
+def mold_box(cavity_r, height, wall=2.4, flange=3.0, flange_t=3.0, spigot_h=4.0, clearance=0.25):
+    """Base board and housing tube for casting silicone or plaster around a master.
+    The base is a flange disc with a raised spigot disc of radius `cavity_r` (the master
+    stands on it); the tube's bore slides over the spigot with `clearance` per side and
+    rests on the flange, so the cast material fills a cylinder of radius `cavity_r`
+    from the spigot top up to the tube's rim (`height` above the spigot). Returns
+    (base, tube, z_floor): tube in print pose (bore vertical, on Z=0); in use it sits
+    `flange_t` up. Seal the joint with clay before pouring."""
+    bore = cavity_r + clearance
+    outer = bore + wall
+    base = extrude(circle(0, 0, outer + flange), flange_t)
+    base += extrude(circle(0, 0, cavity_r), spigot_h + 0.1, flange_t - 0.1)
+    tube = extrude(circle(0, 0, outer), spigot_h + height) - extrude(circle(0, 0, bore), spigot_h + height + 2, -1)
+    return base, tube, flange_t + spigot_h

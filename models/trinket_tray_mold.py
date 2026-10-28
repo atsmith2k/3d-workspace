@@ -1,9 +1,10 @@
-"""Mold for a fluted round trinket tray / ring dish in cement, plaster or Jesmonite.
+"""Mold for a trinket tray / ring dish in cement, plaster or Jesmonite.
 
-The tray is 100 mm across with 28 rounded flutes around the outside and a smooth,
-shallow well 82 mm across and 11 mm deep for rings, keys or a candle. Pour, screed the
+Choose the version in the title. The fluted tray is 100 mm across with 28 rounded flutes
+around the outside; the heart tray is 100 x 85 mm. Both have a smooth, shallow well
+11 mm deep for rings, keys or a candle. Pour, screed the
 back flat, and lift it out once cured; every surface is tapered so it releases from the
-rigid mold. Prints opening-up with no supports in about 5.5 hours on a Bambu A1 or A1
+rigid mold. Prints opening-up with no supports in under 2 hours on a Bambu A1 or A1
 mini.
 
 Spec:
@@ -26,17 +27,17 @@ from cadkit.relief import *
 DESCRIPTION = "Fluted round trinket tray / ring dish mold for cement, plaster or Jesmonite"
 
 PRODUCT = dict(
-    title="Fluted Trinket Tray Mold",
+    title="{shape} Trinket Tray Mold",          # filled from params per variant
     category="molds",
     tags=["mold", "concrete", "cement", "plaster", "jesmonite", "trinket tray", "ring dish",
-          "jewelry dish", "fluted", "home decor"],
+          "jewelry dish", "fluted", "heart", "valentine", "home decor"],
     printers=["a1", "a1mini"],
     cast_material="cement, plaster or Jesmonite",
 )
 LICENSE_NOTES = None   # original design
 
 PARAMS = dict(
-    shape="fluted",     # fluted | round
+    shape="fluted",     # fluted | round | heart
     diameter=100.0,     # tray diameter at its top face (across the flutes)
     height=20.0,
     rim=9.0,            # flat rim from the outside to the edge of the well
@@ -51,6 +52,8 @@ EMBED = 0.1
 
 
 def body_section(p, r):
+    if p.shape == "heart":
+        return heart(2 * r)
     if p.shape == "round":
         return circle(0, 0, r)
     n = p.flutes
@@ -68,16 +71,29 @@ def well_radius(p, f):
     return R * (1 - 0.25 * f - 0.6 * f * f)
 
 
+def rim_point(p):
+    """A point on the flat rim, halfway between the outside and the well, where the
+    outline is widest (y = 0 for round shapes)."""
+    R = p.diameter / 2
+    if p.shape != "heart":
+        return R - p.rim / 2, 0.0
+    import numpy as np
+    pts = [np.asarray(heart(2 * r).to_polygons()[0]) for r in (R, well_radius(p, 0))]
+    a, b = (q[np.argmax(q[:, 0])] for q in pts)
+    return tuple(float(v) for v in (a + b) / 2)
+
+
 def checks(p):
     R = p.diameter / 2
     lean = draft_offset(p.height, p.body_draft)
     outer = p.diameter + 2 * (lean + p.wall)
+    rx, ry = rim_point(p)
     return [
         dims(x=(outer - 2, outer + 1), z=p.floor + p.height),
-        empty((R - p.rim / 2, 0, p.floor + 1), (0, 0, p.floor + p.well_depth + 1)),   # rim, above the dome
-        solid((0, 0, p.floor + p.well_depth - 0.5), (well_radius(p, 0.5) - 0.5, 0, p.floor + p.well_depth * 0.5)),
-        thickness_at((R - p.rim / 2, 0, 0.5), p.floor - 0.2, direction=(0, 0, 1)),
-        flat_base(math.pi * R * R * 0.9),
+        empty((rx, ry, p.floor + 1), (0, 0, p.floor + p.well_depth + 1)),             # rim, above the dome
+        solid((0, 0, p.floor + p.well_depth - 0.5), (well_radius(p, 0.5) * 0.8, 0, p.floor + p.well_depth * 0.5)),
+        thickness_at((rx, ry, 0.5), p.floor - 0.2, direction=(0, 0, 1)),
+        flat_base(math.pi * R * R * (0.6 if p.shape == "heart" else 0.9)),
         no_overhang(),
         single_body(),
     ]
@@ -86,11 +102,15 @@ def checks(p):
 def build(p):
     r = p.diameter / 2
     lean = draft_offset(p.height, p.body_draft)
-    mold = extrude(body_section(p, r + lean + p.wall), p.floor + p.height)
+    if p.shape == "heart":   # an even wall round the notch: offset, not scale
+        mold = extrude(grow(body_section(p, r + lean), p.wall), p.floor + p.height)
+    else:
+        mold = extrude(body_section(p, r + lean + p.wall), p.floor + p.height)
     mold -= tapered(body_section(p, r), p.floor, p.height + 1, lean * (p.height + 1) / p.height)
     # dome: one slice per print layer so the bowl is as smooth as the printer can make it
     steps = max(8, round(p.well_depth / 0.2))
-    mold += drafted(lambda f: circle(0, 0, well_radius(p, f)), p.floor - EMBED, p.well_depth + EMBED, steps=steps)
+    well = (lambda f: heart(2 * well_radius(p, f))) if p.shape == "heart" else (lambda f: circle(0, 0, well_radius(p, f)))
+    mold += drafted(well, p.floor - EMBED, p.well_depth + EMBED, steps=steps)
     return mold
 
 

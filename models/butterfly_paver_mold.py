@@ -4,7 +4,7 @@ The finished paver is a butterfly silhouette about 1 in thick, its face carrying
 border line, wing veins, two spots on each forewing and an eyespot on each hindwing,
 all cast as crisp grooves, with the body standing slightly proud. Pour cement, let it
 cure, flex the mold and lift it off. Every wall and rib is drafted so the paver releases
-cleanly, and the mold prints opening-up with no supports in about ten hours on a Bambu
+cleanly, and the mold prints opening-up with no supports in about two hours on a Bambu
 A1 or A1 mini.
 
 A square variant (`style=square`, 5 x 5 in) raises the whole butterfly on a square

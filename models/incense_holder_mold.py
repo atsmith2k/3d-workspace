@@ -3,7 +3,7 @@ tall.
 
 A shallow well catches the ash, and the hole in its centre holds a stick upright (it
 fits sticks with a 1.5-2.5 mm core); cones sit in the well too. Pour, screed the back
-flat, and lift it out once cured. Prints opening-up with no supports in about 5 hours on
+flat, and lift it out once cured. Prints opening-up with no supports in about 1.5 hours on
 a Bambu A1 or A1 mini.
 
 Spec:

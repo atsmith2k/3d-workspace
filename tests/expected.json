@@ -557,5 +557,258 @@
         "checks_ok": true
       }
     }
+  },
+  "heart_trinket_tray_mold": {
+    "model": "trinket_tray_mold.py",
+    "set": [
+      "shape=heart"
+    ],
+    "parts": {
+      "heart_trinket_tray_mold": {
+        "size": [
+          107.4,
+          92.0,
+          23.0
+        ],
+        "volume_cm3": 61.2,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      }
+    }
+  },
+  "heart_tealight_holder_mold": {
+    "model": "candle_holder_mold.py",
+    "set": [
+      "shape=heart"
+    ],
+    "parts": {
+      "heart_tealight_holder_mold": {
+        "size": [
+          108.8,
+          93.2,
+          43.0
+        ],
+        "volume_cm3": 86.9,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      }
+    }
+  },
+  "heart_coaster_mold": {
+    "model": "hex_coaster_mold.py",
+    "set": [
+      "shape=heart",
+      "ring_insets=9,18"
+    ],
+    "parts": {
+      "heart_coaster_mold": {
+        "size": [
+          111.7,
+          95.7,
+          13.0
+        ],
+        "volume_cm3": 32.6,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      }
+    }
+  },
+  "ribbed_candle_mold_kit": {
+    "model": "candle_master_mold.py",
+    "set": [
+      "style=ribbed"
+    ],
+    "parts": {
+      "ribbed_candle_mold_kit-master": {
+        "size": [
+          101.3,
+          101.3,
+          107.5
+        ],
+        "volume_cm3": 381.9,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "ribbed_candle_mold_kit-housing": {
+        "size": [
+          95.3,
+          95.3,
+          104.0
+        ],
+        "volume_cm3": 72.6,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      }
+    }
+  },
+  "faceted_candle_mold_kit": {
+    "model": "candle_master_mold.py",
+    "set": [
+      "style=faceted"
+    ],
+    "parts": {
+      "faceted_candle_mold_kit-master": {
+        "size": [
+          96.3,
+          96.3,
+          102.5
+        ],
+        "volume_cm3": 308.4,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "faceted_candle_mold_kit-housing": {
+        "size": [
+          90.3,
+          90.3,
+          99.0
+        ],
+        "volume_cm3": 65.4,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      }
+    }
+  },
+  "twisted_candle_mold_kit": {
+    "model": "candle_master_mold.py",
+    "set": [
+      "style=twisted"
+    ],
+    "parts": {
+      "twisted_candle_mold_kit-master": {
+        "size": [
+          91.3,
+          91.3,
+          117.5
+        ],
+        "volume_cm3": 277.4,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "twisted_candle_mold_kit-housing": {
+        "size": [
+          85.3,
+          85.3,
+          114.0
+        ],
+        "volume_cm3": 71.1,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      }
+    }
+  },
+  "wax_melt_master": {
+    "model": "wax_melt_master.py",
+    "set": [],
+    "parts": {
+      "wax_melt_master": {
+        "size": [
+          126.8,
+          88.8,
+          22.0
+        ],
+        "volume_cm3": 119.2,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      }
+    }
+  },
+  "bowl_slip_cast_master": {
+    "model": "slip_cast_master.py",
+    "set": [
+      "piece=bowl"
+    ],
+    "parts": {
+      "bowl_slip_cast_master-master": {
+        "size": [
+          175.3,
+          175.3,
+          78.1
+        ],
+        "volume_cm3": 676.2,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "bowl_slip_cast_master-cottle": {
+        "size": [
+          169.3,
+          169.3,
+          100.1
+        ],
+        "volume_cm3": 125.6,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      }
+    }
+  },
+  "tumbler_slip_cast_master": {
+    "model": "slip_cast_master.py",
+    "set": [
+      "piece=tumbler"
+    ],
+    "parts": {
+      "tumbler_slip_cast_master-master": {
+        "size": [
+          152.5,
+          152.5,
+          140.6
+        ],
+        "volume_cm3": 774.6,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "tumbler_slip_cast_master-cottle": {
+        "size": [
+          146.5,
+          146.5,
+          162.6
+        ],
+        "volume_cm3": 176.2,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      }
+    }
+  },
+  "thermoform_heart_box": {
+    "model": "thermoform_heart_box.py",
+    "set": [],
+    "parts": {
+      "thermoform_heart_box-box": {
+        "size": [
+          80.0,
+          67.8,
+          30.0
+        ],
+        "volume_cm3": 98.1,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "thermoform_heart_box-lid": {
+        "size": [
+          81.8,
+          69.4,
+          12.0
+        ],
+        "volume_cm3": 42.6,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      }
+    }
   }
 }

@@ -54,6 +54,9 @@ def parse_overrides(defaults, pairs):
         kind = type(p[key])
         if kind is bool:
             p[key] = raw.lower() in ("1", "true", "yes", "on")
+        elif kind in (list, tuple):     # "9,18" -> (9.0, 18.0), typed like the default's items
+            elem = type(p[key][0]) if p[key] else str
+            p[key] = kind(elem(x) for x in raw.split(",") if x.strip())
         else:
             p[key] = kind(raw)
     return p

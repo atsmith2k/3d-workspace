@@ -1,16 +1,17 @@
 """Mold for a cement or Jesmonite candle holder you pour straight into the print.
 
 Choose the version in the title: a fluted tealight holder (75 mm across, 40 mm tall), a
-faceted hexagon tealight holder, or a fluted holder for a 7/8 in taper candle (56 mm
-across, 48 mm tall). The tealight pocket fits standard 38-39 mm tealights with room to
+faceted hexagon tealight holder, a heart-shaped tealight holder (100 x 85 mm), or a
+fluted holder for a 7/8 in taper candle (56 mm across, 48 mm tall). The tealight pocket fits standard 38-39 mm tealights with room to
 lift them out; the taper pocket narrows slightly so the candle wedges upright. Pour, tap
 out the air, screed the back flat, and lift the holder out once cured: every wall is
 tapered so it releases from the rigid mold. Prints opening-up with no supports in about
-4-6 hours on a Bambu A1 or A1 mini.
+1-2 hours on a Bambu A1 or A1 mini.
 
 Spec:
   object:       mold for a cement / Jesmonite candle holder, poured straight into the print
-  overall:      tealight: holder 75 mm across, 40 mm tall; mold ~85 x 85 x 43 mm.
+  overall:      tealight: holder 75 mm across, 40 mm tall; mold ~85 x 85 x 43 mm;
+                heart tealight: 100 x 85 mm heart, 40 mm tall; mold ~110 x 95 x 43 mm.
                 taper: holder 56 mm across, 48 mm tall; mold ~66 x 66 x 51 mm
   mates with:   tealight cup 39.0 mm dia x 16 mm (standard 38-39 mm); pocket 40.5 at the
                 bottom, 17 deep. Taper candle 7/8 in (22.2 mm) base; pocket 22.8 at the
@@ -33,7 +34,7 @@ PRODUCT = dict(
     title="{shape} {candle} Candle Holder Mold",   # filled from params per variant
     category="molds",
     tags=["mold", "concrete", "cement", "jesmonite", "candle holder", "tealight", "taper candle",
-          "fluted", "home decor"],
+          "fluted", "heart", "valentine", "home decor"],
     printers=["a1", "a1mini"],
     cast_material="cement, concrete or Jesmonite",
 )
@@ -41,7 +42,7 @@ LICENSE_NOTES = None   # original design
 
 PARAMS = dict(
     candle="tealight",      # tealight | taper
-    shape="fluted",         # fluted | hex | round
+    shape="fluted",         # fluted | hex | round | heart
     diameter=0.0,           # holder diameter at its top face (0 = default for the candle)
     height=0.0,             # holder height (0 = default for the candle)
     floor=3.0,
@@ -61,13 +62,17 @@ CANDLES = {
 
 def dims_for(p):
     c = CANDLES[p.candle]
-    return c, (p.diameter or c["body_d"]), (p.height or c["body_h"])
+    d = p.diameter or c["body_d"] * (4 / 3 if p.shape == "heart" else 1.0)   # a heart needs width round the pocket
+    return c, d, (p.height or c["body_h"])
 
 
 def body_section(p, r):
     """Holder outline at radius r (circumradius for hex, outer flute tip for fluted)."""
     if p.shape == "round":
         return circle(0, 0, r)
+    if p.shape == "heart":
+        # nudged up so the pocket at the origin sits where the heart is roomiest
+        return heart(2 * r).translate((0, 0.03 * r))
     if p.shape == "hex":
         pts = [(r * math.cos(math.radians(60 * i)), r * math.sin(math.radians(60 * i)))
                for i in range(6)]
@@ -82,10 +87,21 @@ def body_section(p, r):
     return grow(grow(cs, 1.0), -1.0)
 
 
+def _cement_ok(p, pocket_r, need=6.0):
+    """Narrowest cement between the candle pocket and the outside of the holder, from
+    the outline itself (probing points can't see a notch that cuts into the pocket)."""
+    import numpy as np
+    _, d, _ = dims_for(p)
+    q = np.asarray(body_section(p, d / 2).to_polygons()[0])
+    gap = float(np.hypot(q[:, 0], q[:, 1]).min() - pocket_r)
+    return gap >= need, f"{gap:.1f} mm (need {need:g})"
+
+
 def checks(p):
     c, d, h = dims_for(p)
     lean = draft_offset(h, p.body_draft)
     pocket_r = c["d"] / 2 + c["clear"]
+    boss_lean = draft_offset(c["depth"], c["draft"])
     outer = d + 2 * (lean + p.wall)
     return [
         dims(z=p.floor + h, x=(outer - 2, outer + 1)),
@@ -94,7 +110,8 @@ def checks(p):
         solid((pocket_r - 0.3, 0, p.floor + c["depth"] - 0.3)),           # boss top is wide enough for the candle
         empty((0, 0, p.floor + c["depth"] + 1.0)),                         # boss stops at pocket depth
         thickness_at(((pocket_r + d / 2) / 2, 0, 0.5), p.floor - 0.2, direction=(0, 0, 1)),
-        flat_base(math.pi * (d / 2) ** 2 * 0.9),
+        custom("cement round pocket", lambda ctx: _cement_ok(p, pocket_r + boss_lean)),
+        flat_base(math.pi * (d / 2) ** 2 * (0.6 if p.shape == "heart" else 0.9)),
         no_overhang(),
         single_body(),
     ]
@@ -105,7 +122,10 @@ def build(p):
     r = d / 2
     lean = draft_offset(h, p.body_draft)
     # mold block follows the widest holder outline plus the wall
-    mold = extrude(body_section(p, r + lean + p.wall), p.floor + h)
+    if p.shape == "heart":   # an even wall round the notch: offset, not scale
+        mold = extrude(grow(body_section(p, r + lean), p.wall), p.floor + h)
+    else:
+        mold = extrude(body_section(p, r + lean + p.wall), p.floor + h)
     # cavity widens toward the opening (the holder's base)
     mold -= tapered(body_section(p, r), p.floor, h + 1, lean * (h + 1) / h)
     # candle pocket: a boss on the floor, narrowing upward to the candle size

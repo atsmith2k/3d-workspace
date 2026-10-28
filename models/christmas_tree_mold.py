@@ -3,7 +3,7 @@ eight-pointed star that tapers to a small tip, 100 mm tall and 60 mm across.
 
 Pour into the upright mold, screed the base flat, and lift the tree out once cured; the
 taper itself lets it release cleanly. Leave it raw, paint the tip gold, or make a few in
-different finishes. Prints tip-down with no supports in about 5 hours on a Bambu A1 or
+different finishes. Prints tip-down with no supports in under 2 hours on a Bambu A1 or
 A1 mini.
 
 Spec:

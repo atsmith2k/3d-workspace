@@ -31,3 +31,9 @@ def test_flatten_filament_keeps_parent_limits(tmp_path):
     _write(tmp_path, "filament", "PLA @A1", dict(inherits="PLA @base"))
     flat = slicer._flatten_preset(tmp_path, "filament", "PLA @A1")
     assert flat["filament_max_volumetric_speed"] == ["21"] and flat["filament_density"] == ["1.26"]
+
+
+def test_set_parses_comma_lists_with_the_default_item_type():
+    from cadkit.__main__ import parse_overrides
+    p = parse_overrides(dict(ring_insets=(10.0, 22.0), shape="hexagon", n=3), ["ring_insets=9,18", "n=5"])
+    assert p["ring_insets"] == (9.0, 18.0) and p["n"] == 5 and p["shape"] == "hexagon"
