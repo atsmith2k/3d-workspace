@@ -87,8 +87,13 @@ def build(p):
     r = p.diameter / 2
     lean = draft_offset(p.height, p.body_draft)
     mold = extrude(body_section(p, r + lean + p.wall), p.floor + p.height)
-    mold -= drafted(lambda f: body_section(p, r + f * lean), p.floor, p.height + 1, steps=8)
+    mold -= tapered(body_section(p, r), p.floor, p.height + 1, lean * (p.height + 1) / p.height)
     # dome: one slice per print layer so the bowl is as smooth as the printer can make it
     steps = max(8, round(p.well_depth / 0.2))
     mold += drafted(lambda f: circle(0, 0, well_radius(p, f)), p.floor - EMBED, p.well_depth + EMBED, steps=steps)
     return mold
+
+
+def casting(p):
+    """What the mold makes, for the shop's cast render: the tray the right way up."""
+    return cast_of(build(p))

@@ -107,6 +107,11 @@ def build(p):                          # p.width, p.style ...
 ```
 
 `PRODUCT` and `LICENSE_NOTES` are read by `cad publish` only; every key is optional.
+`PRODUCT["title"]` may use `{param}` placeholders so `--set` variants get their own titles.
+Molds should also define `casting(p)` returning the piece the mold makes (usually
+`cast_of(build(p))` from `cadkit.relief`; pass `minus=` a core, `flip=False` for upright
+casts); `cad publish` renders it as `<name>_cast.png` in cement grey, since buyers judge
+a mold by what comes out of it.
 `sellable=None` lets the gate decide, `True` sells despite caveats (they stay listed
 as reasons), `False` keeps the model off the shop. The `Spec:` block is parsed into the
 manifest, so keep its `key: value` lines (`orientation` ends up in the print notes).
@@ -132,7 +137,7 @@ The same measurements are available in `cadkit/measure.py` and from `cad measure
 | Kernel | Use for | Helpers |
 |---|---|---|
 | **build123d** (OpenCascade B-rep) | Engineered parts: enclosures, brackets, adapters, anything with fillets, chamfers, holes, threads, exact fits. Exports STEP too. | `from cadkit.cad import *`: `closed_spline`, `clip`, `draft_extrude`, `faces_of` |
-| **manifold3d** (mesh CSG) | Decorative and organic work: reliefs, molds with artwork, patterns, lots of strokes/spots. Fast and never fails on intricate booleans. STL only. | `from cadkit.relief import *`: `smooth_shape`, `stroke`, `bezier`, `circle`, `ellipse`, `mirror_x`, `grow`, `extrude`, `drafted`, `draft_offset`, `text` |
+| **manifold3d** (mesh CSG) | Decorative and organic work: reliefs, molds with artwork, patterns, lots of strokes/spots. Fast and never fails on intricate booleans. STL only. | `from cadkit.relief import *`: `smooth_shape`, `stroke`, `bezier`, `circle`, `ellipse`, `mirror_x`, `grow`, `extrude`, `drafted`, `tapered`, `draft_offset`, `text`, `cast_of` |
 | **SDF** (implicit, meshed by manifold) | Blends, lattices and gyroid infill, shells, twists, repeats: `smooth_union` instead of fillets, `lattice_fill` to lighten a part. Returns a Manifold, so it combines with relief shapes and `text`. | `from cadkit.sdf import *`: `sphere`, `box`, `cylinder`, `capsule`, `torus`, `plane`, `union`, `intersect`, `subtract`, `smooth_*`, `twist`, `bend`, `repeat`, `shell`, `gyroid`, `schwarz_p`, `diamond`, `lattice_fill`, `build_sdf`, `to_sdf` |
 
 Worked examples: `models/butterfly_paver_mold.py` (manifold relief mold),
@@ -244,6 +249,9 @@ Bambu A1 series design notes (0.4 mm nozzle, 0.42 mm line width, 0.2 mm layers):
 - build123d: `extrude(taper>0)` goes through LocOpe_DPrism and can **segfault** on thin or
   traced shapes; use `draft_extrude` from `cadkit.cad`. Spline faces built from clockwise
   points face -Z and won't fuse with other faces; `closed_spline` fixes that.
+- manifold `drafted` stacks slices, so a tall drafted wall comes out as visible stair
+  steps (and the casting copies them). Use `tapered` for body walls and round pins;
+  keep `drafted` for spiky art and for domes (one slice per 0.2 mm layer).
 - build123d tapers on large, intricate art (many joined strokes) are slow (minutes) and
   fail often. Do that kind of work in manifold3d instead.
 - SDF: write functions with numpy ufuncs (`np.sqrt`, `np.maximum`...) so the grid is

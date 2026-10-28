@@ -89,3 +89,8 @@ def build(p):
     outer = Manifold.extrude(circle(0, 0, a), top, scale_top=((R + p.wall) / a,) * 2)
     foot = extrude(circle(0, 0, p.foot_d / 2), p.foot_h)
     return outer + foot - cavity
+
+
+def casting(p):
+    """What the mold makes, for the shop's cast render: the tree standing on its base."""
+    return cast_of(build(p))

@@ -104,10 +104,14 @@ def build(p):
     # mold block follows the widest holder outline plus the wall
     mold = extrude(body_section(p, r + lean + p.wall), p.floor + h)
     # cavity widens toward the opening (the holder's base)
-    mold -= drafted(lambda f: body_section(p, r + f * lean), p.floor, h + 1, steps=8)
+    mold -= tapered(body_section(p, r), p.floor, h + 1, lean * (h + 1) / h)
     # candle pocket: a boss on the floor, narrowing upward to the candle size
     pocket_r = c["d"] / 2 + c["clear"]
     boss_lean = draft_offset(c["depth"], c["draft"])
-    mold += drafted(lambda f: circle(0, 0, pocket_r + (1 - f) * boss_lean),
-                    p.floor - EMBED, c["depth"] + EMBED, steps=6)
+    mold += tapered(circle(0, 0, pocket_r + boss_lean), p.floor - EMBED, c["depth"] + EMBED, -boss_lean)
     return mold
+
+
+def casting(p):
+    """What the mold makes, for the shop's cast render: the holder the right way up."""
+    return cast_of(build(p))

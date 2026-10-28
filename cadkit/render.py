@@ -267,16 +267,18 @@ PRODUCT_CAM = (1, -1, 0.9)          # the preview's iso view
 HERO_CAM = (0.55, -1, 0.42)         # lower and more frontal, for the shop hero image
 PRODUCT_BG = (255, 255, 255)
 PRODUCT_TINT = np.array([186, 188, 192], float)   # neutral light grey, x1.25 in the shader
+CAST_TINT = np.array([176, 170, 160], float)      # warm cement grey, for the cast render
 PRODUCT_SHADE = (0.36, 0.5, 0.2)
 PRODUCT_EDGE = 0.55
 PRODUCT_SS = 2
 
 
-def render_product(tm, path, cam=PRODUCT_CAM, size=1600, ss=PRODUCT_SS, fill=0.80):
+def render_product(tm, path, cam=PRODUCT_CAM, size=1600, ss=PRODUCT_SS, fill=0.80, tint=PRODUCT_TINT):
     """A clean single-view product picture: square `size` px, white background, one
     neutral tint, soft edge lines, no overlays, dimensions or marks. `tm` may be a
     list of meshes (a multi-part model), drawn together in print pose. Renders at
-    `ss` x supersampling and downsamples; returns the time it took in seconds."""
+    `ss` x supersampling and downsamples; returns the time it took in seconds.
+    `tint` is the surface colour (CAST_TINT for a mold's casting)."""
     import time
     import trimesh
     t0 = time.time()
@@ -291,7 +293,7 @@ def render_product(tm, path, cam=PRODUCT_CAM, size=1600, ss=PRODUCT_SS, fill=0.8
     w, h = sx.max() - sx.min(), sy.max() - sy.min()
     scale = px * fill / max(w, h, 1e-6)
     center = center + r * (sx.max() + sx.min()) / 2 - u * (sy.max() + sy.min()) / 2
-    img = _render_view(tm, cam, scale, px, center, tint=PRODUCT_TINT, bg=PRODUCT_BG,
+    img = _render_view(tm, cam, scale, px, center, tint=tint, bg=PRODUCT_BG,
                        shade=PRODUCT_SHADE, edge=PRODUCT_EDGE)
     im = Image.fromarray(img.astype(np.uint8))
     if px != size:

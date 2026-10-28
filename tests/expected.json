@@ -383,7 +383,7 @@
           83.8,
           43.0
         ],
-        "volume_cm3": 74.3,
+        "volume_cm3": 74.1,
         "bodies": 1,
         "watertight": true,
         "checks_ok": true
@@ -402,7 +402,7 @@
           72.6,
           43.0
         ],
-        "volume_cm3": 67.4,
+        "volume_cm3": 66.8,
         "bodies": 1,
         "watertight": true,
         "checks_ok": true
@@ -421,7 +421,7 @@
           65.3,
           51.0
         ],
-        "volume_cm3": 53.5,
+        "volume_cm3": 53.3,
         "bodies": 1,
         "watertight": true,
         "checks_ok": true
@@ -438,7 +438,7 @@
           38.7,
           41.0
         ],
-        "volume_cm3": 142.4,
+        "volume_cm3": 142.1,
         "bodies": 1,
         "watertight": true,
         "checks_ok": true
@@ -489,7 +489,7 @@
           107.4,
           23.0
         ],
-        "volume_cm3": 77.5,
+        "volume_cm3": 77.4,
         "bodies": 1,
         "watertight": true,
         "checks_ok": true
@@ -506,7 +506,7 @@
           80.6,
           25.0
         ],
-        "volume_cm3": 65.6,
+        "volume_cm3": 65.4,
         "bodies": 1,
         "watertight": true,
         "checks_ok": true

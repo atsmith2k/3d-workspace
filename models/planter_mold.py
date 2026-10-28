@@ -137,3 +137,12 @@ def build(p):
         a = math.pi / 2 * k
         core -= extrude(circle(vent_r * math.cos(a), vent_r * math.sin(a), p.vent_d / 2), p.flange_t + 2, -1)
     return {"cup": cup, "core": core}
+
+
+def casting(p):
+    """What the mold makes, for the shop's cast render: the planter, cast right side up,
+    so the core is taken away in its assembled pose and nothing is flipped."""
+    parts = build(p)
+    dx, dy, dz, rx, ry, rz = assembly(p)["core"]
+    core = parts["core"].rotate((rx, ry, rz)).translate((dx, dy, dz))
+    return cast_of(parts["cup"], minus=core, flip=False)

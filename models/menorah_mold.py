@@ -100,16 +100,22 @@ def build(p):
     mold = extrude(rounded_rect(L + 2 * (lean + p.wall), p.width + 2 * (lean + p.wall), p.corner + p.wall), top)
     # menorah body: the bar from the lights' level up, the shamash block from the floor up;
     # both lean outward at the same rate so their sides stay flush where they meet
-    bar = drafted(lambda f: grow(rounded_rect(L, p.width, p.corner), (p.shamash_raise + f * p.height) / H * lean),
-                  z_bar, p.height + 1, steps=8)
+    rate = lean / H                                       # sideways per mm of height
+    bar = tapered(grow(rounded_rect(L, p.width, p.corner), p.shamash_raise * rate), z_bar, p.height + 1,
+                  (p.height + 1) * rate)
     sw = p.shamash_width
-    block = drafted(lambda f: grow(rounded_rect(sw, p.width, p.corner), f * p.shamash_raise / H * lean),
-                    p.floor, p.shamash_raise + 0.5, steps=4)
+    block = tapered(rounded_rect(sw, p.width, p.corner), p.floor, p.shamash_raise + 0.5,
+                    (p.shamash_raise + 0.5) * rate)
     mold -= bar + block
     # candle cups: bosses narrowing upward to the cup size
     boss_lean = draft_offset(p.cup_depth, p.cup_draft)
     r = p.cup_d / 2
     for x in cup_xs(p):
         z0 = p.floor if x == 0 else z_bar
-        mold += drafted(lambda f: circle(x, 0, r + (1 - f) * boss_lean), z0 - EMBED, p.cup_depth + EMBED, steps=5)
+        mold += tapered(circle(x, 0, r + boss_lean), z0 - EMBED, p.cup_depth + EMBED, -boss_lean)
     return mold
+
+
+def casting(p):
+    """What the mold makes, for the shop's cast render: the menorah the right way up."""
+    return cast_of(build(p))

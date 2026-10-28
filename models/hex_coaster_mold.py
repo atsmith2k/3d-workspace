@@ -80,7 +80,7 @@ def checks(p):
 def build(p):
     lean = draft_offset(p.thickness, p.wall_draft)
     mold = extrude(hexagon(p.flats + 2 * (lean + p.wall), p.corner + p.wall), p.floor + p.thickness)
-    mold -= drafted(lambda f: grow(hexagon(p.flats, p.corner), f * lean), p.floor, p.thickness + 1, steps=6)
+    mold -= tapered(hexagon(p.flats, p.corner), p.floor, p.thickness + 1, lean * (p.thickness + 1) / p.thickness)
     if p.pattern == "rings":
         rib_lean = draft_offset(p.groove_depth, p.rib_draft)
         for inset in p.ring_insets:
@@ -88,3 +88,8 @@ def build(p):
             ring = hexagon(f_out, p.corner) - hexagon(f_out - 2 * p.groove_w, max(p.corner - p.groove_w, 0.5))
             mold += drafted(lambda f: grow(ring, -f * rib_lean), p.floor - EMBED, p.groove_depth + EMBED, steps=3)
     return mold
+
+
+def casting(p):
+    """What the mold makes, for the shop's cast render: the coaster, face up."""
+    return cast_of(build(p))

@@ -81,10 +81,15 @@ def build(p):
     lean = draft_offset(p.height, p.body_draft)
     outline = pebble(p)
     mold = extrude(grow(outline, lean + p.wall), p.floor + p.height)
-    mold -= drafted(lambda f: grow(outline, f * lean), p.floor, p.height + 1, steps=8)
+    mold -= tapered(outline, p.floor, p.height + 1, lean * (p.height + 1) / p.height)
     steps = max(8, round(p.well_depth / 0.2))
     mold += drafted(lambda f: well(p, f), p.floor - EMBED, p.well_depth + EMBED, steps=steps)
     z_dome = p.floor + p.well_depth
     rt, rb = p.hole_top / 2, p.hole_bottom / 2
     mold += drafted(lambda f: circle(0, 0, rt + (rb - rt) * f), z_dome - EMBED, p.hole_depth + EMBED, steps=4)
     return mold
+
+
+def casting(p):
+    """What the mold makes, for the shop's cast render: the holder the right way up."""
+    return cast_of(build(p))

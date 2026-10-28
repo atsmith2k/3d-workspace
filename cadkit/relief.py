@@ -9,7 +9,7 @@ Import in a model with:  from cadkit.relief import *
 import math
 
 import numpy as np
-from manifold3d import CrossSection, JoinType, Manifold
+from manifold3d import CrossSection, JoinType, Manifold, OpType
 
 ROUND = JoinType.Round
 CIRC = 48  # segments per full circle
@@ -91,6 +91,18 @@ def drafted(section_at, z, height, steps=8):
     return out
 
 
+def tapered(cs, z, height, lean):
+    """Smooth drafted solid: `cs` at the bottom, grown by about `lean` at the top, with
+    straight sides (no stair steps, unlike `drafted`). Scales per axis about the shape's
+    centre, so the draft is exact on straight and round sides and close elsewhere; use
+    `drafted` for spiky outlines where scaling would move thin features sideways."""
+    x0, y0, x1, y1 = cs.bounds()
+    cx, cy, w, h = (x0 + x1) / 2, (y0 + y1) / 2, x1 - x0, y1 - y0
+    m = Manifold.extrude(cs.translate((-cx, -cy)), height,
+                         scale_top=((w + 2 * lean) / w, (h + 2 * lean) / h))
+    return m.translate((cx, cy, z))
+
+
 def text(string, size, font="Arial", bold=False, font_path=None, mirror=False):
     """Text as a 2D CrossSection centred on the origin, for reliefs and molds: use it
     like any other shape here (extrude, grow, drafted, mirror_x...). `size` is the
@@ -114,3 +126,32 @@ def text(string, size, font="Arial", bold=False, font_path=None, mirror=False):
 def draft_offset(height, degrees):
     """How far a wall of this height moves sideways at this draft angle."""
     return height * math.tan(math.radians(degrees))
+
+
+def cast_of(mold, minus=None, flip=True):
+    """The piece a mold makes, for the shop's cast render: every opening in the mold's
+    top face, extruded down through the mold, minus the mold (and `minus`, e.g. a core
+    in its assembled pose). Assumes the cavity is widest at the opening, as a drafted
+    mold is. `flip=True` turns it over (face-down casts), so the face the mold floor
+    shaped is on top; the result sits on Z=0."""
+    lo, hi = mold.bounding_box()[2], mold.bounding_box()[5]
+    rim = hi - 0.25                     # just under the rim: pins may stand a hair proud of it
+    polys = mold.slice(rim).to_polygons()
+    holes = [q for q in polys if _signed_area(q) < 0]
+    if not holes:
+        return Manifold()
+    fill = Manifold()
+    for q in holes:
+        fill += Manifold.extrude(poly(q), rim - lo).translate((0, 0, lo))
+    cast = (fill - mold) - minus if minus is not None else fill - mold
+    # anything reaching down to the mold's base lies outside it (e.g. round a foot)
+    cast = Manifold.batch_boolean([c for c in cast.decompose() if c.bounding_box()[2] > lo + 0.01] or [Manifold()],
+                                  OpType.Add)
+    if flip:
+        cast = cast.rotate((180, 0, 0))
+    return cast.translate((0, 0, -cast.bounding_box()[2]))
+
+
+def _signed_area(q):
+    q = np.asarray(q, float)
+    return 0.5 * np.sum(q[:, 0] * np.roll(q[:, 1], -1) - np.roll(q[:, 0], -1) * q[:, 1])

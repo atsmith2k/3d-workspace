@@ -31,7 +31,7 @@ from . import outputs
 from . import printers
 from . import publish as publishmod
 from . import slicer
-from .render import HERO_CAM, render_product, render_sheet
+from .render import CAST_TINT, HERO_CAM, render_product, render_sheet
 
 ROOT = Path(__file__).resolve().parent.parent
 EXPECTED = ROOT / "tests" / "expected.json"
@@ -460,6 +460,8 @@ def cmd_publish(args):
         ss = 1.5 if t > 30 else 2
         render_product(meshes, out / f"{name}_hero.png", cam=HERO_CAM, ss=ss)
         print(f"  render    {name}_product.png, {name}_hero.png ({t:.1f}s" + (", hero at 1.5x" if ss != 2 else "") + ")")
+        if hasattr(mod, "casting"):
+            render_cast(mod, build, out / f"{name}_cast.png")
         nf, nb = publishmod.preview_glb(meshes, out / f"{name}_preview.glb")
         print(f"  viewer    {name}_preview.glb ({nf} faces, {nb / 1024:.0f} KB, unit-scaled)")
     manifest = publishmod.compose_manifest(out, build, slices, info, printers=requested)
@@ -473,6 +475,16 @@ def cmd_publish(args):
         print("  MANIFEST INVALID:\n    " + "\n    ".join(problems))
         return 2
     return 0 if manifest["sellable"] else 1
+
+
+def render_cast(mod, build, path):
+    """Render what the mold makes, from the model's casting(p), with the params the
+    build used, in cement grey."""
+    from .mesh import to_trimesh
+    cast = mod.casting(SimpleNamespace(**build.get("params", {})))
+    pieces = cast if isinstance(cast, (list, tuple)) else [cast]
+    t = render_product([to_trimesh(c) for c in pieces], path, tint=CAST_TINT)
+    print(f"  render    {path.name} ({t:.1f}s)")
 
 
 def cmd_new(args):

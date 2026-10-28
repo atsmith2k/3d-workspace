@@ -127,3 +127,8 @@ def build(p):
         hy = cy + p.size / 2 - p.ring_d / 2
         mold += drafted(lambda f: circle(cx, hy, p.hole_d / 2 + (1 - f) * pin_lean), p.floor - EMBED, p.thickness + EMBED, steps=3)
     return mold
+
+
+def casting(p):
+    """What the mold makes, for the shop's cast render: the four ornaments, show face up."""
+    return cast_of(build(p))

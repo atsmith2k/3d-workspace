@@ -3,6 +3,7 @@
 Writes into output/<name>/:
     <name>_product.png      clean 1600 x 1600 iso render, white background
     <name>_hero.png         same, lower and more frontal camera
+    <name>_cast.png         molds with casting(p): the piece the mold makes, cement grey
     <stem>_plate.png        the slicer's own plate picture per sliced 3MF
     <name>_print_notes.txt  what the buyer needs to know (deterministic bytes)
     <name>_preview.glb      low-poly, unit-scaled viewer mesh for the shop's 3D canvas
@@ -212,6 +213,7 @@ def collect_files(out, name, parts, printers):
             add(out / f"{fname}_{key}.3mf", "3mf", part=part, printer=key)
     add(out / f"{name}_product.png", "png", kind="product")
     add(out / f"{name}_hero.png", "png", kind="hero")
+    add(out / f"{name}_cast.png", "png", kind="cast")
     add(out / f"{name}_preview.png", "png", kind="check_sheet")
     for fname in parts:
         for key in printers:
@@ -270,6 +272,8 @@ def compose_manifest(out, build, slices, info, printers=None, git=None, generate
     images = dict(product=by_kind.get("product"), hero=by_kind.get("hero"),
                   check_sheet=by_kind.get("check_sheet"),
                   thumbnails=[f["path"] for f in files if f.get("kind") == "plate"])
+    if by_kind.get("cast"):
+        images["cast"] = by_kind["cast"]          # molds only: the piece the mold makes
     git = git or outputs.git_info()
     manifest = dict(
         schema=SCHEMA,

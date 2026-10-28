@@ -398,3 +398,28 @@ def test_title_fills_param_placeholders_per_variant():
     assert publish.title_of("x", product, dict(shape="hex", candle="tealight")) == "Hex Tealight Candle Holder Mold"
     assert publish.title_of("x", dict(title="Plain Title"), dict(shape="hex")) == "Plain Title"
     assert publish.title_of("oak_leaf_coaster_mold") == "Oak Leaf Coaster Mold"
+
+
+def test_cast_of_is_the_cavity_flipped_and_drops_outside_pieces():
+    from cadkit.relief import cast_of, circle, extrude, tapered
+    # 3 mm floor, 20 mm deep drafted cavity, a 5 mm pin on the floor, and a foot ring
+    # below that the fill would otherwise catch
+    mold = extrude(circle(0, 0, 30), 23) - tapered(circle(0, 0, 25), 3, 21, 1.0)
+    mold += extrude(circle(0, 0, 2.5), 10, 2.9)
+    cast = cast_of(mold)
+    lo = cast.bounding_box()
+    assert len(cast.decompose()) == 1
+    assert abs((lo[5] - lo[2]) - 19.75) < 0.05            # cavity depth up to just under the rim
+    assert lo[2] == 0
+    # flipped: the face the floor shaped is on top, so the pin hole opens at the top
+    from cadkit.mesh import to_trimesh
+    tm = to_trimesh(cast)
+    assert not tm.contains([[0, 0, lo[5] - 1]])[0] and tm.contains([[10, 0, lo[5] - 1]])[0]
+
+
+def test_tapered_grows_by_lean_with_straight_sides():
+    from cadkit.relief import CrossSection, tapered
+    m = tapered(CrossSection.square((40, 20), center=True).translate((5, 5)), 2, 10, 1.5)
+    b = m.bounding_box()
+    assert [round(v, 3) for v in b] == [-16.5, -6.5, 2, 26.5, 16.5, 12]
+    assert m.num_tri() == 12
