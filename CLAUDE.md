@@ -100,13 +100,17 @@ PARAMS = dict(width=40.0, style="a")   # every tunable dimension; types drive --
 PRODUCT = dict(title="...", category="molds", tags=[...], printers=["a1", "a1mini"],
                cast_material="cement", post_processing=None, sellable=None)  # optional
 LICENSE_NOTES = "..."                  # optional; replaces the default licence text
+MIN_WALL = 0.4                         # optional; thin-wall warning floor (blades); dict per part ok
 def checks(p):                         # or a static CHECKS = [...] list
     return [dims(x=p.width), hole(6.4, at=(10, 10)), solid((0, 0, 1)), no_overhang()]
 def build(p):                          # p.width, p.style ...
     return part                        # or {"lid": a, "base": b} for multi-part prints
 ```
 
-`PRODUCT` and `LICENSE_NOTES` are read by `cad publish` only; every key is optional.
+`PRODUCT`, `LICENSE_NOTES` and an optional `display(p)` (product-shot poses, like `assembly`;
+otherwise overlapping parts are laid side by side) are read by `cad publish` only.
+`MIN_WALL` lowers the thin-wall warning threshold for walls that are thin on purpose
+(cutter blade edges); the report still shows the share under 1.2 mm.
 `PRODUCT["title"]` may use `{param}` placeholders so `--set` variants get their own titles.
 Molds should also define `casting(p)` returning the piece the mold makes (usually
 `cast_of(build(p))` from `cadkit.relief`; pass `minus=` a core, `flip=False` for upright
@@ -165,6 +169,12 @@ box), `lid` (plate with inner lip, returned in print pose), `boss` / `add_bosses
 standoff, hook, knob, clip, handle or channel from primitives, and copy their loft and
 sweep setup (section planes from `Plane(origin, x_dir, z_dir)`, `path @ 0` / `path % 0`
 for the sweep start) rather than improvising.
+
+**Clay cutters** (`from cadkit.cutter import *`, manifold): `Art(outline, cutouts,
+imprints, bars_x, bars_y)` plus `cutter_set(art, p)` gives a cutter and a pusher per size
+in `p.sizes` (outline blade, cut-through inner blades, recessed imprint blades, support
+bars, pusher prongs). Merge `CUTTER_PARAMS` into PARAMS, set `MIN_WALL = CUTTER_MIN_WALL`,
+and use `cutter_checks(p)` / `cutter_assembly(p)` / `cutter_display(p)`. Worked model: `heart_hoop_clay_cutter`.
 
 **Images and SVGs** (`from cadkit.image import *`): `trace("logo.png", width=60)` turns a
 logo, sketch or photo silhouette into a CrossSection (holes kept); `svg_shape("x.svg",

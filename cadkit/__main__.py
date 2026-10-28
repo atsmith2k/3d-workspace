@@ -99,7 +99,7 @@ def model_checks(mod, p, part_name, single):
     return spec or []
 
 
-def export(part, name, out, args, title, checks=(), params=None):
+def export(part, name, out, args, title, checks=(), params=None, min_wall=None):
     t0 = time.time()
     tol = 0.05 if args.fast else 0.01
     tm = meshmod.to_trimesh(part, tolerance=tol)
@@ -124,7 +124,8 @@ def export(part, name, out, args, title, checks=(), params=None):
         export_step(part, str(step))
         files.append(step)
     _, pr, bed = printer_of(args)
-    rep = meshmod.check(tm, bed=bed, thickness_samples=2000 if args.fast else 4000, bed_name=pr["name"])
+    rep = meshmod.check(tm, bed=bed, thickness_samples=2000 if args.fast else 4000, bed_name=pr["name"],
+                        min_wall=min_wall)
     rep.stl_bytes = stl.stat().st_size
     if rep.stl_bytes > meshmod.TINKERCAD_MAX_BYTES:
         rep.warnings.append("STL is over Tinkercad's 25 MB import limit; rebuild with --fast")
@@ -175,7 +176,10 @@ def cmd_build(args):
     for part_name, part in parts.items():
         fname = part_name if part_name == name else f"{name}-{part_name}"
         chk = model_checks(mod, SimpleNamespace(**p), part_name, not isinstance(result, dict))
-        lines, rep = export(part, fname, out, args, fname, checks=chk, params=SimpleNamespace(**p))
+        mw = getattr(mod, "MIN_WALL", None)
+        mw = mw.get(part_name) if isinstance(mw, dict) else mw
+        lines, rep = export(part, fname, out, args, fname, checks=chk, params=SimpleNamespace(**p),
+                            min_wall=mw)
         all_ok &= rep.ok and rep.checks_ok
         reports[fname] = rep
         meshes[part_name] = rep.tm
@@ -469,8 +473,10 @@ def cmd_publish(args):
     for stem, s in slices.items():
         if s.get("file") and not outputs.slice_is_stale(s, out):
             slicer.extract_plate_png(out / s["file"], out / f"{stem}_plate.png")
-    meshes = [trimesh.load(out / part["stl"]) for part in build.get("parts", {}).values() if (out / part["stl"]).exists()]
+    meshes = {part.get("part", fname): trimesh.load(out / part["stl"])
+              for fname, part in build.get("parts", {}).items() if (out / part["stl"]).exists()}
     if meshes:
+        meshes = publishmod.display_meshes(mod, SimpleNamespace(**build.get("params", {})), meshes)
         t = render_product(meshes, out / f"{name}_product.png")
         ss = 1.5 if t > 30 else 2
         render_product(meshes, out / f"{name}_hero.png", cam=HERO_CAM, ss=ss)
