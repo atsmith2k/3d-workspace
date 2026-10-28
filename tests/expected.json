@@ -372,5 +372,190 @@
         "checks_ok": true
       }
     }
+  },
+  "candle_holder_mold": {
+    "model": "candle_holder_mold.py",
+    "set": [],
+    "parts": {
+      "candle_holder_mold": {
+        "size": [
+          83.8,
+          83.8,
+          43.0
+        ],
+        "volume_cm3": 74.3,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      }
+    }
+  },
+  "candle_holder_mold_hex": {
+    "model": "candle_holder_mold.py",
+    "set": [
+      "shape=hex"
+    ],
+    "parts": {
+      "candle_holder_mold_hex": {
+        "size": [
+          83.2,
+          72.6,
+          43.0
+        ],
+        "volume_cm3": 67.4,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      }
+    }
+  },
+  "candle_holder_mold_taper": {
+    "model": "candle_holder_mold.py",
+    "set": [
+      "candle=taper"
+    ],
+    "parts": {
+      "candle_holder_mold_taper": {
+        "size": [
+          65.3,
+          65.3,
+          51.0
+        ],
+        "volume_cm3": 53.5,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      }
+    }
+  },
+  "menorah_mold": {
+    "model": "menorah_mold.py",
+    "set": [],
+    "parts": {
+      "menorah_mold": {
+        "size": [
+          176.7,
+          38.7,
+          41.0
+        ],
+        "volume_cm3": 142.4,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      }
+    }
+  },
+  "christmas_tree_mold": {
+    "model": "christmas_tree_mold.py",
+    "set": [],
+    "parts": {
+      "christmas_tree_mold": {
+        "size": [
+          66.0,
+          66.0,
+          103.0
+        ],
+        "volume_cm3": 70.6,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      }
+    }
+  },
+  "snowflake_ornament_mold": {
+    "model": "snowflake_ornament_mold.py",
+    "set": [],
+    "parts": {
+      "snowflake_ornament_mold": {
+        "size": [
+          142.0,
+          142.0,
+          9.1
+        ],
+        "volume_cm3": 145.8,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      }
+    }
+  },
+  "trinket_tray_mold": {
+    "model": "trinket_tray_mold.py",
+    "set": [],
+    "parts": {
+      "trinket_tray_mold": {
+        "size": [
+          107.4,
+          107.4,
+          23.0
+        ],
+        "volume_cm3": 77.5,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      }
+    }
+  },
+  "incense_holder_mold": {
+    "model": "incense_holder_mold.py",
+    "set": [],
+    "parts": {
+      "incense_holder_mold": {
+        "size": [
+          128.3,
+          80.6,
+          25.0
+        ],
+        "volume_cm3": 65.6,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      }
+    }
+  },
+  "planter_mold": {
+    "model": "planter_mold.py",
+    "set": [],
+    "parts": {
+      "planter_mold-cup": {
+        "size": [
+          86.0,
+          86.0,
+          78.0
+        ],
+        "volume_cm3": 113.2,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "planter_mold-core": {
+        "size": [
+          91.4,
+          91.4,
+          68.0
+        ],
+        "volume_cm3": 211.7,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      }
+    }
+  },
+  "hex_coaster_mold": {
+    "model": "hex_coaster_mold.py",
+    "set": [],
+    "parts": {
+      "hex_coaster_mold": {
+        "size": [
+          121.0,
+          106.7,
+          13.0
+        ],
+        "volume_cm3": 41.5,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      }
+    }
   }
 }
