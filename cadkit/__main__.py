@@ -102,6 +102,18 @@ def export(part, name, out, args, title, checks=(), params=None):
     tm = meshmod.to_trimesh(part, tolerance=tol)
     stl = out / f"{name}.stl"
     tm.export(stl)
+    bambu_note = None
+    if not args.fast and slicer.find_bambu():
+        # ship the mesh as Bambu Studio itself exports it (its import repair applied),
+        # and run every check on that file
+        try:
+            import trimesh
+            n0, n1 = slicer.bambu_export_stl(stl)
+            tm = trimesh.load(stl)
+            bambu_note = f"bambu    re-exported by Bambu Studio ({n1} faces" + (")" if n0 == n1 else f", was {n0})")
+        except Exception as e:
+            tm.export(stl)
+            bambu_note = f"bambu    kept cadkit's STL: {e}"
     files = [stl]
     if hasattr(part, "tessellate") and not args.fast:
         from build123d import export_step
@@ -120,7 +132,7 @@ def export(part, name, out, args, title, checks=(), params=None):
     if not rep.checks_ok:
         failed = [l.split("FAIL ", 1)[1] for l in check_lines if "FAIL" in l]
         rep.warnings.append(f"{len(failed)} check{'s' if len(failed) > 1 else ''} failed: " + "; ".join(failed))
-    lines = rep.lines() + check_lines
+    lines = rep.lines() + ([bambu_note] if bambu_note else []) + check_lines
     if not args.no_render:
         png = out / f"{name}_preview.png"
         render_sheet(tm, png, title, lines, overhang_faces=rep.overhang_faces,

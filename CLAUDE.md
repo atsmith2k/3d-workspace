@@ -194,7 +194,9 @@ Definitions live in `cadkit/printers.py`. When the user doesn't say which printe
 the A1 and keep parts under 175 mm so they also fit the mini when possible.
 
 `cad slice` uses Bambu Studio's own CLI and system presets, so the time and filament are
-what Bambu Studio will show, and it writes `output/<name>/<name>_<printer>.3mf`: a sliced
+what Bambu Studio will show (each preset goes in with its `inherits` chain and `include`
+templates merged, `_flatten_preset`; passed raw, the CLI silently falls back to generic
+G-code, a 200 mm bed and a 2 mm3/s flow limit), and it writes `output/<name>/<name>_<printer>.3mf`: a sliced
 project the user opens in Bambu Studio and sends to the printer as is. Hand that 3MF to
 the user along with the STL. `--filament "Bambu PETG Basic"` picks another Bambu filament
 preset; `--layer-height` picks the matching Bambu quality preset (0.08 Extra Fine, 0.12
@@ -258,6 +260,10 @@ Bambu A1 series design notes (0.4 mm nozzle, 0.42 mm line width, 0.2 mm layers):
   evaluated at once; `math` functions force a slow point-by-point path. An open lattice
   band thinner than ~2 cells breaks into pieces; closed-skin `lattice_fill` is robust.
   `from build123d import *` shadows single-letter names like `M` (it is a unit).
+- Full builds re-export every STL through Bambu Studio's CLI (`slicer.bambu_export_stl`,
+  `--arrange 0 --orient 0` so the pose and coordinates stay put): the shipped file is the
+  mesh Bambu Studio itself loads and repairs, and the checks run on it. The build line
+  `bambu    kept cadkit's STL: ...` means its export was rejected and why.
 - Mesh cleanup and float32 rounding are handled in `cadkit/mesh.py`; if a build reports
   NOT watertight, look for coplanar or touching geometry in the model first.
 - manifold3d can return a solid that touches itself at a vertex or edge (two indices,

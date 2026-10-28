@@ -164,8 +164,44 @@ def _preset_density(profiles, name, kind="filament"):
     return 1.24
 
 
+def bambu_export_stl(stl, timeout=300):
+    """Re-export an STL through Bambu Studio's CLI so the shipped file is the mesh Bambu
+    Studio itself loads (it repairs every mesh on import: welds, fixes normals, drops
+    degenerate faces). Bambu centres the object on its bed; the result is moved back to
+    the original position so the STL keeps the model's coordinates. Replaces `stl` in
+    place and returns (faces_before, faces_after), or raises when Bambu Studio is
+    missing or its export is not a sound solid of the same size."""
+    import numpy as np
+    import trimesh
+    from .mesh import sound_as_sliced
+    exe = find_bambu()
+    if not exe:
+        raise FileNotFoundError("Bambu Studio not found")
+    stl = Path(stl)
+    before = trimesh.load(stl)
+    with tempfile.TemporaryDirectory() as tmp:
+        tmp = Path(tmp)
+        src = tmp / "in.stl"
+        shutil.copy(stl, src)
+        # no arrange/orient: keep the exact print pose and coordinates
+        r = subprocess.run([exe, "--arrange", "0", "--orient", "0", "--export-stl",
+                            "--outputdir", str(tmp), str(src)],
+                           capture_output=True, text=True, timeout=timeout, cwd=tmp)
+        info = json.loads((tmp / "result.json").read_text(encoding="utf-8")) if (tmp / "result.json").exists() else {}
+        out = next(iter(sorted((tmp / "stl").glob("*.stl"))), None) if (tmp / "stl").exists() else None
+        if info.get("return_code", r.returncode) != 0 or out is None:
+            raise RuntimeError(f"Bambu Studio export failed: {info.get('error_string', 'no STL written')}")
+        after = trimesh.load(out)
+    after.apply_translation(np.r_[before.bounds[0] - after.bounds[0]])
+    if not sound_as_sliced(after) or abs(after.volume - before.volume) > 1e-3 * abs(before.volume)             or not np.allclose(after.extents, before.extents, atol=0.01):
+        raise RuntimeError("Bambu Studio's export is not a sound solid of the same size; kept the original")
+    after.export(stl)
+    return len(before.faces), len(after.faces)
+
+
 def _flatten_preset(profiles, kind, name):
-    """A system preset with its whole `inherits` chain merged in, child keys winning.
+    """A system preset with its whole `inherits` chain (and each level's `include`
+    templates) merged in, child keys winning.
     The CLI only applies the named parent's own keys when a user preset inherits, so
     overrides have to ride on a fully resolved copy."""
     chain = []
@@ -180,8 +216,16 @@ def _flatten_preset(profiles, kind, name):
         name = d.get("inherits")
     merged = {}
     for d in reversed(chain):
+        # `include` pulls in template files (the A1's start/end/layer-change G-code
+        # live in "<machine> template machine_start_gcode.json" and the like)
+        for inc in d.get("include", []):
+            f = profiles / kind / f"{inc}.json"
+            if f.exists():
+                t = json.loads(f.read_text(encoding="utf-8"))
+                merged.update({k: v for k, v in t.items() if k not in ("name", "instantiation", "type")})
         merged.update(d)
-    merged.pop("inherits", None)
+    for k in ("inherits", "include"):
+        merged.pop(k, None)
     return merged
 
 
@@ -200,7 +244,8 @@ def slice_bambu(exe, stl, out_dir, printer_key, layer_height, infill, supports, 
         raise FileNotFoundError(f"no Bambu filament preset '{filament_name}'; see {profiles / 'filament'}")
     base_h = min(printers.BAMBU_PROCESS, key=lambda h: abs(h - layer_height))
     process_name = f"{printers.BAMBU_PROCESS[base_h]} {pr['process_suffix']}"
-    machine_json = profiles / "machine" / f"{pr['machine']}.json"
+    if not (profiles / "machine" / f"{pr['machine']}.json").exists():
+        raise FileNotFoundError(f"no Bambu machine preset '{pr['machine']}'; see {profiles / 'machine'}")
 
     with tempfile.TemporaryDirectory() as tmp:
         tmp = Path(tmp)
@@ -212,8 +257,21 @@ def slice_bambu(exe, stl, out_dir, printer_key, layer_height, infill, supports, 
                          "enable_support": "1" if supports else "0"})
         process_json = tmp / "process.json"
         process_json.write_text(json.dumps(override), encoding="utf-8")
-        cmd = [exe, "--load-settings", f"{machine_json};{process_json}",
-               "--load-filaments", str(filament_json),
+        # The filament preset needs its inherits chain resolved too: passed as is, the CLI
+        # drops the parents' keys and falls back to defaults such as a 2 mm3/s volumetric
+        # limit, which slows every extrusion move ~3x in the G-code and the estimate.
+        filament_cfg = _flatten_preset(profiles, "filament", filament_name)
+        filament_cfg.update({"from": "User", "compatible_printers": [pr["machine"]]})
+        flat_filament = tmp / "filament.json"
+        flat_filament.write_text(json.dumps(filament_cfg), encoding="utf-8")
+        # Same for the machine: unresolved, it loses the A1's start/end G-code, bed size,
+        # acceleration and retraction limits to generic defaults.
+        machine_cfg = _flatten_preset(profiles, "machine", pr["machine"])
+        flat_machine = tmp / "machine.json"
+        flat_machine.write_text(json.dumps(machine_cfg), encoding="utf-8")
+        cmd = [exe, "--load-settings", f"{flat_machine};{process_json}",
+               "--load-filaments", str(flat_filament),
+               "--orient", "0",            # the model is already in its print pose
                "--slice", "0", "--export-3mf", "out.3mf", "--outputdir", str(tmp), str(stl)]
         r = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, cwd=tmp)
         result = tmp / "result.json"
