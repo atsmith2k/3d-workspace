@@ -1,9 +1,11 @@
-"""One-piece cement mold for a Hanukkah menorah: a straight bar holding eight candles in a
-row at one height, with the shamash in the middle on a raised block.
+"""Mold for a modern cement or Jesmonite Hanukkah menorah: a straight bar with eight
+candle cups in a row at one height and the shamash raised in the middle.
 
-Cast upside down: the mold floor forms the menorah's top face, drafted bosses on the floor
-form the candle cups, and a deeper well in the middle of the floor forms the raised shamash
-block. The pour face becomes the menorah's flat base.
+The finished menorah is 168 mm long, 30 mm deep and 26 mm tall, with the shamash block
+12 mm higher. The cups take standard 9-10 mm Hanukkah candles and narrow slightly so
+the candles stand straight. Cement does not burn, which makes it a good material for a
+menorah. Pour, screed the back flat, and lift it out once cured. Prints opening-up with
+no supports in about 8 hours, and fits the A1 mini bed.
 
 Spec:
   object:       mold for a cement / Jesmonite menorah, poured straight into the print

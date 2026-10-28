@@ -1,9 +1,10 @@
-"""One-piece cement mold for a pebble-shaped incense stick holder: a soft organic outline,
-a shallow ash well, and a tapered hole in the middle of the well that holds a stick upright.
+"""Mold for a pebble-shaped incense holder in cement or Jesmonite, 120 x 72 mm and 22 mm
+tall.
 
-Cast upside down: the mold floor forms the holder's top, a dome on the floor forms the ash
-well, and a tapered pin on top of the dome forms the stick hole. The pour face becomes the
-flat base.
+A shallow well catches the ash, and the hole in its centre holds a stick upright (it
+fits sticks with a 1.5-2.5 mm core); cones sit in the well too. Pour, screed the back
+flat, and lift it out once cured. Prints opening-up with no supports in about 5 hours on
+a Bambu A1 or A1 mini.
 
 Spec:
   object:       mold for a cement / Jesmonite incense stick holder (also takes cones)

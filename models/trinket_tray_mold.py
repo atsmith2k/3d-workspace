@@ -1,10 +1,10 @@
-"""One-piece mold for a round trinket tray / ring dish with a fluted outside and a smooth,
-shallow well, for cement, plaster or Jesmonite.
+"""Mold for a fluted round trinket tray / ring dish in cement, plaster or Jesmonite.
 
-Cast upside down: the mold floor forms the tray's top, and a dome standing on the floor
-forms the well. The dome's profile starts at about 40 deg from vertical at its foot and
-flattens to the top, so it releases easily and leaves a soft bowl. The pour face is the
-tray's flat base.
+The tray is 100 mm across with 28 rounded flutes around the outside and a smooth,
+shallow well 82 mm across and 11 mm deep for rings, keys or a candle. Pour, screed the
+back flat, and lift it out once cured; every surface is tapered so it releases from the
+rigid mold. Prints opening-up with no supports in about 5.5 hours on a Bambu A1 or A1
+mini.
 
 Spec:
   object:       mold for a 100 mm cement / plaster / Jesmonite ring dish

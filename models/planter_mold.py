@@ -1,10 +1,11 @@
-"""Two-part cement mold for a small planter with a drainage hole: an outer cup and a core.
+"""Two-part mold for a fluted cement or Jesmonite planter with a drainage hole: 80 mm
+across the rim, 75 mm tall, with 8 mm walls and a 10 mm floor.
 
-The planter is cast right side up. The outer cup forms the outside (widening upward, 2 deg)
-and a pin on its floor forms the drainage hole. The core forms the inside: it hangs from a
-flange that rests on the cup's rim, and a skirt around the flange slides over the outside
-of the cup to centre it, so the wall comes out even. Four vents in the flange let air and
-excess cement out as the core is pressed down. Weigh the core down while the cement cures.
+Fill the cup about two-thirds with cement, press the core in until its flange rests on
+the rim (its skirt centres it, so the wall comes out even), and weigh it down while the
+cement cures. Four vents in the flange let air and excess cement out. A pin on the cup
+floor forms the drainage hole; poke through any thin skin left over it. Both parts
+print with no supports, about 16 hours together, and fit the A1 mini bed.
 
 Spec:
   object:       two-part mold for an 80 mm cement / Jesmonite planter with a drain hole

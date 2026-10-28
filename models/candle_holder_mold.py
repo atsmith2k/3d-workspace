@@ -1,9 +1,12 @@
-"""One-piece cement mold for a candle holder: a tealight or a taper candle, in a fluted,
-faceted hex or plain round body.
+"""Mold for a cement or Jesmonite candle holder you pour straight into the print.
 
-The holder is cast upside down: the mold floor forms the holder's top face, and a drafted
-boss standing on the floor forms the candle pocket. The pour face (screeded flat) becomes
-the holder's base. Every wall the cement touches is drafted so the casting slides out.
+Choose the version in the title: a fluted tealight holder (75 mm across, 40 mm tall), a
+faceted hexagon tealight holder, or a fluted holder for a 7/8 in taper candle (56 mm
+across, 48 mm tall). The tealight pocket fits standard 38-39 mm tealights with room to
+lift them out; the taper pocket narrows slightly so the candle wedges upright. Pour, tap
+out the air, screed the back flat, and lift the holder out once cured: every wall is
+tapered so it releases from the rigid mold. Prints opening-up with no supports in about
+4-6 hours on a Bambu A1 or A1 mini.
 
 Spec:
   object:       mold for a cement / Jesmonite candle holder, poured straight into the print

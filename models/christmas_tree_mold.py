@@ -1,10 +1,10 @@
-"""One-piece cement mold for a star-section Christmas tree: an eight-pointed star that tapers
-from the base to a small flat tip, the modern faceted look.
+"""Mold for a modern tabletop Christmas tree in cement, plaster or Jesmonite: an
+eight-pointed star that tapers to a small tip, 100 mm tall and 60 mm across.
 
-Cast upside down: the tip sits at the bottom of the mold and the pour face becomes the
-tree's flat base. The taper itself is the draft (about 8 deg on the star points), so the
-casting lifts straight out. The mold's outer cone keeps a constant wall over the star points,
-and a disc at the bottom keeps it stable and stuck to the bed.
+Pour into the upright mold, screed the base flat, and lift the tree out once cured; the
+taper itself lets it release cleanly. Leave it raw, paint the tip gold, or make a few in
+different finishes. Prints tip-down with no supports in about 5 hours on a Bambu A1 or
+A1 mini.
 
 Spec:
   object:       mold for a cement / plaster / Jesmonite tabletop Christmas tree

@@ -1,9 +1,9 @@
-"""Hexagon coaster mold for Jesmonite, plaster, terrazzo mixes or resin, with optional
-concentric hexagon grooves on the face.
+"""Mold for a 100 mm hexagon coaster in Jesmonite, plaster, a terrazzo mix or resin, with
+two concentric hexagon grooves on its face.
 
-Cast face-down: the mold floor forms the coaster's face, so ribs on the floor become grooves
-in the coaster. The pour face is the back (add cork or felt). Pairs with the oak leaf
-coaster mold.
+The coaster is 10 mm thick, and the back is the pour side: screed it flat and add cork
+or felt pads. Make a set in different colours, or pair it with the oak leaf coaster mold.
+Prints opening-up with no supports in about 4 hours on a Bambu A1 or A1 mini.
 
 Spec:
   object:       mold for a 100 mm hexagon coaster, 10 mm thick

@@ -1,10 +1,10 @@
-"""Plaster ornament mold: a plate with four different snowflake cavities, each with a pin that
-forms the hanging hole through the ornament's top arm.
+"""Mold for four plaster, Jesmonite or resin snowflake ornaments at once, each a different
+design, 62 mm across and 6 mm thick, with a raised hexagon at the centre.
 
-The snowflakes are flat, 6 mm thick, cast face-down: the mold floor gives the show face and
-the pour face is the back. A shallow hexagon pocket in each cavity floor becomes a raised
-hexagon at the snowflake's centre. Walls of the cavities are drafted 8 deg because the arms are
-narrow and the mold is rigid.
+Each snowflake has a hanging hole in its top arm for a ribbon or hook. Fill the
+cavities level, let them set, and tip them out. They take paint, gilding or glitter
+well. The mold is one flat plate that prints with no supports in about 9 hours and fits
+the A1 mini bed.
 
 Spec:
   object:       mold for four plaster / Jesmonite / resin snowflake ornaments, 62 mm each
