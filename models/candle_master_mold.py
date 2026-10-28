@@ -7,8 +7,8 @@ pillar turning a third of a turn, 60 x 100 mm). The master stands on a base boar
 the housing tube over the base, seal the joint with a little clay, and pour silicone to
 the rim. The pin on top of the master leaves a ready-made wick hole through the silicone.
 Demold, and pour wax into the silicone through its open end, which forms the candle's
-flat base. The build reports how much silicone to mix. Both parts print with no supports
-on a Bambu A1 or A1 mini.
+flat base. Mix about 300 ml of silicone (ribbed 303 ml, faceted 275 ml, twisted 315 ml).
+Both parts print with no supports, about 2.5 hours each, on a Bambu A1 or A1 mini.
 
 Spec:
   object:       two-part master + housing for casting a silicone pillar-candle mold
@@ -21,7 +21,7 @@ Spec:
   orientation:  master: base board on the bed, candle and wick pin up; housing: either
                 end down; no supports
   must have:    styles ribbed / faceted / twisted; 2 mm chamfer round the candle top;
-                wick pin 2.5 mm; silicone volume reported by the build
+                wick pin 2.5 mm; silicone needed reported by the build (275-315 ml)
   tolerances:   sliding 0.25 mm per side on the spigot
 
 Units: mm. Z is up, each part sits on Z=0 in its print pose.
@@ -44,8 +44,9 @@ PRODUCT = dict(
     cast_material="silicone (Shore 20-30A, platinum or tin cure), then candle wax",
     post_processing=("Lightly sand the master's visible layer lines or brush on a sealer; the "
                      "silicone copies every line. Spray release on the master and housing, seal "
-                     "the housing-to-base joint with modelling clay, then mix the silicone volume "
-                     "the build reports and pour slowly into one corner. Demold after full cure."),
+                     "the housing-to-base joint with modelling clay, then mix about 300 ml of "
+                     "silicone (ribbed 303, faceted 275, twisted 315 ml) and pour slowly into one "
+                     "corner. Demold after full cure."),
 )
 LICENSE_NOTES = None   # original design
 

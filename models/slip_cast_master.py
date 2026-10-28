@@ -5,9 +5,10 @@ Choose the piece in the title: a small bowl (95 mm across and 45 mm tall after f
 a tumbler (75 mm across the rim and 100 mm tall after firing). The master is already
 scaled up for 12% clay shrinkage, so the fired piece comes out at those sizes, and it
 carries a spare (pour reservoir) at the rim. Stand it on its base, slide the cottle tube
-over, seal the joint with clay, and pour plaster to the rim; the build reports how much
-to mix. The finished mold has no undercuts, so the leather-hard piece drops straight
-out. Both parts print with no supports on a Bambu A1 or A1 mini.
+over, seal the joint with clay, and pour plaster to the rim: about 1.5 litres of mixed
+plaster for the bowl, 1.8 litres for the tumbler. The finished mold has no undercuts,
+so the leather-hard piece drops straight out. Both parts print with no supports on a
+Bambu A1 or A1 mini (about 7 hours for the bowl kit, 9 for the tumbler).
 
 Spec:
   object:       master on a base board + cottle tube for casting a one-piece plaster
@@ -46,8 +47,8 @@ PRODUCT = dict(
     cast_material="pottery plaster (USG No. 1 or similar), then casting slip",
     post_processing=("Sand the master's layer lines smooth, or fill them with a primer, and seal it; "
                      "plaster copies every line. Coat master and cottle with mold soap, seal the "
-                     "cottle-to-base joint with clay, mix the plaster volume the build reports and "
-                     "pour to the rim. Dry the mold fully before the first cast."),
+                     "cottle-to-base joint with clay, mix about 1.5 litres (bowl) or 1.8 litres "
+                     "(tumbler) of plaster and pour to the rim. Dry the mold fully before the first cast."),
 )
 LICENSE_NOTES = None   # original design
 

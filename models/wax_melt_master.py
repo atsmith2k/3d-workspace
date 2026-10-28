@@ -3,8 +3,8 @@ each topped with its own raised design (leaf, flower, heart, sprig, star and dai
 
 Pour silicone into the box to just over the rim, let it cure and peel it out: you have a
 six-cavity wax-melt mold that copies every design. The melts come out 30 x 30 mm and
-14 mm thick with the design raised on their face. The build reports how much silicone to
-mix. Prints in one piece, open side up, with no supports, on a Bambu A1 or A1 mini.
+14 mm thick with the design raised on their face. Mix about 130 ml of silicone. Prints in
+one piece, open side up, with no supports, in under 2 hours on a Bambu A1 or A1 mini.
 
 Spec:
   object:       one-piece silicone mold master (positive + mold box) for six wax melts
@@ -35,7 +35,7 @@ PRODUCT = dict(
     printers=["a1", "a1mini"],
     cast_material="silicone (Shore 20-30A, platinum or tin cure), then wax",
     post_processing=("Brush a sealer or spray release over the master; the silicone copies layer "
-                     "lines. Mix the silicone volume the build reports, pour slowly into one corner "
+                     "lines. Mix about 130 ml of silicone, pour slowly into one corner "
                      "until it covers the melt shapes by about 6 mm, and demold after full cure."),
 )
 LICENSE_NOTES = None   # original artwork
