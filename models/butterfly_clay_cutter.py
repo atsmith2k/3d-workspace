@@ -63,5 +63,9 @@ def assembly(p):
     return cutter_assembly(p)
 
 
+def display(p):
+    return cutter_display(p)
+
+
 def build(p):
     return cutter_set(art(p), p)

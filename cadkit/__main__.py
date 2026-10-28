@@ -473,8 +473,10 @@ def cmd_publish(args):
     for stem, s in slices.items():
         if s.get("file") and not outputs.slice_is_stale(s, out):
             slicer.extract_plate_png(out / s["file"], out / f"{stem}_plate.png")
-    meshes = [trimesh.load(out / part["stl"]) for part in build.get("parts", {}).values() if (out / part["stl"]).exists()]
+    meshes = {part.get("part", fname): trimesh.load(out / part["stl"])
+              for fname, part in build.get("parts", {}).items() if (out / part["stl"]).exists()}
     if meshes:
+        meshes = publishmod.display_meshes(mod, SimpleNamespace(**build.get("params", {})), meshes)
         t = render_product(meshes, out / f"{name}_product.png")
         ss = 1.5 if t > 30 else 2
         render_product(meshes, out / f"{name}_hero.png", cam=HERO_CAM, ss=ss)

@@ -107,7 +107,8 @@ def build(p):                          # p.width, p.style ...
     return part                        # or {"lid": a, "base": b} for multi-part prints
 ```
 
-`PRODUCT` and `LICENSE_NOTES` are read by `cad publish` only; every key is optional.
+`PRODUCT`, `LICENSE_NOTES` and an optional `display(p)` (product-shot poses, like `assembly`;
+otherwise overlapping parts are laid side by side) are read by `cad publish` only.
 `MIN_WALL` lowers the thin-wall warning threshold for walls that are thin on purpose
 (cutter blade edges); the report still shows the share under 1.2 mm.
 `PRODUCT["title"]` may use `{param}` placeholders so `--set` variants get their own titles.
@@ -173,7 +174,7 @@ for the sweep start) rather than improvising.
 imprints, bars_x, bars_y)` plus `cutter_set(art, p)` gives a cutter and a pusher per size
 in `p.sizes` (outline blade, cut-through inner blades, recessed imprint blades, support
 bars, pusher prongs). Merge `CUTTER_PARAMS` into PARAMS, set `MIN_WALL = CUTTER_MIN_WALL`,
-and use `cutter_checks(p)` / `cutter_assembly(p)`. Worked model: `heart_hoop_clay_cutter`.
+and use `cutter_checks(p)` / `cutter_assembly(p)` / `cutter_display(p)`. Worked model: `heart_hoop_clay_cutter`.
 
 **Images and SVGs** (`from cadkit.image import *`): `trace("logo.png", width=60)` turns a
 logo, sketch or photo silhouette into a CrossSection (holes kept); `svg_shape("x.svg",

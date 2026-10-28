@@ -16,7 +16,8 @@ Every cutter prints back plane and finger flange on the bed, edge up; every push
 prints plate down, prongs up. Neither has overhangs.
 
 `CUTTER_PARAMS` holds the defaults models merge into PARAMS; `cutter_checks(p)` and
-`cutter_assembly(p)` give the matching checks and fit poses. Models set
+`cutter_assembly(p)` give the matching checks and fit poses, `cutter_display(p)` the
+product-shot layout. Models set
 `MIN_WALL = CUTTER_MIN_WALL` so the blade edges don't raise the thin-wall warning.
 """
 from dataclasses import dataclass, field
@@ -197,4 +198,18 @@ def cutter_assembly(p, spacing=80.0):
     for i, size in enumerate(p.sizes):
         out[f"cutter_{_tag(size)}"] = (i * spacing, 0, 0, 0, 0, 0)
         out[f"pusher_{_tag(size)}"] = (i * spacing, 0, -p.pusher_plate - 0.2, 0, 0, 0)
+    return out
+
+
+def cutter_display(p, gap=8.0):
+    """Product-shot layout: cutters in a back row, each pusher in front of its cutter,
+    sizes left to right (smallest first)."""
+    rim = 2 * (p.outer_base + p.flange_w)
+    out, x = {}, 0.0
+    for size in p.sizes:
+        w = size + rim
+        x += w / 2
+        out[f"cutter_{_tag(size)}"] = (x, w / 2 + gap / 2, 0, 0, 0, 0)
+        out[f"pusher_{_tag(size)}"] = (x, -w / 2 - gap / 2, 0, 0, 0, 0)
+        x += w / 2 + gap
     return out

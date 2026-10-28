@@ -128,6 +128,31 @@ def model_info(mod, path):
 
 # ---------------------------------------------------------------- viewer mesh
 
+def display_meshes(mod, p, meshes, gap=8.0):
+    """Meshes (dict part name -> trimesh, print pose) arranged for the product
+    pictures and the 3D viewer: by the model's `display(p)` poses if it has one
+    ({part: (dx, dy, dz, rx, ry, rz)}, like `assembly`), else side by side along X
+    when parts printed at the same spot would overlap. Returns a list."""
+    from .measure import posed
+    if callable(getattr(mod, "display", None)):
+        poses = mod.display(p)
+        return [posed(tm, poses[n]) if n in poses else tm for n, tm in meshes.items()]
+    tms = list(meshes.values())
+    boxes = [tm.bounds[:, :2] for tm in tms]
+    overlap = any((a[0] < b[1]).all() and (b[0] < a[1]).all()
+                  for i, a in enumerate(boxes) for b in boxes[i + 1:])
+    if not overlap:
+        return tms
+    out, x = [], 0.0
+    for tm in tms:
+        lo, hi = tm.bounds
+        moved = tm.copy()
+        moved.apply_translation((x - lo[0], -(lo[1] + hi[1]) / 2, 0))
+        out.append(moved)
+        x += hi[0] - lo[0] + gap
+    return out
+
+
 def preview_glb(meshes, path, faces=GLB_FACES):
     """Write a binary glTF preview of `meshes` (trimesh.Trimesh, print pose) for the
     shop's 3D viewer. Not printable on purpose: the parts are concatenated, simplified
