@@ -233,6 +233,8 @@ class Report:
     wall_thin_mm: float = 0.0        # ~1st percentile of sampled thickness
     wall_median_mm: float = 0.0
     thin_fraction: float = 0.0       # share of surface samples under MIN_WALL
+    min_wall: float = MIN_WALL       # warning threshold (a model's MIN_WALL can lower it)
+    flag_fraction: float = 0.0       # share of surface samples under min_wall
     thin_points: list = field(default_factory=list)
     thin_samples: np.ndarray = field(default=None, repr=False)   # every thin sample, for the preview
     stl_bytes: int = 0
@@ -268,6 +270,7 @@ class Report:
             thinnest_wall_mm=round(float(self.wall_thin_mm), 2),
             wall_median_mm=round(float(self.wall_median_mm), 2),
             thin_fraction=round(float(self.thin_fraction), 4),
+            min_wall_mm=float(self.min_wall),
             thin_points=[dict(at=[float(v) for v in q], mm=float(t)) for q, t in self.thin_points],
             stl_bytes=int(self.stl_bytes),
             warnings=list(self.warnings),
@@ -288,13 +291,18 @@ class Report:
         ]
         if self.wall_median_mm:
             out.append(f"wall     thinnest ~{self.wall_thin_mm:.1f} mm, median {self.wall_median_mm:.1f} mm, "
-                       f"{100 * self.thin_fraction:.1f}% of surface under {MIN_WALL} mm")
+                       f"{100 * self.thin_fraction:.1f}% of surface under {MIN_WALL} mm"
+                       + (f" (model allows {self.min_wall:g} mm: {100 * self.flag_fraction:.1f}% under that)"
+                          if self.min_wall < MIN_WALL else ""))
         if self.stl_bytes:
             out.append(f"stl      {self.stl_bytes / 1e6:.1f} MB")
         return out + [f"WARNING  {w}" for w in self.warnings]
 
 
-def check(tm, bed=(256, 256, 256), thickness_samples=4000, bed_name=None):
+def check(tm, bed=(256, 256, 256), thickness_samples=4000, bed_name=None, min_wall=None):
+    """min_wall: the model's own floor for intentional thin walls (a module-level
+    MIN_WALL, e.g. cutter blade edges); the thin-wall warning fires only below it."""
+    min_wall = MIN_WALL if min_wall is None else min(min_wall, MIN_WALL)
     lo, hi = tm.bounds
     size = hi - lo
     n = tm.face_normals
@@ -334,10 +342,13 @@ def check(tm, bed=(256, 256, 256), thickness_samples=4000, bed_name=None):
         mask[fi[thin]] = True
         rep.thin_faces = _grow_faces(tm, mask)
         rep.thin_samples = pts[thin]
-        if thin.any():
-            # group thin samples into spots 8 mm across, biggest first, so the model
+        rep.min_wall = min_wall
+        flag = th < min_wall
+        rep.flag_fraction = float(flag.mean())
+        if flag.any():
+            # group flagged samples into spots 8 mm across, biggest first, so the model
             # knows where to look and how thin that region typically is
-            tp, tt = pts[thin], th[thin]
+            tp, tt = pts[flag], th[flag]
             left = np.ones(len(tp), bool)
             spots = []
             while left.any():
@@ -355,9 +366,9 @@ def check(tm, bed=(256, 256, 256), thickness_samples=4000, bed_name=None):
         rep.warnings.append("nothing sits flat at the lowest Z; rotate it or add a base")
     if rep.overhang_area_mm2 > 1:
         rep.warnings.append("overhangs present; needs supports or a different print orientation")
-    if rep.thin_fraction > 0.003:
+    if rep.flag_fraction > 0.003:
         where = ", ".join(f"({x}, {y}, {z}) {t} mm" for (x, y, z), t in rep.thin_points)
-        rep.warnings.append(f"walls under {MIN_WALL} mm (yellow in preview) near {where}")
+        rep.warnings.append(f"walls under {rep.min_wall:g} mm (yellow in preview) near {where}")
     if any(s > b for s, b in zip(sorted(size), sorted(bed))):
         rep.warnings.append(f"larger than the {bed_name + ' ' if bed_name else ''}bed "
                             f"({bed[0]:g} x {bed[1]:g} x {bed[2]:g} mm)")
