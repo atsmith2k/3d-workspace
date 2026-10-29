@@ -70,6 +70,8 @@ def rounded(cs, r):
 
 
 def prism(cs, z0, z1):
+    if cs.is_empty():   # e.g. a hole narrower than its blade: extruding nothing is invalid
+        return Manifold()
     return Manifold.extrude(cs, z1 - z0).translate((0, 0, z0))
 
 
