@@ -30,7 +30,9 @@ from . import printers as printersmod
 SCHEMA = "cadkit-product/1"
 DEFAULT_PRINTERS = ["a1", "a1mini"]
 FILE_ROLES = ("stl", "3mf", "step", "png", "txt", "glb")
-GLB_FACES = (8000, 12000)   # face band for the viewer mesh; the hard cap is 15k
+GLB_FACES = (8000, 12000)   # face band for the viewer mesh
+GLB_MAX_TOL = 0.2           # mm; past this manifold's simplify stops shrinking thin-walled
+                            # parts and tears them (0.45 mm cutter blades lost 30% of their area at 4 mm)
 SPEC_KEYS = ("object", "overall", "mates_with", "orientation", "must_have", "tolerances",
              "casting", "material")
 
@@ -163,7 +165,8 @@ def preview_glb(meshes, path, faces=GLB_FACES):
     Simplification is manifold3d's tolerance-bounded edge collapse (every vertex stays
     within the tolerance of the original surface), which keeps 1.7 mm mold walls and
     relief lines intact where quadric decimators collapse them; the tolerance is
-    searched so the count lands in the band."""
+    searched so the count lands in the band, but never past `GLB_MAX_TOL`: a part too
+    detailed to reach the band at that tolerance ships heavier rather than torn."""
     import numpy as np
     import trimesh
     import manifold3d as m3
@@ -173,7 +176,7 @@ def preview_glb(meshes, path, faces=GLB_FACES):
         man = m3.Manifold(m3.Mesh(np.ascontiguousarray(tm.vertices, np.float32),
                                   np.ascontiguousarray(tm.faces, np.uint32)))
         if man.status() == m3.Error.NoError and man.num_tri() > 0:
-            best, t_lo, t_hi = None, 0.01, 4.0          # mm; bisect in log space
+            best, t_lo, t_hi = None, 0.01, GLB_MAX_TOL  # mm; bisect in log space
             for _ in range(14):
                 tol = float(np.sqrt(t_lo * t_hi))
                 n = man.simplify(tol).num_tri()
