@@ -105,7 +105,10 @@ def candle(p):
     r = d / 2
     body_h = h - p.chamfer
     twist = TWIST[p.style]
-    body = Manifold.extrude(section(p, r), body_h, n_divisions=max(1, int(abs(twist) / 2)),
+    # at least one division per mm: coarser steps bend each flat facet into visible
+    # diagonal bands (the faceted style)
+    body = Manifold.extrude(section(p, r), body_h,
+                            n_divisions=max(1, int(abs(twist) / 2), int(body_h) if twist else 1),
                             twist_degrees=twist)
     # chamfered top: the last `chamfer` mm narrows by the same amount, carrying the twist on
     top_twist = twist * p.chamfer / body_h

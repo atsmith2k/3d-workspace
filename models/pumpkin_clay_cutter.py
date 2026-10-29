@@ -9,7 +9,8 @@ Three kinds of blade, all sharing the same back plane:
 Blade profile follows the 0.4 mm nozzle rule (walls at multiples of the 0.45 mm line
 width): the outer blade is 1.35 mm at the base, inner and imprint blades 0.9 mm, and all
 taper over the top `taper_h` to a 0.45 mm single-line edge. The cutting face is vertical
-on the keep side (the piece) and the taper sits on the waste side.
+on the keep side (the piece) and the taper sits on the waste side as a straight bevel
+(blades and pusher are built by `cadkit.cutter`).
 
 The inner blades are held by three support bars across the back (`bar_h` tall). They sit
 well back from the clay, so they never show in the cut piece, and the back stays open so
@@ -22,9 +23,10 @@ cutter without flipping.
 Don't scale the STL to resize: that changes blade thickness. Use --set size=... instead.
 """
 import numpy as np
-from manifold3d import CrossSection, JoinType, Manifold
+from manifold3d import JoinType
 
 from cadkit.relief import *
+from cadkit.cutter import Art, _cutter
 
 DESCRIPTION = "1 in jack-o'-lantern clay cutter with face cutouts, rib imprints and matching pusher"
 
@@ -59,25 +61,6 @@ def rect(x0, y0, x1, y1):
 def rounded(cs, r):
     """Round convex then concave corners by r."""
     return off(off(off(off(cs, -r), r), r), -r)
-
-
-def slices(make, z0, z1, steps, top_extra=0.0):
-    """Stack of extruded slices from z0 to z1. make(f) gives the section, f in (0, 1],
-    f = 1 being the top slice. Slices overlap 0.05 mm so they fuse; the top slice can
-    run past z1 by top_extra (for cutting tools)."""
-    out = Manifold()
-    h = (z1 - z0) / steps
-    for k in range(steps):
-        cs = make((k + 1) / steps).simplify(0.002)
-        if cs.is_empty():
-            continue
-        top = z0 + (k + 1) * h + (0.05 if k < steps - 1 else top_extra)
-        out += Manifold.extrude(cs, top - (z0 + k * h)).translate((0, 0, z0 + k * h))
-    return out
-
-
-def prism(cs, z0, z1):
-    return Manifold.extrude(cs, z1 - z0).translate((0, 0, z0))
 
 
 # ---- artwork, drawn in a ~26 mm frame and scaled to `size` ----
@@ -116,56 +99,12 @@ def build(p):
     O = xf(outline)
     F = rounded(xf(face[0]), 0.4) + rounded(xf(face[1]), 0.35) + rounded(xf(face[2]), 0.3)
     rib_paths = [(np.asarray(r) - c) * s for r in ribs]
-    H, T = p.height, p.taper_h
-    zt = H - T
-    steps = max(4, int(round(T / 0.2)))
-    lerp = lambda a, b, f: a + (b - a) * f
-
-    # outer blade + finger flange, inner face exactly on the outline
-    outer = (prism(off(O, p.outer_base + p.flange_w), 0, p.flange_t)
-             + prism(off(O, p.outer_base), p.flange_t - 0.1, zt + 0.05)  # starts inside the flange
-             + slices(lambda f: off(O, lerp(p.outer_base, p.tip, f)), zt, H, steps))
-    outer -= prism(O, -1, H + 1)
-
-    # cut-through blades for the face, growing inward (waste side)
-    inner = prism(F, 0, H)
-    inner -= prism(off(F, -p.inner_base), -1, zt + 0.05)
-    inner -= slices(lambda f: off(F, -lerp(p.inner_base, p.tip, f)), zt, H, steps, top_extra=1.0)
-
-    # imprint blades: symmetric taper, stopping imprint_recess short of the edge
-    Hr = H - p.imprint_recess
-    imprint = Manifold()
-    for path in rib_paths:
-        imprint += prism(stroke(path, p.inner_base), 0, Hr - T + 0.05)
-        imprint += slices(lambda f, path=path: stroke(path, lerp(p.inner_base, p.tip, f)),
-                          Hr - T, Hr, steps)
-
-    # support bars, ends buried mid-way into the outer blade wall
     by = [(y - c[1]) * s for y in bar_ys]
-    big = p.size
-    strips = rect(-p.bar_w / 2, -big, p.bar_w / 2, big)
-    for y in by:
-        strips += rect(-big, y - p.bar_w / 2, big, y + p.bar_w / 2)
-    bars_cs = strips ^ off(O, p.outer_base / 2)
-    bars = prism(bars_cs, 0, p.bar_h)
 
-    cutter = outer + inner + imprint + bars
+    # blades, bars and pusher come from cadkit.cutter (exact ruled bevels); the art is
+    # already at final size and centred, so _cutter's own scaling is 1
+    art = Art(outline=O, cutouts=[F], imprints=rib_paths, bars_x=[0.0], bars_y=by, cut_round=0)
+    cutter, pusher = _cutter(art, max(O.bounds()[2] - O.bounds()[0], O.bounds()[3] - O.bounds()[1]), p)
     if not p.pusher:
         return cutter
-
-    # pusher: prongs fill every open gap in the back, clear of blades and bars
-    clr = p.pusher_clearance
-    ribs_cs = CrossSection()
-    for path in rib_paths:
-        ribs_cs += stroke(path, p.inner_base)
-    blocked = off(F + ribs_cs + bars_cs, clr)
-    room = (off(O, -clr) - blocked) + (off(F, -p.inner_base - clr) - off(bars_cs, clr))
-    room = off(off(room, -0.6), 0.6)  # drop slivers too thin to print as a 12 mm prong
-    prongs = CrossSection()
-    for piece in room.decompose():
-        if piece.area() >= 3.0:
-            prongs += piece
-    plate = off(O, p.outer_base + p.flange_w)
-    pusher = (prism(plate, 0, p.pusher_plate)
-              + prism(prongs, p.pusher_plate - 0.1, p.pusher_plate + H - 0.2))
     return {"cutter": cutter, "pusher": pusher}

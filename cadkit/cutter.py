@@ -10,7 +10,7 @@ Art is drawn at any scale; each cutter scales it so the outline's longest side i
 size named in `p.sizes` (mm). Blade thickness never scales: blades are 3 lines (outer)
 and 2 lines (inner) of a 0.4 mm nozzle at the base, tapering over the top `taper_h` to a
 single 0.45 mm line. The cutting face is vertical on the keep side and the taper sits on
-the waste side.
+the waste side as a straight, exact bevel (`relief.offset_loft`), not stacked slices.
 
 Every cutter prints back plane and finger flange on the bed, edge up; every pusher
 prints plate down, prongs up. Neither has overhangs.
@@ -26,6 +26,7 @@ import numpy as np
 from manifold3d import CrossSection, JoinType, Manifold
 
 from cadkit.checks import custom, dims, flat_base, no_overhang, single_body
+from cadkit.relief import offset_loft
 
 CUTTER_PARAMS = dict(
     sizes=(20.0, 28.0, 36.0),  # longest side of each cut piece; one cutter + pusher per size
@@ -110,28 +111,53 @@ def _cutter(art, size, p):
     steps = max(4, int(round(T / 0.2)))
     lerp = lambda a, b, f: a + (b - a) * f
 
-    outer = (prism(off(O, p.outer_base + p.flange_w), 0, p.flange_t)
-             + prism(off(O, p.outer_base), p.flange_t - 0.1, zt + 0.05)
-             + slices(lambda f: off(O, lerp(p.outer_base, p.tip, f)), zt, H, steps))
-    outer -= prism(O, -1, H + 1)
+    # Blades taper as exact ruled bevels (offset_loft). The waste side is closed (outer)
+    # or opened (cutouts) by just over the blade width first, so the bevel cannot fold
+    # in a notch narrower than the blade: there the blade simply stays solid.
+    close = p.outer_base + 0.05
+    Oc = off(off(O, close), -close)
+    outer = prism(off(O, p.outer_base + p.flange_w), 0, p.flange_t)
+    body = offset_loft(Oc, [(p.flange_t - 0.1, p.outer_base), (zt, p.outer_base), (H, p.tip)])
+    if body is None:
+        body = (prism(off(O, p.outer_base), p.flange_t - 0.1, zt + 0.05)
+                + slices(lambda f: off(O, lerp(p.outer_base, p.tip, f)), zt, H, steps))
+    outer = (outer + body) - prism(O, -1, H + 1)
     cutter = outer
 
     if not F.is_empty():
         inner = prism(F, 0, H)
-        inner -= prism(off(F, -p.inner_base), -1, zt + 0.05)
-        inner -= slices(lambda f: off(F, -lerp(p.inner_base, p.tip, f)), zt, H, steps, top_extra=1.0)
-        cutter += inner
+        opn = p.inner_base + 0.05
+        Fo = off(off(F, -opn), opn)
+        # carry the bevel on past the edge so the subtraction leaves a clean top
+        ext = min(1.0, (p.tip - 0.05) * T / max(p.inner_base - p.tip, 1e-6))
+        hole = Manifold()
+        if not Fo.is_empty():
+            hole = offset_loft(Fo, [(-1, -p.inner_base), (zt, -p.inner_base),
+                                    (H + ext, -(p.tip - (p.inner_base - p.tip) * ext / T))])
+        if hole is None:
+            hole = (prism(off(F, -p.inner_base), -1, zt + 0.05)
+                    + slices(lambda f: off(F, -lerp(p.inner_base, p.tip, f)), zt, H, steps,
+                             top_extra=1.0))
+        cutter += inner - hole
 
-    # imprint lines may run past the outline; they are clipped to the middle of the
-    # outer blade, so they always join it and never stick out of the cutter
+    # imprint lines and bars may run past the outline; they are clipped together to the
+    # middle of the outer blade (one 3D cut, so where a bar and a rib end at the same
+    # spot their end faces coincide exactly instead of leaving micron slivers)
     Hr = H - p.imprint_recess
     keep = off(O, p.outer_base / 2)
     ribs_cs = CrossSection()
+    backs = Manifold()
     for path in paths:
         ribs_cs += stroke_cs(path, p.inner_base) ^ keep
-        cutter += prism(stroke_cs(path, p.inner_base) ^ keep, 0, Hr - T + 0.05)
-        cutter += slices(lambda f, path=path: stroke_cs(path, lerp(p.inner_base, p.tip, f)) ^ keep,
-                         Hr - T, Hr, steps)
+        core = p.tip - 0.1          # a stroke this wide, grown back out to the blade width
+        rib = offset_loft(stroke_cs(path, core), [(0, (p.inner_base - core) / 2),
+                                                  (Hr - T, (p.inner_base - core) / 2),
+                                                  (Hr, (p.tip - core) / 2)])
+        if rib is None:
+            rib = (prism(stroke_cs(path, p.inner_base), 0, Hr - T + 0.05)
+                   + slices(lambda f, path=path: stroke_cs(path, lerp(p.inner_base, p.tip, f)),
+                            Hr - T, Hr, steps))
+        backs += rib
 
     bars_cs = CrossSection()
     big = 2 * size
@@ -142,8 +168,10 @@ def _cutter(art, size, p):
         y = (y - c[1]) * s
         bars_cs += rect(-big, y - p.bar_w / 2, big, y + p.bar_w / 2)
     if not bars_cs.is_empty():
-        bars_cs = bars_cs ^ off(O, p.outer_base / 2)
-        cutter += prism(bars_cs, 0, p.bar_h)
+        backs += prism(bars_cs, 0, p.bar_h)
+        bars_cs = bars_cs ^ keep
+    if not backs.is_empty():
+        cutter += backs ^ prism(keep, -1, H + 1)
 
     # pusher: prongs fill every open gap in the back, clear of blades and bars
     clr = p.pusher_clearance

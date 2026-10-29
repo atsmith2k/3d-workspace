@@ -9,7 +9,7 @@ Import in a model with:  from cadkit.relief import *
 import math
 
 import numpy as np
-from manifold3d import CrossSection, JoinType, Manifold, OpType
+from manifold3d import CrossSection, Error, JoinType, Manifold, Mesh, OpType, triangulate
 
 ROUND = JoinType.Round
 CIRC = 48  # segments per full circle
@@ -101,6 +101,110 @@ def tapered(cs, z, height, lean):
     m = Manifold.extrude(cs.translate((-cx, -cy)), height,
                          scale_top=((w + 2 * lean) / w, (h + 2 * lean) / h))
     return m.translate((cx, cy, z))
+
+
+def _rings(cs):
+    """Polygons of `cs` as arrays, with repeated points dropped."""
+    out = []
+    for poly in cs.simplify(0.002).to_polygons():
+        q = np.asarray(poly, float)
+        q = q[np.linalg.norm(q - np.roll(q, 1, axis=0), axis=1) > 1e-4]
+        if len(q) >= 3:
+            out.append(q)
+    return out
+
+
+def _loft_mesh(sections, zs):
+    """Solid through `sections` (one list of rings per z, same ring sizes at every z),
+    joined by straight quads, capped top and bottom. None if the mesh is invalid."""
+    sizes = [len(q) for q in sections[0]]
+    per = sum(sizes)
+    verts = np.vstack([np.column_stack([q, np.full(len(q), z)])
+                       for ring, z in zip(sections, zs) for q in ring])
+    tris = []
+    for s in range(len(zs) - 1):
+        start = 0
+        for n in sizes:
+            i = np.arange(n)
+            a, b = s * per + start + i, s * per + start + (i + 1) % n
+            tris.append(np.column_stack([a, b, b + per]))
+            tris.append(np.column_stack([a, b + per, a + per]))
+            start += n
+    tris.append(triangulate(sections[0])[:, ::-1])               # bottom faces down
+    tris.append(triangulate(sections[-1]) + (len(zs) - 1) * per)
+    out = Manifold(Mesh(vert_properties=verts.astype(np.float32),
+                        tri_verts=np.vstack(tris).astype(np.uint32)))
+    return out if out.status() == Error.NoError and out.volume() > 0 else None
+
+
+def scaled_loft(cs, z, height, scale_at, steps=8):
+    """Smooth version of `drafted` for shapes that only scale: the section at fraction f
+    of the height (0 = bottom) is `cs` scaled about the origin by scale_at(f) (a number
+    or an (sx, sy) pair). Straight bands between steps, so a dome comes out as a smooth
+    surface instead of stacked slices (which shop viewers and decimators shred)."""
+    rings = _rings(cs)
+    if not rings:
+        return Manifold()
+    sections, zs = [], []
+    for k in range(steps + 1):
+        f = k / steps
+        s = np.broadcast_to(np.asarray(scale_at(f), float), (2,))
+        sections.append([q * s for q in rings])
+        zs.append(z + height * f)
+    out = _loft_mesh(sections, zs)
+    if out is None:
+        raise ValueError("scaled_loft: invalid section (zero scale or self-intersecting outline?)")
+    return out
+
+
+def offset_loft(cs, stations, step_deg=5.0):
+    """Exact ruled solid whose section at each `(z, r)` station is `cs` offset by r (round
+    joins), with straight walls in between: a smooth bevel with no stair steps, unlike
+    `drafted`. Every station's r must have the same sign (or be zero only where no
+    corner would collapse). Each vertex of `cs` maps to fixed rays (one miter ray, or
+    an arc of rays at corners that open up), so every station has the same vertices and
+    each point is linear in r. Close (r > 0) or open (r < 0) `cs` by more than max |r|
+    first so no notch or neck changes topology inside the range. Returns None if a
+    station still self-intersects, so the caller can fall back to `drafted` slices."""
+    stations = sorted(stations)
+    sign = 1.0 if max(r for _, r in stations) > 0 else -1.0
+    step = math.radians(step_deg)
+    rings = []                      # per polygon: (base points, unit rays)
+    for q in _rings(cs):
+        e_in = q - np.roll(q, 1, axis=0)
+        e_out = np.roll(q, -1, axis=0) - q
+        def normal(e):
+            n = np.stack([e[:, 1], -e[:, 0]], axis=1)
+            return n / np.maximum(np.linalg.norm(n, axis=1, keepdims=True), 1e-12)
+        n0, n1 = normal(e_in), normal(e_out)
+        turn = e_in[:, 0] * e_out[:, 1] - e_in[:, 1] * e_out[:, 0]   # > 0: convex
+        base, rays = [], []
+        for i, p in enumerate(q):
+            a0, a1 = math.atan2(n0[i, 1], n0[i, 0]), math.atan2(n1[i, 1], n1[i, 0])
+            sweep = (a1 - a0 + math.pi) % (2 * math.pi) - math.pi
+            if turn[i] * sign > 0 and abs(sweep) > step:      # corner opens: arc of rays
+                k = int(math.ceil(abs(sweep) / step))
+                for j in range(k + 1):
+                    a = a0 + sweep * j / k
+                    base.append(p)
+                    rays.append((math.cos(a), math.sin(a)))
+            else:                                             # miter ray
+                m = n0[i] + n1[i]
+                d = 1 + float(n0[i] @ n1[i])
+                base.append(p)
+                rays.append(m / d if d > 1e-6 else n1[i])
+        rings.append((np.array(base), np.array(rays)))
+    if not rings:
+        return Manifold()
+
+    for z, r in stations:            # each station must be a simple, non-overlapping set
+        polys = [b + r * u for b, u in rings]
+        shoelace = sum(_signed_area(p) for p in polys)
+        if abs(CrossSection(polys).area() - shoelace) > 1e-4 * abs(shoelace) + 1e-3:
+            return None
+
+    return _loft_mesh([[b + r * u for b, u in rings] for _, r in stations],
+                      [z for z, _ in stations])
 
 
 def text(string, size, font="Arial", bold=False, font_path=None, mirror=False):
