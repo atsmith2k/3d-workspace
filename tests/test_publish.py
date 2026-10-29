@@ -201,8 +201,8 @@ def test_preview_glb_is_low_poly_unit_scaled_and_loads(tmp_path):
 
 def test_preview_glb_never_tears_thin_walls_to_reach_the_band(tmp_path):
     # a six-armed clay cutter (0.45 mm blade edges) asked for a face band it cannot reach
-    # at any tolerance (simplify bottoms out near 1.5k faces, then grows again as it
-    # tears): it must stop at GLB_MAX_TOL and ship more faces; the old 4 mm fallback
+    # without tearing (with ruled bevels simplify bottoms out near 900 faces at
+    # GLB_MAX_TOL): it must stop there and ship more faces; the old 4 mm fallback
     # kept 86% of the surface, the snowflake set's 73%
     import math
     import numpy as np
@@ -216,8 +216,8 @@ def test_preview_glb_never_tears_thin_walls_to_reach_the_band(tmp_path):
     p = SimpleNamespace(**dict(CUTTER_PARAMS, sizes=(30.0,)))
     mesh = cutter_set(Art(outline=grow(grow(arms, 0.7), -0.7), bars_x=[0]), p)["cutter_30"].to_mesh()
     tm = trimesh.Trimesh(np.asarray(mesh.vert_properties)[:, :3], np.asarray(mesh.tri_verts))
-    faces, _ = publish.preview_glb([tm], tmp_path / "c_preview.glb", faces=(100, 1000))
-    assert faces > 1000
+    faces, _ = publish.preview_glb([tm], tmp_path / "c_preview.glb", faces=(50, 300))
+    assert faces > 300
     scene = trimesh.load(tmp_path / "c_preview.glb", file_type="glb")
     out = sum(g.area for g in scene.geometry.values()) * max(tm.extents) ** 2
     assert out / tm.area > 0.95, "blade surface lost to simplification"

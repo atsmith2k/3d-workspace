@@ -84,10 +84,12 @@ def build(p):
     mold = extrude(grow(outline, lean + p.wall), p.floor + p.height)
     mold -= tapered(outline, p.floor, p.height + 1, lean * (p.height + 1) / p.height)
     steps = max(8, round(p.well_depth / 0.2))
-    mold += drafted(lambda f: well(p, f), p.floor - EMBED, p.well_depth + EMBED, steps=steps)
+    mold += scaled_loft(well(p, 0), p.floor - EMBED, p.well_depth + EMBED,
+                        lambda f: 1 - 0.25 * f - 0.6 * f * f, steps=steps)
     z_dome = p.floor + p.well_depth
     rt, rb = p.hole_top / 2, p.hole_bottom / 2
-    mold += drafted(lambda f: circle(0, 0, rt + (rb - rt) * f), z_dome - EMBED, p.hole_depth + EMBED, steps=4)
+    mold += scaled_loft(circle(0, 0, rt), z_dome - EMBED, p.hole_depth + EMBED,
+                        lambda f: (rt + (rb - rt) * f) / rt, steps=1)
     return mold
 
 

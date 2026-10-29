@@ -107,10 +107,12 @@ def build(p):
     else:
         mold = extrude(body_section(p, r + lean + p.wall), p.floor + p.height)
     mold -= tapered(body_section(p, r), p.floor, p.height + 1, lean * (p.height + 1) / p.height)
-    # dome: one slice per print layer so the bowl is as smooth as the printer can make it
+    # dome: a smooth scaled loft, one band per print layer (stacked slices shred in viewers)
     steps = max(8, round(p.well_depth / 0.2))
-    well = (lambda f: heart(2 * well_radius(p, f))) if p.shape == "heart" else (lambda f: circle(0, 0, well_radius(p, f)))
-    mold += drafted(well, p.floor - EMBED, p.well_depth + EMBED, steps=steps)
+    R = well_radius(p, 0)
+    base = heart(2 * R) if p.shape == "heart" else circle(0, 0, R)
+    mold += scaled_loft(base, p.floor - EMBED, p.well_depth + EMBED,
+                        lambda f: well_radius(p, f) / R, steps=steps)
     return mold
 
 
