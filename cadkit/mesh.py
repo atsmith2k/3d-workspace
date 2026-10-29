@@ -22,16 +22,22 @@ def to_trimesh(obj, tolerance=0.01, angular_tolerance=0.1):
         # float32; simplify first, then weld. Big meshes (lattices) get one pass.
         big = obj.num_tri() > 400_000
         best = None
-        for tol in ((0.05,) if big else (0.01, 0.02, 0.005, 0.03)):
+        for k, tol in enumerate((0.05,) if big else (0.01, 0.02, 0.005, 0.03)):
             m = obj.simplify(tol).to_mesh()
             v, f = np.asarray(m.vert_properties)[:, :3], np.asarray(m.tri_verts)
+            # manifold3d may leave the solid touching itself at a vertex (two indices,
+            # one position). Slicers weld by position and then see a non-manifold
+            # pinch ("reversed faces" in Bambu Studio), so pull such vertices apart.
+            v, pinched = unpinch(v, f)
+            if pinched and k == 0:
+                print(f"  note: separated {pinched} self-touching vertices by {UNPINCH_MM} mm")
             # thin geometry can lose watertightness to vertex welding; the un-welded
             # mesh (float32-rounded only) is often sound, and cheaper to test first
             raw = trimesh.Trimesh(v.astype(np.float32).astype(np.float64), f, process=False)
-            if raw.is_watertight and raw.is_winding_consistent:
+            if sound_as_sliced(raw):
                 return raw
             tm = clean(v, f)
-            if tm.is_watertight and tm.is_winding_consistent:
+            if sound_as_sliced(tm):
                 return tm
             best = best or tm
         return best
@@ -57,6 +63,51 @@ def drop_crumbs(manifold, min_volume_mm3=1.0):
     print(f"  note: dropped {len(crumbs)} floating crumbs under {min_volume_mm3} mm3")
     # subtract rather than recompose: recomposing loses enclosed voids
     return manifold - Manifold.compose(crumbs)
+
+
+UNPINCH_MM = 0.004   # how far self-touching vertices are pulled apart (invisible on a print)
+
+
+def unpinch(v, f, step=UNPINCH_MM):
+    """Separate vertices that share a float32 position but not an index: a solid that
+    touches itself at a point or edge. Each extra vertex moves `step` toward the mean
+    of its own incident face centres, i.e. into its own surface, so the two sheets
+    no longer coincide and position-welding (what every slicer does) stays manifold.
+    Returns (vertices, number moved)."""
+    v = np.array(v, float)
+    moved = 0
+    for attempt in range(3):
+        key = v.astype(np.float32)
+        _, first, inv, cnt = np.unique(key, axis=0, return_index=True,
+                                       return_inverse=True, return_counts=True)
+        inv = inv.ravel()
+        extra = np.where(cnt[inv] > 1)[0]
+        extra = extra[extra != first[inv[extra]]]      # keep one vertex of each group in place
+        if len(extra) == 0:
+            break
+        centres = v[f].mean(axis=1)
+        for vi in extra:
+            fi = np.where((f == vi).any(axis=1))[0]
+            d = centres[fi].mean(axis=0) - v[vi] if len(fi) else np.zeros(3)
+            n = np.linalg.norm(d)
+            if n < 1e-12:
+                d = np.array([1.0, 0, 0]) * (attempt + 1)
+                n = np.linalg.norm(d)
+            v[vi] += d / n * step * (attempt + 1)
+        moved += len(extra)
+    return v, moved
+
+
+def sound_as_sliced(tm):
+    """Watertight and consistently wound after welding vertices by position, which is
+    how slicers read an STL (an index-level check alone misses self-touching solids)."""
+    if not (tm.is_watertight and tm.is_winding_consistent):
+        return False
+    if len(tm.vertices) == len(np.unique(tm.vertices.astype(np.float32), axis=0)):
+        return True
+    w = tm.copy()
+    w.merge_vertices()
+    return bool(w.is_watertight and w.is_winding_consistent)
 
 
 def clean(v, f):
@@ -182,6 +233,8 @@ class Report:
     wall_thin_mm: float = 0.0        # ~1st percentile of sampled thickness
     wall_median_mm: float = 0.0
     thin_fraction: float = 0.0       # share of surface samples under MIN_WALL
+    min_wall: float = MIN_WALL       # warning threshold (a model's MIN_WALL can lower it)
+    flag_fraction: float = 0.0       # share of surface samples under min_wall
     thin_points: list = field(default_factory=list)
     thin_samples: np.ndarray = field(default=None, repr=False)   # every thin sample, for the preview
     stl_bytes: int = 0
@@ -193,6 +246,35 @@ class Report:
     @property
     def ok(self):
         return self.watertight and self.bodies >= 1
+
+    @property
+    def est_grams_pla(self):
+        """Mass if printed solid in PLA; a sliced estimate is in the slice data."""
+        return self.volume_cm3 * PLA_DENSITY
+
+    def to_dict(self):
+        """Plain JSON-able numbers for build.json / manifest.json (no mesh arrays)."""
+        size = [round(float(v), 2) for v in self.size]
+        return dict(
+            size_mm=size,
+            size_in=[round(v / 25.4, 3) for v in size],
+            volume_cm3=round(float(self.volume_cm3), 2),
+            est_grams_pla=round(float(self.est_grams_pla), 1),
+            triangles=int(self.triangles),
+            watertight=bool(self.watertight),
+            bodies=int(self.bodies),
+            voids=int(self.voids),
+            flat_base_mm2=round(float(self.base_area_mm2), 1),
+            overhang_mm2=round(float(self.overhang_area_mm2), 1),
+            overhang_minor_mm2=round(float(self.overhang_minor_mm2), 1),
+            thinnest_wall_mm=round(float(self.wall_thin_mm), 2),
+            wall_median_mm=round(float(self.wall_median_mm), 2),
+            thin_fraction=round(float(self.thin_fraction), 4),
+            min_wall_mm=float(self.min_wall),
+            thin_points=[dict(at=[float(v) for v in q], mm=float(t)) for q, t in self.thin_points],
+            stl_bytes=int(self.stl_bytes),
+            warnings=list(self.warnings),
+        )
 
     def lines(self):
         x, y, z = self.size
@@ -209,13 +291,18 @@ class Report:
         ]
         if self.wall_median_mm:
             out.append(f"wall     thinnest ~{self.wall_thin_mm:.1f} mm, median {self.wall_median_mm:.1f} mm, "
-                       f"{100 * self.thin_fraction:.1f}% of surface under {MIN_WALL} mm")
+                       f"{100 * self.thin_fraction:.1f}% of surface under {MIN_WALL} mm"
+                       + (f" (model allows {self.min_wall:g} mm: {100 * self.flag_fraction:.1f}% under that)"
+                          if self.min_wall < MIN_WALL else ""))
         if self.stl_bytes:
             out.append(f"stl      {self.stl_bytes / 1e6:.1f} MB")
         return out + [f"WARNING  {w}" for w in self.warnings]
 
 
-def check(tm, bed=(256, 256, 256), thickness_samples=4000, bed_name=None):
+def check(tm, bed=(256, 256, 256), thickness_samples=4000, bed_name=None, min_wall=None):
+    """min_wall: the model's own floor for intentional thin walls (a module-level
+    MIN_WALL, e.g. cutter blade edges); the thin-wall warning fires only below it."""
+    min_wall = MIN_WALL if min_wall is None else min(min_wall, MIN_WALL)
     lo, hi = tm.bounds
     size = hi - lo
     n = tm.face_normals
@@ -231,7 +318,7 @@ def check(tm, bed=(256, 256, 256), thickness_samples=4000, bed_name=None):
         size=size,
         volume_cm3=abs(tm.volume) / 1000,
         triangles=len(tm.faces),
-        watertight=bool(tm.is_watertight and tm.is_winding_consistent),
+        watertight=sound_as_sliced(tm),
         bodies=bodies,
         voids=voids,
         base_area_mm2=float(area[zmin_face & (n[:, 2] < -0.999)].sum()),
@@ -255,10 +342,13 @@ def check(tm, bed=(256, 256, 256), thickness_samples=4000, bed_name=None):
         mask[fi[thin]] = True
         rep.thin_faces = _grow_faces(tm, mask)
         rep.thin_samples = pts[thin]
-        if thin.any():
-            # group thin samples into spots 8 mm across, biggest first, so the model
+        rep.min_wall = min_wall
+        flag = th < min_wall
+        rep.flag_fraction = float(flag.mean())
+        if flag.any():
+            # group flagged samples into spots 8 mm across, biggest first, so the model
             # knows where to look and how thin that region typically is
-            tp, tt = pts[thin], th[thin]
+            tp, tt = pts[flag], th[flag]
             left = np.ones(len(tp), bool)
             spots = []
             while left.any():
@@ -276,9 +366,9 @@ def check(tm, bed=(256, 256, 256), thickness_samples=4000, bed_name=None):
         rep.warnings.append("nothing sits flat at the lowest Z; rotate it or add a base")
     if rep.overhang_area_mm2 > 1:
         rep.warnings.append("overhangs present; needs supports or a different print orientation")
-    if rep.thin_fraction > 0.003:
+    if rep.flag_fraction > 0.003:
         where = ", ".join(f"({x}, {y}, {z}) {t} mm" for (x, y, z), t in rep.thin_points)
-        rep.warnings.append(f"walls under {MIN_WALL} mm (yellow in preview) near {where}")
+        rep.warnings.append(f"walls under {rep.min_wall:g} mm (yellow in preview) near {where}")
     if any(s > b for s, b in zip(sorted(size), sorted(bed))):
         rep.warnings.append(f"larger than the {bed_name + ' ' if bed_name else ''}bed "
                             f"({bed[0]:g} x {bed[1]:g} x {bed[2]:g} mm)")

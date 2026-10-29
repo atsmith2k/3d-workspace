@@ -81,7 +81,9 @@ class SliceResult:
     gcode: Path = None
     project: Path = None           # Bambu sliced 3MF, ready to open and print
     printer: str = "generic"
+    printer_key: str = "generic"   # cadkit printer key (a1, a1mini, generic)
     slicer: str = ""
+    material: str = ""             # PLA / PETG / ... as the slicer recorded it
     time_text: str = "?"
     time_s: int = 0
     filament_mm: float = 0.0
@@ -92,6 +94,29 @@ class SliceResult:
     supports_enabled: bool = False
     support_lines: int = 0
     settings: dict = field(default_factory=dict)
+
+    def to_dict(self):
+        """Plain JSON-able numbers for slice.json / manifest.json."""
+        return dict(
+            printer=self.printer_key,
+            printer_name=self.printer,
+            slicer=self.slicer,
+            filament_preset=self.filament_name,
+            material=self.material,
+            layer_height_mm=_num(self.settings.get("layer_height")),
+            infill_pct=_num(str(self.settings.get("fill_density", "")).rstrip("%")),
+            process=self.settings.get("process", ""),
+            supports=dict(enabled=bool(self.supports_enabled), generated=bool(self.support_lines)),
+            print_time_s=int(self.time_s),
+            print_time_text=self.time_text,
+            layers=int(self.layers),
+            filament_g=round(float(self.filament_g), 1),
+            filament_m=round(float(self.filament_mm) / 1000, 2),
+            cost=round(float(self.cost), 2),
+            file=self.project.name if self.project else None,
+            gcode=self.gcode.name if self.gcode else None,
+            lines=self.lines(),
+        )
 
     def lines(self):
         if self.supports_enabled:
@@ -139,8 +164,44 @@ def _preset_density(profiles, name, kind="filament"):
     return 1.24
 
 
+def bambu_export_stl(stl, timeout=300):
+    """Re-export an STL through Bambu Studio's CLI so the shipped file is the mesh Bambu
+    Studio itself loads (it repairs every mesh on import: welds, fixes normals, drops
+    degenerate faces). Bambu centres the object on its bed; the result is moved back to
+    the original position so the STL keeps the model's coordinates. Replaces `stl` in
+    place and returns (faces_before, faces_after), or raises when Bambu Studio is
+    missing or its export is not a sound solid of the same size."""
+    import numpy as np
+    import trimesh
+    from .mesh import sound_as_sliced
+    exe = find_bambu()
+    if not exe:
+        raise FileNotFoundError("Bambu Studio not found")
+    stl = Path(stl)
+    before = trimesh.load(stl)
+    with tempfile.TemporaryDirectory() as tmp:
+        tmp = Path(tmp)
+        src = tmp / "in.stl"
+        shutil.copy(stl, src)
+        # no arrange/orient: keep the exact print pose and coordinates
+        r = subprocess.run([exe, "--arrange", "0", "--orient", "0", "--export-stl",
+                            "--outputdir", str(tmp), str(src)],
+                           capture_output=True, text=True, timeout=timeout, cwd=tmp)
+        info = json.loads((tmp / "result.json").read_text(encoding="utf-8")) if (tmp / "result.json").exists() else {}
+        out = next(iter(sorted((tmp / "stl").glob("*.stl"))), None) if (tmp / "stl").exists() else None
+        if info.get("return_code", r.returncode) != 0 or out is None:
+            raise RuntimeError(f"Bambu Studio export failed: {info.get('error_string', 'no STL written')}")
+        after = trimesh.load(out)
+    after.apply_translation(np.r_[before.bounds[0] - after.bounds[0]])
+    if not sound_as_sliced(after) or abs(after.volume - before.volume) > 1e-3 * abs(before.volume)             or not np.allclose(after.extents, before.extents, atol=0.01):
+        raise RuntimeError("Bambu Studio's export is not a sound solid of the same size; kept the original")
+    after.export(stl)
+    return len(before.faces), len(after.faces)
+
+
 def _flatten_preset(profiles, kind, name):
-    """A system preset with its whole `inherits` chain merged in, child keys winning.
+    """A system preset with its whole `inherits` chain (and each level's `include`
+    templates) merged in, child keys winning.
     The CLI only applies the named parent's own keys when a user preset inherits, so
     overrides have to ride on a fully resolved copy."""
     chain = []
@@ -155,8 +216,16 @@ def _flatten_preset(profiles, kind, name):
         name = d.get("inherits")
     merged = {}
     for d in reversed(chain):
+        # `include` pulls in template files (the A1's start/end/layer-change G-code
+        # live in "<machine> template machine_start_gcode.json" and the like)
+        for inc in d.get("include", []):
+            f = profiles / kind / f"{inc}.json"
+            if f.exists():
+                t = json.loads(f.read_text(encoding="utf-8"))
+                merged.update({k: v for k, v in t.items() if k not in ("name", "instantiation", "type")})
         merged.update(d)
-    merged.pop("inherits", None)
+    for k in ("inherits", "include"):
+        merged.pop(k, None)
     return merged
 
 
@@ -175,7 +244,8 @@ def slice_bambu(exe, stl, out_dir, printer_key, layer_height, infill, supports, 
         raise FileNotFoundError(f"no Bambu filament preset '{filament_name}'; see {profiles / 'filament'}")
     base_h = min(printers.BAMBU_PROCESS, key=lambda h: abs(h - layer_height))
     process_name = f"{printers.BAMBU_PROCESS[base_h]} {pr['process_suffix']}"
-    machine_json = profiles / "machine" / f"{pr['machine']}.json"
+    if not (profiles / "machine" / f"{pr['machine']}.json").exists():
+        raise FileNotFoundError(f"no Bambu machine preset '{pr['machine']}'; see {profiles / 'machine'}")
 
     with tempfile.TemporaryDirectory() as tmp:
         tmp = Path(tmp)
@@ -187,15 +257,29 @@ def slice_bambu(exe, stl, out_dir, printer_key, layer_height, infill, supports, 
                          "enable_support": "1" if supports else "0"})
         process_json = tmp / "process.json"
         process_json.write_text(json.dumps(override), encoding="utf-8")
-        cmd = [exe, "--load-settings", f"{machine_json};{process_json}",
-               "--load-filaments", str(filament_json),
+        # The filament preset needs its inherits chain resolved too: passed as is, the CLI
+        # drops the parents' keys and falls back to defaults such as a 2 mm3/s volumetric
+        # limit, which slows every extrusion move ~3x in the G-code and the estimate.
+        filament_cfg = _flatten_preset(profiles, "filament", filament_name)
+        filament_cfg.update({"from": "User", "compatible_printers": [pr["machine"]]})
+        flat_filament = tmp / "filament.json"
+        flat_filament.write_text(json.dumps(filament_cfg), encoding="utf-8")
+        # Same for the machine: unresolved, it loses the A1's start/end G-code, bed size,
+        # acceleration and retraction limits to generic defaults.
+        machine_cfg = _flatten_preset(profiles, "machine", pr["machine"])
+        flat_machine = tmp / "machine.json"
+        flat_machine.write_text(json.dumps(machine_cfg), encoding="utf-8")
+        cmd = [exe, "--load-settings", f"{flat_machine};{process_json}",
+               "--load-filaments", str(flat_filament),
+               "--orient", "0",            # the model is already in its print pose
                "--slice", "0", "--export-3mf", "out.3mf", "--outputdir", str(tmp), str(stl)]
         r = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, cwd=tmp)
         result = tmp / "result.json"
         info = json.loads(result.read_text(encoding="utf-8")) if result.exists() else {}
         if info.get("return_code", r.returncode) != 0 or not (tmp / "out.3mf").exists():
             raise RuntimeError(f"Bambu Studio failed: {info.get('error_string', r.stderr[-500:] or 'unknown')}")
-        res = SliceResult(printer=pr["name"], slicer="Bambu Studio", filament_name=filament)
+        res = SliceResult(printer=pr["name"], printer_key=printer_key, slicer="Bambu Studio",
+                          filament_name=filament)
         res.project = Path(out_dir) / f"{stl.stem}_{printer_key}.3mf"
         shutil.move(tmp / "out.3mf", res.project)
         gcode = next(tmp.glob("plate_*.gcode"), None)
@@ -207,8 +291,10 @@ def slice_bambu(exe, stl, out_dir, printer_key, layer_height, infill, supports, 
     res.layers = int(_grab(text, "total layer number", "0") or 0)
     res.supports_enabled = supports
     res.support_lines = text.count(";TYPE:Support") + text.count("; FEATURE: Support")
-    m = re.search(r'used_m="([\d.]+)"', _slice_info(res.project))
+    slice_info = _slice_info(res.project)
+    m = re.search(r'used_m="([\d.]+)"', slice_info)
     res.filament_mm = float(m.group(1)) * 1000 if m else 0.0
+    res.material = material_of(slice_info, filament)
     dens = _preset_density(profiles, filament_name)
     res.filament_g = res.filament_mm / 10 * 3.14159 * (1.75 / 20) ** 2 * dens   # cm3 * g/cm3
     used_h = _grab(text, "layer_height", f"{layer_height:g}")
@@ -216,6 +302,41 @@ def slice_bambu(exe, stl, out_dir, printer_key, layer_height, infill, supports, 
                         fill_density=_grab(text, "sparse_infill_density", f"{infill}%"),
                         layer_height=used_h, printer=pr["name"])
     return res
+
+
+MATERIALS = ("PLA", "PETG", "TPU", "ABS", "ASA", "PA", "PC", "PVA", "PET", "HIPS")
+
+
+def material_of(slice_info, preset_name=""):
+    """Filament material: the `type=` the slicer wrote into slice_info.config, unless
+    the preset name clearly says otherwise (Bambu Studio's CLI has written PLA into
+    a PETG project), else the preset name, else ''."""
+    m = re.search(r'<filament [^>]*\btype="([^"]+)"', slice_info or "")
+    recorded = m.group(1).strip() if m else ""
+    named = next((t for t in MATERIALS if re.search(rf"\b{t}\b", preset_name or "", re.I)), "")
+    if named and recorded and named.upper() != recorded.upper():
+        return named
+    return recorded or named
+
+
+def extract_plate_png(project, dest, which="plate_1.png"):
+    """Copy the slicer's rendered plate picture out of a sliced 3MF to `dest`.
+    Returns dest, or None when the project has no such picture."""
+    import zipfile
+    try:
+        with zipfile.ZipFile(project) as z:
+            data = z.read(f"Metadata/{which}")
+    except (KeyError, OSError, zipfile.BadZipFile):
+        return None
+    Path(dest).write_bytes(data)
+    return Path(dest)
+
+
+def _num(v):
+    try:
+        return float(v) if v not in (None, "", "?") else None
+    except (TypeError, ValueError):
+        return None
 
 
 def _slice_info(project):
@@ -251,6 +372,8 @@ def slice_prusa(exe, stl, out_dir, printer_key, layer_height, infill, supports, 
         raise RuntimeError(f"PrusaSlicer failed ({r.returncode}):\n{r.stdout[-800:]}\n{r.stderr[-800:]}")
     res = parse_prusa_gcode(gcode)
     res.printer, res.slicer = pr["name"] + " (PrusaSlicer generic profile)", "PrusaSlicer"
+    res.printer_key = printer_key
+    res.material = "PLA"   # the generic profile's filament
     res.settings["process"] = f"{layer_height} mm layers"
     return res
 

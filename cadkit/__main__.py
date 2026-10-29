@@ -2,14 +2,17 @@
 
   python -m cadkit build models/foo.py [--set name=value ...] [--fast] [--no-render] [--slice]
   python -m cadkit slice models/foo.py [--set ...] [--profile printer.ini] [--supports]
+  python -m cadkit publish models/foo.py [--set ...] [--refresh] [--printers a1,a1mini]
   python -m cadkit new foo "one-line description"
   python -m cadkit list
   python -m cadkit selftest
 
 `build` runs the model's build(p), checks the result is printable, and writes
-output/<model>/<model>.stl (+ .step for B-rep models), preview.png and report.txt.
-`slice` runs PrusaSlicer headlessly on the built STL(s) and reports print time,
-filament and whether supports were generated.
+output/<model>/<model>.stl (+ .step for B-rep models), preview.png, build.json and
+report.txt. `slice` runs Bambu Studio (or PrusaSlicer) headlessly on the built STL(s),
+reports print time, filament and whether supports were generated, and records it in
+slice.json. `publish` turns a built and sliced folder into a shop product: clean
+renders, print notes and manifest.json.
 """
 import argparse
 import numpy as np
@@ -20,12 +23,15 @@ import time
 from pathlib import Path
 from types import SimpleNamespace
 
+from . import __version__
 from . import checks as checksmod
 from . import measure as measuremod
 from . import mesh as meshmod
+from . import outputs
 from . import printers
+from . import publish as publishmod
 from . import slicer
-from .render import render_sheet
+from .render import CAST_TINT, HERO_CAM, render_product, render_sheet
 
 ROOT = Path(__file__).resolve().parent.parent
 EXPECTED = ROOT / "tests" / "expected.json"
@@ -48,6 +54,9 @@ def parse_overrides(defaults, pairs):
         kind = type(p[key])
         if kind is bool:
             p[key] = raw.lower() in ("1", "true", "yes", "on")
+        elif kind in (list, tuple):     # "9,18" -> (9.0, 18.0), typed like the default's items
+            elem = type(p[key][0]) if p[key] else str
+            p[key] = kind(elem(x) for x in raw.split(",") if x.strip())
         else:
             p[key] = kind(raw)
     return p
@@ -90,12 +99,24 @@ def model_checks(mod, p, part_name, single):
     return spec or []
 
 
-def export(part, name, out, args, title, checks=(), params=None):
+def export(part, name, out, args, title, checks=(), params=None, min_wall=None):
     t0 = time.time()
     tol = 0.05 if args.fast else 0.01
     tm = meshmod.to_trimesh(part, tolerance=tol)
     stl = out / f"{name}.stl"
     tm.export(stl)
+    bambu_note = None
+    if not args.fast and slicer.find_bambu():
+        # ship the mesh as Bambu Studio itself exports it (its import repair applied),
+        # and run every check on that file
+        try:
+            import trimesh
+            n0, n1 = slicer.bambu_export_stl(stl)
+            tm = trimesh.load(stl)
+            bambu_note = f"bambu    re-exported by Bambu Studio ({n1} faces" + (")" if n0 == n1 else f", was {n0})")
+        except Exception as e:
+            tm.export(stl)
+            bambu_note = f"bambu    kept cadkit's STL: {e}"
     files = [stl]
     if hasattr(part, "tessellate") and not args.fast:
         from build123d import export_step
@@ -103,17 +124,19 @@ def export(part, name, out, args, title, checks=(), params=None):
         export_step(part, str(step))
         files.append(step)
     _, pr, bed = printer_of(args)
-    rep = meshmod.check(tm, bed=bed, thickness_samples=2000 if args.fast else 4000, bed_name=pr["name"])
+    rep = meshmod.check(tm, bed=bed, thickness_samples=2000 if args.fast else 4000, bed_name=pr["name"],
+                        min_wall=min_wall)
     rep.stl_bytes = stl.stat().st_size
     if rep.stl_bytes > meshmod.TINKERCAD_MAX_BYTES:
         rep.warnings.append("STL is over Tinkercad's 25 MB import limit; rebuild with --fast")
     ctx = SimpleNamespace(tm=tm, report=rep, params=params, name=name)
     rep.tm = tm
-    rep.checks_ok, check_lines = checksmod.run_checks(checks, ctx)
+    rep.check_results = checksmod.check_results(checks, ctx)
+    rep.checks_ok, check_lines = checksmod.run_checks(checks, ctx, results=rep.check_results)
     if not rep.checks_ok:
         failed = [l.split("FAIL ", 1)[1] for l in check_lines if "FAIL" in l]
         rep.warnings.append(f"{len(failed)} check{'s' if len(failed) > 1 else ''} failed: " + "; ".join(failed))
-    lines = rep.lines() + check_lines
+    lines = rep.lines() + ([bambu_note] if bambu_note else []) + check_lines
     if not args.no_render:
         png = out / f"{name}_preview.png"
         render_sheet(tm, png, title, lines, overhang_faces=rep.overhang_faces,
@@ -126,6 +149,9 @@ def export(part, name, out, args, title, checks=(), params=None):
         print("  " + line)
     for f in files:
         print(f"  -> {f.relative_to(ROOT) if f.is_relative_to(ROOT) else f}")
+    rep.data = dict(rep.to_dict(), checks=rep.check_results, checks_ok=rep.checks_ok, lines=lines,
+                    stl=stl.name, stl_sha256=outputs.sha256(stl),
+                    step=next((f.name for f in files if f.suffix == ".step"), None))
     return lines, rep
 
 
@@ -141,28 +167,41 @@ def cmd_build(args):
     print(f"built {name} in {time.time() - t0:.1f}s")
     parts = result if isinstance(result, dict) else {name: result}
 
-    _, pr, bed = printer_of(args)
-    report = [f"# {name}", getattr(mod, "DESCRIPTION", "").strip(), "",
+    key, pr, bed = printer_of(args)
+    header = [f"# {name}", getattr(mod, "DESCRIPTION", "").strip(), "",
               "params: " + ", ".join(f"{k}={v}" for k, v in p.items()),
               f"printer: {pr['name']}, bed {bed[0]:g} x {bed[1]:g} x {bed[2]:g} mm", ""]
     all_ok = True
-    reports, meshes = {}, {}
+    reports, meshes, part_data = {}, {}, {}
     for part_name, part in parts.items():
         fname = part_name if part_name == name else f"{name}-{part_name}"
         chk = model_checks(mod, SimpleNamespace(**p), part_name, not isinstance(result, dict))
-        lines, rep = export(part, fname, out, args, fname, checks=chk, params=SimpleNamespace(**p))
-        report += [f"## {fname}", *lines, ""]
+        mw = getattr(mod, "MIN_WALL", None)
+        mw = mw.get(part_name) if isinstance(mw, dict) else mw
+        lines, rep = export(part, fname, out, args, fname, checks=chk, params=SimpleNamespace(**p),
+                            min_wall=mw)
         all_ok &= rep.ok and rep.checks_ok
         reports[fname] = rep
         meshes[part_name] = rep.tm
+        part_data[fname] = dict(part=part_name, **rep.data)
+    fit = None
     if len(parts) > 1:
-        fit_lines, fit_ok = fit_report(mod, SimpleNamespace(**p), meshes)
-        report += ["## fit", *fit_lines, ""]
+        fit_lines, fit_ok, pairs = fit_report(mod, SimpleNamespace(**p), meshes)
+        fit = dict(ok=fit_ok, lines=fit_lines, pairs=pairs)
         print("\n== fit")
         for line in fit_lines:
             print("  " + line)
         all_ok &= fit_ok
-    (out / "report.txt").write_text("\n".join(report), encoding="utf-8")
+    build = dict(
+        name=name, model=str(path.relative_to(ROOT).as_posix() if path.is_relative_to(ROOT) else path),
+        model_sha256=outputs.sha256(path), description=getattr(mod, "DESCRIPTION", "").strip(),
+        params=p, printer=key, printer_name=pr["name"], bed=list(bed), fast=bool(args.fast),
+        ok=bool(all_ok), header_lines=header, parts=part_data, fit=fit,
+        generated_at=outputs.now_iso(), cadkit_version=__version__,
+    )
+    outputs.save_json(out / "build.json", build)
+    outputs.write_report(out)
+    args.build_data = build
     if getattr(args, "slice", False) and all_ok:
         slice_folder(out, name, args)
     args.reports = reports
@@ -173,28 +212,32 @@ def fit_report(mod, p, meshes, min_clearance=0.1):
     """For multi-part models with an assembly(p) function: move each part from print
     pose to assembled pose and measure every pair for interference and clearance."""
     if not callable(getattr(mod, "assembly", None)):
-        return ["(define assembly(p) -> {part: (dx, dy, dz, rx, ry, rz)} to check how the parts fit)"], True
+        return ["(define assembly(p) -> {part: (dx, dy, dz, rx, ry, rz)} to check how the parts fit)"], True, []
     poses = mod.assembly(p)
     placed = {n: (measuremod.posed(tm, poses[n]) if n in poses else tm) for n, tm in meshes.items()}
     names = list(placed)
-    lines, ok = [], True
+    lines, ok, pairs = [], True, []
     for i, a in enumerate(names):
         for b in names[i + 1:]:
             r = measuremod.fit(placed[a], placed[b])
+            pair = dict(a=a, b=b, interference_mm3=round(r["interference_mm3"], 2),
+                        clearance_mm=round(r["clearance_mm"], 3), ok=True)
             if r["interference_mm3"] > 0.5:
                 lines.append(f"fit      {a} vs {b}: INTERFERE by {r['interference_mm3']:.1f} mm3")
-                ok = False
+                ok = pair["ok"] = False
             elif r["clearance_mm"] < min_clearance:
                 lines.append(f"fit      {a} vs {b}: touching (gap {r['clearance_mm']:.2f} mm)")
             else:
                 lines.append(f"fit      {a} vs {b}: clear, smallest gap {r['clearance_mm']:.2f} mm")
+            pairs.append(pair)
     if not ok:
         lines.append("WARNING  parts overlap when assembled; check the fit lines")
-    return lines, ok
+    return lines, ok, pairs
 
 
 def slice_folder(out, name, args):
-    """Slice every STL in an output folder; append the numbers to report.txt."""
+    """Slice every STL in an output folder; record each in slice.json (keyed by the
+    3MF stem, so slices for different printers coexist) and recompose report.txt."""
     stls = sorted(out.glob(f"{name}*.stl"))
     if not stls:
         sys.exit(f"nothing built in {out}; run build first")
@@ -202,8 +245,7 @@ def slice_folder(out, name, args):
     if not slicer.find_slicer():
         print("  slice    skipped: no Bambu Studio or PrusaSlicer found (set CAD_BAMBU / CAD_SLICER)")
         return None
-    report = (out / "report.txt").read_text(encoding="utf-8").split("\n") if (out / "report.txt").exists() else []
-    report = [l for l in report if not l.startswith("## slice")]  # keep it idempotent
+    slices = outputs.load_json(out / "slice.json")
     results = []
     for stl in stls:
         t0 = time.time()
@@ -224,9 +266,12 @@ def slice_folder(out, name, args):
             print("  " + line)
         f = res.project or res.gcode
         print(f"  -> {f.relative_to(ROOT) if f.is_relative_to(ROOT) else f}")
-        report += [f"## slice {stl.stem} ({res.slicer})", *lines, ""]
+        stem = f.stem if res.project else f"{stl.stem}_{res.printer_key}"
+        slices[stem] = dict(res.to_dict(), stl=stl.name, stl_sha256=outputs.sha256(stl),
+                            sliced_at=outputs.now_iso())
         results.append(res)
-    (out / "report.txt").write_text("\n".join(report), encoding="utf-8")
+    outputs.save_json(out / "slice.json", slices)
+    outputs.write_report(out)
     return results
 
 
@@ -394,6 +439,75 @@ def cmd_measure(args):
     return 0
 
 
+def cmd_publish(args):
+    """Build (if needed or --refresh), slice for every supported printer, render the
+    product pictures, write the print notes and manifest.json for the shop."""
+    import trimesh
+    path, name, out = resolve_output(args)
+    mod = load_model(path)
+    info = publishmod.model_info(mod, path)
+    requested = [k.strip() for k in (args.printers or "").split(",") if k.strip()] or None
+    refresh = args.refresh or not (out / "build.json").exists()
+    if refresh:
+        ns = argparse.Namespace(**vars(args))
+        ns.fast, ns.no_render, ns.slice, ns.section = False, False, False, getattr(args, "section", None)
+        if cmd_build(ns) != 0:
+            print("  build reported failures; publishing anyway, the manifest will not be sellable")
+    build = outputs.load_json(out / "build.json")
+    wanted, supported = publishmod.printers_for(info, build, requested)
+    for key in wanted:
+        if key not in supported:
+            print(f"  printer   {key}: skipped, the part does not fit its bed")
+    slices = outputs.load_json(out / "slice.json")
+    fresh = {Path(s["stl"]).stem + "_" + s["printer"] for s in slices.values()
+             if not outputs.slice_is_stale(s, out)}
+    need = [key for key in supported if refresh or any(f"{fname}_{key}" not in fresh for fname in build.get("parts", {}))]
+    if need and not slicer.find_slicer():
+        print("  slice     skipped: no Bambu Studio or PrusaSlicer found; the manifest will not be sellable")
+    elif need:
+        for key in need:
+            ns = argparse.Namespace(**vars(args))
+            ns.printer, ns.bed = key, None
+            slice_folder(out, name, ns)
+        slices = outputs.load_json(out / "slice.json")
+    for stem, s in slices.items():
+        if s.get("file") and not outputs.slice_is_stale(s, out):
+            slicer.extract_plate_png(out / s["file"], out / f"{stem}_plate.png")
+    meshes = {part.get("part", fname): trimesh.load(out / part["stl"])
+              for fname, part in build.get("parts", {}).items() if (out / part["stl"]).exists()}
+    if meshes:
+        meshes = publishmod.display_meshes(mod, SimpleNamespace(**build.get("params", {})), meshes)
+        t = render_product(meshes, out / f"{name}_product.png")
+        ss = 1.5 if t > 30 else 2
+        render_product(meshes, out / f"{name}_hero.png", cam=HERO_CAM, ss=ss)
+        print(f"  render    {name}_product.png, {name}_hero.png ({t:.1f}s" + (", hero at 1.5x" if ss != 2 else "") + ")")
+        if hasattr(mod, "casting"):
+            render_cast(mod, build, out / f"{name}_cast.png")
+        nf, nb = publishmod.preview_glb(meshes, out / f"{name}_preview.glb")
+        print(f"  viewer    {name}_preview.glb ({nf} faces, {nb / 1024:.0f} KB, unit-scaled)")
+    manifest = publishmod.compose_manifest(out, build, slices, info, printers=requested)
+    (out / f"{name}_print_notes.txt").write_text(publishmod.print_notes_text(manifest), encoding="utf-8", newline="\n")
+    manifest = publishmod.compose_manifest(out, build, slices, info, printers=requested)
+    problems = publishmod.validate_manifest(manifest)
+    outputs.save_json(out / "manifest.json", manifest)
+    publishmod._print_summary(manifest)
+    print(f"  -> {(out / 'manifest.json').relative_to(ROOT) if out.is_relative_to(ROOT) else out / 'manifest.json'}")
+    if problems:
+        print("  MANIFEST INVALID:\n    " + "\n    ".join(problems))
+        return 2
+    return 0 if manifest["sellable"] else 1
+
+
+def render_cast(mod, build, path):
+    """Render what the mold makes, from the model's casting(p), with the params the
+    build used, in cement grey."""
+    from .mesh import to_trimesh
+    cast = mod.casting(SimpleNamespace(**build.get("params", {})))
+    pieces = cast if isinstance(cast, (list, tuple)) else [cast]
+    t = render_product([to_trimesh(c) for c in pieces], path, tint=CAST_TINT)
+    print(f"  render    {path.name} ({t:.1f}s)")
+
+
 def cmd_new(args):
     dest = ROOT / "models" / f"{args.name}.py"
     if dest.exists():
@@ -443,6 +557,14 @@ def cmd_selftest(args):
                 continue
             if not list((Path(tmp) / key).glob("*_preview.png")):
                 failures.append(f"{key}: no preview rendered")
+            try:
+                mod = load_model(ROOT / "models" / exp["model"])
+                m = publishmod.compose_manifest(Path(tmp) / key, ns.build_data, {}, publishmod.model_info(mod, ROOT / "models" / exp["model"]))
+                problems = publishmod.validate_manifest(m)
+                if problems:
+                    failures.append(f"{key}: manifest invalid: " + "; ".join(problems[:3]))
+            except Exception as e:
+                failures.append(f"{key}: manifest: {type(e).__name__}: {e}")
             got = {}
             for part, rep in ns.reports.items():
                 got[part] = dict(size=[round(float(v), 1) for v in rep.size],
@@ -524,6 +646,12 @@ def main():
     add_model_args(s)
     add_slice_args(s)
     s.add_argument("--section", action="append", metavar="AXIS=MM", help=argparse.SUPPRESS)
+    pb = sub.add_parser("publish", help="product renders, print notes and manifest.json for the shop")
+    add_model_args(pb)
+    add_slice_args(pb)
+    pb.add_argument("--refresh", action="store_true", help="rebuild (full) and re-slice every supported printer")
+    pb.add_argument("--printers", help="comma-separated printer keys (default: PRODUCT['printers'] or a1,a1mini)")
+    pb.add_argument("--section", action="append", metavar="AXIS=MM", help=argparse.SUPPRESS)
     m = sub.add_parser("measure", help="numbers about a built part; probe points and holes")
     add_model_args(m)
     m.add_argument("--probe", action="append", metavar="X,Y,Z", help="inside? thickness? (repeatable)")
@@ -548,7 +676,8 @@ def main():
     if args.cmd == "build" and args.sweep:
         sys.exit(cmd_sweep(args))
     commands = dict(build=cmd_build, slice=cmd_slice, measure=cmd_measure, new=cmd_new,
-                    list=cmd_list, selftest=cmd_selftest, lint=cmd_lint, trace=cmd_trace)
+                    list=cmd_list, selftest=cmd_selftest, lint=cmd_lint, trace=cmd_trace,
+                    publish=cmd_publish)
     sys.exit(commands[args.cmd](args))
 
 

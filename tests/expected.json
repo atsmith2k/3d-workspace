@@ -26,7 +26,7 @@
           128.7,
           30.4
         ],
-        "volume_cm3": 137.2,
+        "volume_cm3": 131.8,
         "bodies": 1,
         "watertight": true,
         "checks_ok": true
@@ -45,7 +45,7 @@
           136.8,
           30.4
         ],
-        "volume_cm3": 140.7,
+        "volume_cm3": 140.2,
         "bodies": 1,
         "watertight": true,
         "checks_ok": true
@@ -305,6 +305,3026 @@
           18.0
         ],
         "volume_cm3": 10.5,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      }
+    }
+  },
+  "sequoia_ashtray_bin": {
+    "model": "sequoia_ashtray_bin.py",
+    "set": [],
+    "parts": {
+      "sequoia_ashtray_bin": {
+        "size": [
+          82.4,
+          66.6,
+          140.0
+        ],
+        "volume_cm3": 105.3,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      }
+    }
+  },
+  "d20_paver_mold": {
+    "model": "d20_paver_mold.py",
+    "set": [],
+    "parts": {
+      "d20_paver_mold": {
+        "size": [
+          136.3,
+          136.3,
+          24.0
+        ],
+        "volume_cm3": 124.3,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      }
+    }
+  },
+  "alarm_light_prop": {
+    "model": "alarm_light_prop.py",
+    "set": [],
+    "parts": {
+      "alarm_light_prop-bezel": {
+        "size": [
+          100.0,
+          100.0,
+          13.0
+        ],
+        "volume_cm3": 69.4,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "alarm_light_prop-lens": {
+        "size": [
+          59.6,
+          59.6,
+          23.0
+        ],
+        "volume_cm3": 43.9,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      }
+    }
+  },
+  "candle_holder_mold": {
+    "model": "candle_holder_mold.py",
+    "set": [],
+    "parts": {
+      "candle_holder_mold": {
+        "size": [
+          83.8,
+          83.8,
+          43.0
+        ],
+        "volume_cm3": 74.1,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      }
+    }
+  },
+  "candle_holder_mold_hex": {
+    "model": "candle_holder_mold.py",
+    "set": [
+      "shape=hex"
+    ],
+    "parts": {
+      "candle_holder_mold_hex": {
+        "size": [
+          83.2,
+          72.6,
+          43.0
+        ],
+        "volume_cm3": 66.8,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      }
+    }
+  },
+  "candle_holder_mold_taper": {
+    "model": "candle_holder_mold.py",
+    "set": [
+      "candle=taper"
+    ],
+    "parts": {
+      "candle_holder_mold_taper": {
+        "size": [
+          65.3,
+          65.3,
+          51.0
+        ],
+        "volume_cm3": 53.3,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      }
+    }
+  },
+  "menorah_mold": {
+    "model": "menorah_mold.py",
+    "set": [],
+    "parts": {
+      "menorah_mold": {
+        "size": [
+          176.7,
+          38.7,
+          41.0
+        ],
+        "volume_cm3": 142.1,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      }
+    }
+  },
+  "christmas_tree_mold": {
+    "model": "christmas_tree_mold.py",
+    "set": [],
+    "parts": {
+      "christmas_tree_mold": {
+        "size": [
+          66.0,
+          66.0,
+          103.0
+        ],
+        "volume_cm3": 70.6,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      }
+    }
+  },
+  "snowflake_ornament_mold": {
+    "model": "snowflake_ornament_mold.py",
+    "set": [],
+    "parts": {
+      "snowflake_ornament_mold": {
+        "size": [
+          142.0,
+          142.0,
+          9.1
+        ],
+        "volume_cm3": 145.8,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      }
+    }
+  },
+  "trinket_tray_mold": {
+    "model": "trinket_tray_mold.py",
+    "set": [],
+    "parts": {
+      "trinket_tray_mold": {
+        "size": [
+          107.4,
+          107.4,
+          23.0
+        ],
+        "volume_cm3": 77.4,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      }
+    }
+  },
+  "incense_holder_mold": {
+    "model": "incense_holder_mold.py",
+    "set": [],
+    "parts": {
+      "incense_holder_mold": {
+        "size": [
+          128.3,
+          80.6,
+          25.0
+        ],
+        "volume_cm3": 65.4,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      }
+    }
+  },
+  "planter_mold": {
+    "model": "planter_mold.py",
+    "set": [],
+    "parts": {
+      "planter_mold-cup": {
+        "size": [
+          86.0,
+          86.0,
+          78.0
+        ],
+        "volume_cm3": 113.2,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "planter_mold-core": {
+        "size": [
+          91.4,
+          91.4,
+          68.0
+        ],
+        "volume_cm3": 211.7,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      }
+    }
+  },
+  "hex_coaster_mold": {
+    "model": "hex_coaster_mold.py",
+    "set": [],
+    "parts": {
+      "hex_coaster_mold": {
+        "size": [
+          121.0,
+          106.7,
+          13.0
+        ],
+        "volume_cm3": 41.5,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      }
+    }
+  },
+  "heart_trinket_tray_mold": {
+    "model": "trinket_tray_mold.py",
+    "set": [
+      "shape=heart"
+    ],
+    "parts": {
+      "heart_trinket_tray_mold": {
+        "size": [
+          107.4,
+          92.0,
+          23.0
+        ],
+        "volume_cm3": 61.2,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      }
+    }
+  },
+  "heart_tealight_holder_mold": {
+    "model": "candle_holder_mold.py",
+    "set": [
+      "shape=heart"
+    ],
+    "parts": {
+      "heart_tealight_holder_mold": {
+        "size": [
+          108.8,
+          93.2,
+          43.0
+        ],
+        "volume_cm3": 86.9,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      }
+    }
+  },
+  "heart_coaster_mold": {
+    "model": "hex_coaster_mold.py",
+    "set": [
+      "shape=heart",
+      "ring_insets=9,18"
+    ],
+    "parts": {
+      "heart_coaster_mold": {
+        "size": [
+          111.7,
+          95.7,
+          13.0
+        ],
+        "volume_cm3": 32.6,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      }
+    }
+  },
+  "ribbed_candle_mold_kit": {
+    "model": "candle_master_mold.py",
+    "set": [
+      "style=ribbed"
+    ],
+    "parts": {
+      "ribbed_candle_mold_kit-master": {
+        "size": [
+          101.3,
+          101.3,
+          107.5
+        ],
+        "volume_cm3": 381.9,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "ribbed_candle_mold_kit-housing": {
+        "size": [
+          95.3,
+          95.3,
+          104.0
+        ],
+        "volume_cm3": 72.6,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      }
+    }
+  },
+  "faceted_candle_mold_kit": {
+    "model": "candle_master_mold.py",
+    "set": [
+      "style=faceted"
+    ],
+    "parts": {
+      "faceted_candle_mold_kit-master": {
+        "size": [
+          96.3,
+          96.3,
+          102.5
+        ],
+        "volume_cm3": 308.4,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "faceted_candle_mold_kit-housing": {
+        "size": [
+          90.3,
+          90.3,
+          99.0
+        ],
+        "volume_cm3": 65.4,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      }
+    }
+  },
+  "twisted_candle_mold_kit": {
+    "model": "candle_master_mold.py",
+    "set": [
+      "style=twisted"
+    ],
+    "parts": {
+      "twisted_candle_mold_kit-master": {
+        "size": [
+          91.3,
+          91.3,
+          117.5
+        ],
+        "volume_cm3": 277.4,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "twisted_candle_mold_kit-housing": {
+        "size": [
+          85.3,
+          85.3,
+          114.0
+        ],
+        "volume_cm3": 71.1,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      }
+    }
+  },
+  "wax_melt_master": {
+    "model": "wax_melt_master.py",
+    "set": [],
+    "parts": {
+      "wax_melt_master": {
+        "size": [
+          126.8,
+          88.8,
+          22.0
+        ],
+        "volume_cm3": 119.2,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      }
+    }
+  },
+  "bowl_slip_cast_master": {
+    "model": "slip_cast_master.py",
+    "set": [
+      "piece=bowl"
+    ],
+    "parts": {
+      "bowl_slip_cast_master-master": {
+        "size": [
+          175.3,
+          175.3,
+          78.1
+        ],
+        "volume_cm3": 676.2,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "bowl_slip_cast_master-cottle": {
+        "size": [
+          169.3,
+          169.3,
+          100.1
+        ],
+        "volume_cm3": 125.6,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      }
+    }
+  },
+  "tumbler_slip_cast_master": {
+    "model": "slip_cast_master.py",
+    "set": [
+      "piece=tumbler"
+    ],
+    "parts": {
+      "tumbler_slip_cast_master-master": {
+        "size": [
+          152.5,
+          152.5,
+          140.6
+        ],
+        "volume_cm3": 774.6,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "tumbler_slip_cast_master-cottle": {
+        "size": [
+          146.5,
+          146.5,
+          162.6
+        ],
+        "volume_cm3": 176.2,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      }
+    }
+  },
+  "thermoform_heart_box": {
+    "model": "thermoform_heart_box.py",
+    "set": [],
+    "parts": {
+      "thermoform_heart_box-box": {
+        "size": [
+          80.0,
+          67.8,
+          30.0
+        ],
+        "volume_cm3": 98.1,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "thermoform_heart_box-lid": {
+        "size": [
+          81.8,
+          69.4,
+          12.0
+        ],
+        "volume_cm3": 42.6,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      }
+    }
+  },
+  "heart_hoop_clay_cutter": {
+    "model": "heart_hoop_clay_cutter.py",
+    "set": [],
+    "parts": {
+      "heart_hoop_clay_cutter-cutter_20": {
+        "size": [
+          26.7,
+          23.6,
+          12.0
+        ],
+        "volume_cm3": 1.5,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "heart_hoop_clay_cutter-pusher_20": {
+        "size": [
+          26.7,
+          23.6,
+          14.2
+        ],
+        "volume_cm3": 2.5,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "heart_hoop_clay_cutter-cutter_28": {
+        "size": [
+          34.7,
+          30.4,
+          12.0
+        ],
+        "volume_cm3": 2.1,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "heart_hoop_clay_cutter-pusher_28": {
+        "size": [
+          34.7,
+          30.4,
+          14.2
+        ],
+        "volume_cm3": 5.1,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "heart_hoop_clay_cutter-cutter_36": {
+        "size": [
+          42.7,
+          37.2,
+          12.0
+        ],
+        "volume_cm3": 2.7,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "heart_hoop_clay_cutter-pusher_36": {
+        "size": [
+          42.7,
+          37.2,
+          14.2
+        ],
+        "volume_cm3": 8.7,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      }
+    }
+  },
+  "rainbow_arch_clay_cutter": {
+    "model": "rainbow_arch_clay_cutter.py",
+    "set": [],
+    "parts": {
+      "rainbow_arch_clay_cutter-cutter_20": {
+        "size": [
+          26.7,
+          16.7,
+          12.0
+        ],
+        "volume_cm3": 1.3,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "rainbow_arch_clay_cutter-pusher_20": {
+        "size": [
+          26.7,
+          16.7,
+          14.2
+        ],
+        "volume_cm3": 2.0,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "rainbow_arch_clay_cutter-cutter_28": {
+        "size": [
+          34.7,
+          20.8,
+          12.0
+        ],
+        "volume_cm3": 1.8,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "rainbow_arch_clay_cutter-pusher_28": {
+        "size": [
+          34.7,
+          20.8,
+          14.2
+        ],
+        "volume_cm3": 4.0,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "rainbow_arch_clay_cutter-cutter_36": {
+        "size": [
+          42.7,
+          24.8,
+          12.0
+        ],
+        "volume_cm3": 2.2,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "rainbow_arch_clay_cutter-pusher_36": {
+        "size": [
+          42.7,
+          24.8,
+          14.2
+        ],
+        "volume_cm3": 6.7,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      }
+    }
+  },
+  "daisy_clay_cutter": {
+    "model": "daisy_clay_cutter.py",
+    "set": [],
+    "parts": {
+      "daisy_clay_cutter-cutter_22": {
+        "size": [
+          28.7,
+          28.7,
+          12.0
+        ],
+        "volume_cm3": 1.9,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "daisy_clay_cutter-pusher_22": {
+        "size": [
+          28.7,
+          28.7,
+          14.2
+        ],
+        "volume_cm3": 3.1,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "daisy_clay_cutter-cutter_30": {
+        "size": [
+          36.7,
+          36.7,
+          12.0
+        ],
+        "volume_cm3": 2.6,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "daisy_clay_cutter-pusher_30": {
+        "size": [
+          36.7,
+          36.7,
+          14.2
+        ],
+        "volume_cm3": 6.2,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "daisy_clay_cutter-cutter_38": {
+        "size": [
+          44.7,
+          44.7,
+          12.0
+        ],
+        "volume_cm3": 3.3,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "daisy_clay_cutter-pusher_38": {
+        "size": [
+          44.7,
+          44.7,
+          14.2
+        ],
+        "volume_cm3": 10.2,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      }
+    }
+  },
+  "tulip_clay_cutter": {
+    "model": "tulip_clay_cutter.py",
+    "set": [],
+    "parts": {
+      "tulip_clay_cutter-cutter_20": {
+        "size": [
+          21.4,
+          26.7,
+          12.0
+        ],
+        "volume_cm3": 1.6,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "tulip_clay_cutter-pusher_20": {
+        "size": [
+          21.4,
+          26.7,
+          14.2
+        ],
+        "volume_cm3": 3.0,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "tulip_clay_cutter-cutter_28": {
+        "size": [
+          27.3,
+          34.7,
+          12.0
+        ],
+        "volume_cm3": 2.2,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "tulip_clay_cutter-pusher_28": {
+        "size": [
+          27.3,
+          34.7,
+          14.2
+        ],
+        "volume_cm3": 6.0,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "tulip_clay_cutter-cutter_36": {
+        "size": [
+          33.2,
+          42.7,
+          12.0
+        ],
+        "volume_cm3": 2.8,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "tulip_clay_cutter-pusher_36": {
+        "size": [
+          33.2,
+          42.7,
+          14.2
+        ],
+        "volume_cm3": 9.9,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      }
+    }
+  },
+  "easter_egg_clay_cutter": {
+    "model": "easter_egg_clay_cutter.py",
+    "set": [],
+    "parts": {
+      "easter_egg_clay_cutter-cutter_22": {
+        "size": [
+          23.0,
+          28.7,
+          12.0
+        ],
+        "volume_cm3": 1.7,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "easter_egg_clay_cutter-pusher_22": {
+        "size": [
+          23.0,
+          28.7,
+          14.2
+        ],
+        "volume_cm3": 3.2,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "easter_egg_clay_cutter-cutter_30": {
+        "size": [
+          29.0,
+          36.7,
+          12.0
+        ],
+        "volume_cm3": 2.3,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "easter_egg_clay_cutter-pusher_30": {
+        "size": [
+          29.0,
+          36.7,
+          14.2
+        ],
+        "volume_cm3": 6.4,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "easter_egg_clay_cutter-cutter_38": {
+        "size": [
+          34.9,
+          44.7,
+          12.0
+        ],
+        "volume_cm3": 2.9,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "easter_egg_clay_cutter-pusher_38": {
+        "size": [
+          34.9,
+          44.7,
+          14.2
+        ],
+        "volume_cm3": 10.5,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      }
+    }
+  },
+  "monstera_leaf_clay_cutter": {
+    "model": "monstera_leaf_clay_cutter.py",
+    "set": [],
+    "parts": {
+      "monstera_leaf_clay_cutter-cutter_24": {
+        "size": [
+          30.2,
+          30.7,
+          12.0
+        ],
+        "volume_cm3": 2.8,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "monstera_leaf_clay_cutter-pusher_24": {
+        "size": [
+          30.2,
+          30.7,
+          14.2
+        ],
+        "volume_cm3": 4.5,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "monstera_leaf_clay_cutter-cutter_32": {
+        "size": [
+          38.1,
+          38.7,
+          12.0
+        ],
+        "volume_cm3": 4.1,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "monstera_leaf_clay_cutter-pusher_32": {
+        "size": [
+          38.1,
+          38.7,
+          14.2
+        ],
+        "volume_cm3": 8.4,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "monstera_leaf_clay_cutter-cutter_40": {
+        "size": [
+          45.9,
+          46.7,
+          12.0
+        ],
+        "volume_cm3": 5.2,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "monstera_leaf_clay_cutter-pusher_40": {
+        "size": [
+          45.9,
+          46.7,
+          14.2
+        ],
+        "volume_cm3": 13.3,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      }
+    }
+  },
+  "crescent_moon_clay_cutter": {
+    "model": "crescent_moon_clay_cutter.py",
+    "set": [],
+    "parts": {
+      "crescent_moon_clay_cutter-cutter_24": {
+        "size": [
+          28.1,
+          30.7,
+          12.0
+        ],
+        "volume_cm3": 1.7,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "crescent_moon_clay_cutter-pusher_24": {
+        "size": [
+          28.1,
+          30.7,
+          14.2
+        ],
+        "volume_cm3": 2.5,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "crescent_moon_clay_cutter-cutter_32": {
+        "size": [
+          35.2,
+          38.7,
+          12.0
+        ],
+        "volume_cm3": 2.3,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "crescent_moon_clay_cutter-pusher_32": {
+        "size": [
+          35.2,
+          38.7,
+          14.2
+        ],
+        "volume_cm3": 4.5,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "crescent_moon_clay_cutter-cutter_40": {
+        "size": [
+          42.3,
+          46.7,
+          12.0
+        ],
+        "volume_cm3": 2.9,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "crescent_moon_clay_cutter-pusher_40": {
+        "size": [
+          42.3,
+          46.7,
+          14.2
+        ],
+        "volume_cm3": 7.1,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      }
+    }
+  },
+  "teardrop_clay_cutter": {
+    "model": "teardrop_clay_cutter.py",
+    "set": [],
+    "parts": {
+      "teardrop_clay_cutter-cutter_24": {
+        "size": [
+          24.2,
+          30.7,
+          12.0
+        ],
+        "volume_cm3": 1.7,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "teardrop_clay_cutter-pusher_24": {
+        "size": [
+          24.2,
+          30.7,
+          14.2
+        ],
+        "volume_cm3": 2.9,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "teardrop_clay_cutter-cutter_32": {
+        "size": [
+          30.0,
+          38.7,
+          12.0
+        ],
+        "volume_cm3": 2.2,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "teardrop_clay_cutter-pusher_32": {
+        "size": [
+          30.0,
+          38.7,
+          14.2
+        ],
+        "volume_cm3": 5.5,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "teardrop_clay_cutter-cutter_40": {
+        "size": [
+          35.8,
+          46.7,
+          12.0
+        ],
+        "volume_cm3": 2.8,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "teardrop_clay_cutter-pusher_40": {
+        "size": [
+          35.8,
+          46.7,
+          14.2
+        ],
+        "volume_cm3": 9.0,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      }
+    }
+  },
+  "citrus_slice_clay_cutter": {
+    "model": "citrus_slice_clay_cutter.py",
+    "set": [],
+    "parts": {
+      "citrus_slice_clay_cutter-cutter_22": {
+        "size": [
+          28.7,
+          28.7,
+          12.0
+        ],
+        "volume_cm3": 2.5,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "citrus_slice_clay_cutter-pusher_22": {
+        "size": [
+          28.7,
+          28.7,
+          14.2
+        ],
+        "volume_cm3": 2.2,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "citrus_slice_clay_cutter-cutter_30": {
+        "size": [
+          36.7,
+          36.7,
+          12.0
+        ],
+        "volume_cm3": 3.4,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "citrus_slice_clay_cutter-pusher_30": {
+        "size": [
+          36.7,
+          36.7,
+          14.2
+        ],
+        "volume_cm3": 6.4,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "citrus_slice_clay_cutter-cutter_38": {
+        "size": [
+          44.7,
+          44.7,
+          12.0
+        ],
+        "volume_cm3": 4.3,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "citrus_slice_clay_cutter-pusher_38": {
+        "size": [
+          44.7,
+          44.7,
+          14.2
+        ],
+        "volume_cm3": 11.2,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      }
+    }
+  },
+  "butterfly_clay_cutter": {
+    "model": "butterfly_clay_cutter.py",
+    "set": [],
+    "parts": {
+      "butterfly_clay_cutter-cutter_24": {
+        "size": [
+          30.7,
+          24.2,
+          12.0
+        ],
+        "volume_cm3": 1.9,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "butterfly_clay_cutter-pusher_24": {
+        "size": [
+          30.7,
+          24.2,
+          14.2
+        ],
+        "volume_cm3": 3.5,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "butterfly_clay_cutter-cutter_32": {
+        "size": [
+          38.7,
+          30.0,
+          12.0
+        ],
+        "volume_cm3": 2.6,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "butterfly_clay_cutter-pusher_32": {
+        "size": [
+          38.7,
+          30.0,
+          14.2
+        ],
+        "volume_cm3": 6.4,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "butterfly_clay_cutter-cutter_40": {
+        "size": [
+          46.7,
+          35.9,
+          12.0
+        ],
+        "volume_cm3": 3.2,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "butterfly_clay_cutter-pusher_40": {
+        "size": [
+          46.7,
+          35.9,
+          14.2
+        ],
+        "volume_cm3": 10.4,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      }
+    }
+  },
+  "christmas_tree_clay_cutter": {
+    "model": "christmas_tree_clay_cutter.py",
+    "set": [],
+    "parts": {
+      "christmas_tree_clay_cutter-cutter_24": {
+        "size": [
+          27.1,
+          30.7,
+          12.0
+        ],
+        "volume_cm3": 1.9,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "christmas_tree_clay_cutter-pusher_24": {
+        "size": [
+          27.1,
+          30.7,
+          14.2
+        ],
+        "volume_cm3": 2.5,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "christmas_tree_clay_cutter-cutter_32": {
+        "size": [
+          33.9,
+          38.7,
+          12.0
+        ],
+        "volume_cm3": 2.5,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "christmas_tree_clay_cutter-pusher_32": {
+        "size": [
+          33.9,
+          38.7,
+          14.2
+        ],
+        "volume_cm3": 4.9,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "christmas_tree_clay_cutter-cutter_40": {
+        "size": [
+          40.7,
+          46.7,
+          12.0
+        ],
+        "volume_cm3": 3.1,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "christmas_tree_clay_cutter-pusher_40": {
+        "size": [
+          40.7,
+          46.7,
+          14.2
+        ],
+        "volume_cm3": 7.9,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      }
+    }
+  },
+  "snowflake_clay_cutter": {
+    "model": "snowflake_clay_cutter.py",
+    "set": [],
+    "parts": {
+      "snowflake_clay_cutter-cutter_24": {
+        "size": [
+          27.9,
+          30.7,
+          12.0
+        ],
+        "volume_cm3": 2.5,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "snowflake_clay_cutter-pusher_24": {
+        "size": [
+          27.9,
+          30.7,
+          14.2
+        ],
+        "volume_cm3": 3.3,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "snowflake_clay_cutter-cutter_32": {
+        "size": [
+          34.9,
+          38.7,
+          12.0
+        ],
+        "volume_cm3": 3.5,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "snowflake_clay_cutter-pusher_32": {
+        "size": [
+          34.9,
+          38.7,
+          14.2
+        ],
+        "volume_cm3": 5.9,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "snowflake_clay_cutter-cutter_40": {
+        "size": [
+          42.0,
+          46.7,
+          12.0
+        ],
+        "volume_cm3": 4.5,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "snowflake_clay_cutter-pusher_40": {
+        "size": [
+          42.0,
+          46.7,
+          14.2
+        ],
+        "volume_cm3": 9.4,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      }
+    }
+  },
+  "gingerbread_house_clay_cutter": {
+    "model": "gingerbread_house_clay_cutter.py",
+    "set": [],
+    "parts": {
+      "gingerbread_house_clay_cutter-cutter_24": {
+        "size": [
+          29.2,
+          30.7,
+          12.0
+        ],
+        "volume_cm3": 2.5,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "gingerbread_house_clay_cutter-pusher_24": {
+        "size": [
+          29.2,
+          30.7,
+          14.2
+        ],
+        "volume_cm3": 3.6,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "gingerbread_house_clay_cutter-cutter_32": {
+        "size": [
+          36.7,
+          38.7,
+          12.0
+        ],
+        "volume_cm3": 3.3,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "gingerbread_house_clay_cutter-pusher_32": {
+        "size": [
+          36.7,
+          38.7,
+          14.2
+        ],
+        "volume_cm3": 7.2,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "gingerbread_house_clay_cutter-cutter_40": {
+        "size": [
+          44.1,
+          46.7,
+          12.0
+        ],
+        "volume_cm3": 4.2,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "gingerbread_house_clay_cutter-pusher_40": {
+        "size": [
+          44.1,
+          46.7,
+          14.2
+        ],
+        "volume_cm3": 11.7,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      }
+    }
+  },
+  "ornament_bauble_clay_cutter": {
+    "model": "ornament_bauble_clay_cutter.py",
+    "set": [],
+    "parts": {
+      "ornament_bauble_clay_cutter-cutter_22": {
+        "size": [
+          22.9,
+          28.7,
+          12.0
+        ],
+        "volume_cm3": 1.7,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "ornament_bauble_clay_cutter-pusher_22": {
+        "size": [
+          22.9,
+          28.7,
+          14.2
+        ],
+        "volume_cm3": 2.3,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "ornament_bauble_clay_cutter-cutter_30": {
+        "size": [
+          28.9,
+          36.7,
+          12.0
+        ],
+        "volume_cm3": 2.3,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "ornament_bauble_clay_cutter-pusher_30": {
+        "size": [
+          28.9,
+          36.7,
+          14.2
+        ],
+        "volume_cm3": 4.8,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "ornament_bauble_clay_cutter-cutter_38": {
+        "size": [
+          34.8,
+          44.7,
+          12.0
+        ],
+        "volume_cm3": 2.9,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "ornament_bauble_clay_cutter-pusher_38": {
+        "size": [
+          34.8,
+          44.7,
+          14.2
+        ],
+        "volume_cm3": 8.1,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      }
+    }
+  },
+  "mitten_clay_cutter": {
+    "model": "mitten_clay_cutter.py",
+    "set": [],
+    "parts": {
+      "mitten_clay_cutter-cutter_22": {
+        "size": [
+          22.0,
+          28.7,
+          12.0
+        ],
+        "volume_cm3": 1.7,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "mitten_clay_cutter-pusher_22": {
+        "size": [
+          22.0,
+          28.7,
+          14.2
+        ],
+        "volume_cm3": 2.6,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "mitten_clay_cutter-cutter_30": {
+        "size": [
+          27.6,
+          36.7,
+          12.0
+        ],
+        "volume_cm3": 2.2,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "mitten_clay_cutter-pusher_30": {
+        "size": [
+          27.6,
+          36.7,
+          14.2
+        ],
+        "volume_cm3": 5.3,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "mitten_clay_cutter-cutter_38": {
+        "size": [
+          33.2,
+          44.7,
+          12.0
+        ],
+        "volume_cm3": 2.8,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "mitten_clay_cutter-pusher_38": {
+        "size": [
+          33.2,
+          44.7,
+          14.2
+        ],
+        "volume_cm3": 8.9,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      }
+    }
+  },
+  "candy_cane_clay_cutter": {
+    "model": "candy_cane_clay_cutter.py",
+    "set": [],
+    "parts": {
+      "candy_cane_clay_cutter-cutter_24": {
+        "size": [
+          18.1,
+          30.7,
+          12.0
+        ],
+        "volume_cm3": 1.6,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "candy_cane_clay_cutter-pusher_24": {
+        "size": [
+          18.1,
+          30.7,
+          14.2
+        ],
+        "volume_cm3": 1.7,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "candy_cane_clay_cutter-cutter_32": {
+        "size": [
+          21.9,
+          38.7,
+          12.0
+        ],
+        "volume_cm3": 2.2,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "candy_cane_clay_cutter-pusher_32": {
+        "size": [
+          21.9,
+          38.7,
+          14.2
+        ],
+        "volume_cm3": 3.1,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "candy_cane_clay_cutter-cutter_40": {
+        "size": [
+          25.7,
+          46.7,
+          12.0
+        ],
+        "volume_cm3": 2.7,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "candy_cane_clay_cutter-pusher_40": {
+        "size": [
+          25.7,
+          46.7,
+          14.2
+        ],
+        "volume_cm3": 4.9,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      }
+    }
+  },
+  "holly_leaf_clay_cutter": {
+    "model": "holly_leaf_clay_cutter.py",
+    "set": [],
+    "parts": {
+      "holly_leaf_clay_cutter-cutter_24": {
+        "size": [
+          19.5,
+          30.7,
+          12.0
+        ],
+        "volume_cm3": 1.7,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "holly_leaf_clay_cutter-pusher_24": {
+        "size": [
+          19.5,
+          30.7,
+          14.2
+        ],
+        "volume_cm3": 1.6,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "holly_leaf_clay_cutter-cutter_32": {
+        "size": [
+          23.7,
+          38.7,
+          12.0
+        ],
+        "volume_cm3": 2.2,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "holly_leaf_clay_cutter-pusher_32": {
+        "size": [
+          23.7,
+          38.7,
+          14.2
+        ],
+        "volume_cm3": 2.9,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "holly_leaf_clay_cutter-cutter_40": {
+        "size": [
+          28.0,
+          46.7,
+          12.0
+        ],
+        "volume_cm3": 2.8,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "holly_leaf_clay_cutter-pusher_40": {
+        "size": [
+          28.0,
+          46.7,
+          14.2
+        ],
+        "volume_cm3": 4.7,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      }
+    }
+  },
+  "scalloped_circle_clay_cutter": {
+    "model": "scalloped_circle_clay_cutter.py",
+    "set": [],
+    "parts": {
+      "scalloped_circle_clay_cutter-cutter_22": {
+        "size": [
+          28.7,
+          28.7,
+          12.0
+        ],
+        "volume_cm3": 1.8,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "scalloped_circle_clay_cutter-pusher_22": {
+        "size": [
+          28.7,
+          28.7,
+          14.2
+        ],
+        "volume_cm3": 3.8,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "scalloped_circle_clay_cutter-cutter_30": {
+        "size": [
+          36.7,
+          36.7,
+          12.0
+        ],
+        "volume_cm3": 2.5,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "scalloped_circle_clay_cutter-pusher_30": {
+        "size": [
+          36.7,
+          36.7,
+          14.2
+        ],
+        "volume_cm3": 7.6,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "scalloped_circle_clay_cutter-cutter_38": {
+        "size": [
+          44.7,
+          44.7,
+          12.0
+        ],
+        "volume_cm3": 3.2,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "scalloped_circle_clay_cutter-pusher_38": {
+        "size": [
+          44.7,
+          44.7,
+          14.2
+        ],
+        "volume_cm3": 12.7,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      }
+    }
+  },
+  "cloud_clay_cutter": {
+    "model": "cloud_clay_cutter.py",
+    "set": [],
+    "parts": {
+      "cloud_clay_cutter-cutter_22": {
+        "size": [
+          28.7,
+          18.9,
+          12.0
+        ],
+        "volume_cm3": 1.3,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "cloud_clay_cutter-pusher_22": {
+        "size": [
+          28.7,
+          18.9,
+          14.2
+        ],
+        "volume_cm3": 2.4,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "cloud_clay_cutter-cutter_30": {
+        "size": [
+          36.7,
+          23.4,
+          12.0
+        ],
+        "volume_cm3": 1.7,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "cloud_clay_cutter-pusher_30": {
+        "size": [
+          36.7,
+          23.4,
+          14.2
+        ],
+        "volume_cm3": 4.7,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "cloud_clay_cutter-cutter_38": {
+        "size": [
+          44.7,
+          27.9,
+          12.0
+        ],
+        "volume_cm3": 2.1,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "cloud_clay_cutter-pusher_38": {
+        "size": [
+          44.7,
+          27.9,
+          14.2
+        ],
+        "volume_cm3": 7.8,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      }
+    }
+  },
+  "mushroom_clay_cutter": {
+    "model": "mushroom_clay_cutter.py",
+    "set": [],
+    "parts": {
+      "mushroom_clay_cutter-cutter_22": {
+        "size": [
+          28.7,
+          27.6,
+          12.0
+        ],
+        "volume_cm3": 2.0,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "mushroom_clay_cutter-pusher_22": {
+        "size": [
+          28.7,
+          27.6,
+          14.2
+        ],
+        "volume_cm3": 3.0,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "mushroom_clay_cutter-cutter_30": {
+        "size": [
+          36.7,
+          35.2,
+          12.0
+        ],
+        "volume_cm3": 2.7,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "mushroom_clay_cutter-pusher_30": {
+        "size": [
+          36.7,
+          35.2,
+          14.2
+        ],
+        "volume_cm3": 5.7,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "mushroom_clay_cutter-cutter_38": {
+        "size": [
+          44.7,
+          42.8,
+          12.0
+        ],
+        "volume_cm3": 3.4,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "mushroom_clay_cutter-pusher_38": {
+        "size": [
+          44.7,
+          42.8,
+          14.2
+        ],
+        "volume_cm3": 9.4,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      }
+    }
+  },
+  "lips_clay_cutter": {
+    "model": "lips_clay_cutter.py",
+    "set": [],
+    "parts": {
+      "lips_clay_cutter-cutter_24": {
+        "size": [
+          30.7,
+          18.1,
+          12.0
+        ],
+        "volume_cm3": 1.4,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "lips_clay_cutter-pusher_24": {
+        "size": [
+          30.7,
+          18.1,
+          14.2
+        ],
+        "volume_cm3": 2.4,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "lips_clay_cutter-cutter_32": {
+        "size": [
+          38.7,
+          22.0,
+          12.0
+        ],
+        "volume_cm3": 1.8,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "lips_clay_cutter-pusher_32": {
+        "size": [
+          38.7,
+          22.0,
+          14.2
+        ],
+        "volume_cm3": 4.3,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "lips_clay_cutter-cutter_40": {
+        "size": [
+          46.7,
+          25.8,
+          12.0
+        ],
+        "volume_cm3": 2.2,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "lips_clay_cutter-pusher_40": {
+        "size": [
+          46.7,
+          25.8,
+          14.2
+        ],
+        "volume_cm3": 6.9,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      }
+    }
+  },
+  "cherry_clay_cutter": {
+    "model": "cherry_clay_cutter.py",
+    "set": [],
+    "parts": {
+      "cherry_clay_cutter-cutter_24": {
+        "size": [
+          26.9,
+          30.7,
+          12.0
+        ],
+        "volume_cm3": 1.9,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "cherry_clay_cutter-pusher_24": {
+        "size": [
+          26.9,
+          30.7,
+          14.2
+        ],
+        "volume_cm3": 3.6,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "cherry_clay_cutter-cutter_32": {
+        "size": [
+          33.6,
+          38.7,
+          12.0
+        ],
+        "volume_cm3": 2.5,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "cherry_clay_cutter-pusher_32": {
+        "size": [
+          33.6,
+          38.7,
+          14.2
+        ],
+        "volume_cm3": 6.4,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "cherry_clay_cutter-cutter_40": {
+        "size": [
+          40.4,
+          46.7,
+          12.0
+        ],
+        "volume_cm3": 3.1,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "cherry_clay_cutter-pusher_40": {
+        "size": [
+          40.4,
+          46.7,
+          14.2
+        ],
+        "volume_cm3": 10.1,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      }
+    }
+  },
+  "strawberry_clay_cutter": {
+    "model": "strawberry_clay_cutter.py",
+    "set": [],
+    "parts": {
+      "strawberry_clay_cutter-cutter_22": {
+        "size": [
+          22.6,
+          28.7,
+          12.0
+        ],
+        "volume_cm3": 1.5,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "strawberry_clay_cutter-pusher_22": {
+        "size": [
+          22.6,
+          28.7,
+          14.2
+        ],
+        "volume_cm3": 2.5,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "strawberry_clay_cutter-cutter_30": {
+        "size": [
+          28.3,
+          36.7,
+          12.0
+        ],
+        "volume_cm3": 2.0,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "strawberry_clay_cutter-pusher_30": {
+        "size": [
+          28.3,
+          36.7,
+          14.2
+        ],
+        "volume_cm3": 5.1,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "strawberry_clay_cutter-cutter_38": {
+        "size": [
+          34.1,
+          44.7,
+          12.0
+        ],
+        "volume_cm3": 2.6,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "strawberry_clay_cutter-pusher_38": {
+        "size": [
+          34.1,
+          44.7,
+          14.2
+        ],
+        "volume_cm3": 8.5,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      }
+    }
+  },
+  "scalloped_heart_clay_cutter": {
+    "model": "scalloped_heart_clay_cutter.py",
+    "set": [],
+    "parts": {
+      "scalloped_heart_clay_cutter-cutter_22": {
+        "size": [
+          28.7,
+          25.9,
+          12.0
+        ],
+        "volume_cm3": 1.7,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "scalloped_heart_clay_cutter-pusher_22": {
+        "size": [
+          28.7,
+          25.9,
+          14.2
+        ],
+        "volume_cm3": 3.3,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "scalloped_heart_clay_cutter-cutter_30": {
+        "size": [
+          36.7,
+          32.8,
+          12.0
+        ],
+        "volume_cm3": 2.3,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "scalloped_heart_clay_cutter-pusher_30": {
+        "size": [
+          36.7,
+          32.8,
+          14.2
+        ],
+        "volume_cm3": 6.3,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "scalloped_heart_clay_cutter-cutter_38": {
+        "size": [
+          44.7,
+          39.8,
+          12.0
+        ],
+        "volume_cm3": 2.8,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "scalloped_heart_clay_cutter-pusher_38": {
+        "size": [
+          44.7,
+          39.8,
+          14.2
+        ],
+        "volume_cm3": 10.4,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      }
+    }
+  },
+  "love_letter_clay_cutter": {
+    "model": "love_letter_clay_cutter.py",
+    "set": [],
+    "parts": {
+      "love_letter_clay_cutter-cutter_22": {
+        "size": [
+          28.7,
+          21.6,
+          12.0
+        ],
+        "volume_cm3": 1.8,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "love_letter_clay_cutter-pusher_22": {
+        "size": [
+          28.7,
+          21.6,
+          14.2
+        ],
+        "volume_cm3": 4.1,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "love_letter_clay_cutter-cutter_30": {
+        "size": [
+          36.7,
+          27.1,
+          12.0
+        ],
+        "volume_cm3": 2.4,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "love_letter_clay_cutter-pusher_30": {
+        "size": [
+          36.7,
+          27.1,
+          14.2
+        ],
+        "volume_cm3": 7.7,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "love_letter_clay_cutter-cutter_38": {
+        "size": [
+          44.7,
+          32.5,
+          12.0
+        ],
+        "volume_cm3": 3.0,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "love_letter_clay_cutter-pusher_38": {
+        "size": [
+          44.7,
+          32.5,
+          14.2
+        ],
+        "volume_cm3": 12.7,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      }
+    }
+  },
+  "seashell_clay_cutter": {
+    "model": "seashell_clay_cutter.py",
+    "set": [],
+    "parts": {
+      "seashell_clay_cutter-cutter_24": {
+        "size": [
+          30.7,
+          23.0,
+          12.0
+        ],
+        "volume_cm3": 2.0,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "seashell_clay_cutter-pusher_24": {
+        "size": [
+          30.7,
+          23.0,
+          14.2
+        ],
+        "volume_cm3": 2.1,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "seashell_clay_cutter-cutter_32": {
+        "size": [
+          38.7,
+          28.4,
+          12.0
+        ],
+        "volume_cm3": 2.6,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "seashell_clay_cutter-pusher_32": {
+        "size": [
+          38.7,
+          28.4,
+          14.2
+        ],
+        "volume_cm3": 4.3,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "seashell_clay_cutter-cutter_40": {
+        "size": [
+          46.7,
+          33.8,
+          12.0
+        ],
+        "volume_cm3": 3.3,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "seashell_clay_cutter-pusher_40": {
+        "size": [
+          46.7,
+          33.8,
+          14.2
+        ],
+        "volume_cm3": 7.3,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      }
+    }
+  },
+  "starfish_clay_cutter": {
+    "model": "starfish_clay_cutter.py",
+    "set": [],
+    "parts": {
+      "starfish_clay_cutter-cutter_24": {
+        "size": [
+          30.7,
+          29.8,
+          12.0
+        ],
+        "volume_cm3": 2.1,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "starfish_clay_cutter-pusher_24": {
+        "size": [
+          30.7,
+          29.8,
+          14.2
+        ],
+        "volume_cm3": 4.0,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "starfish_clay_cutter-cutter_32": {
+        "size": [
+          38.7,
+          37.5,
+          12.0
+        ],
+        "volume_cm3": 2.7,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "starfish_clay_cutter-pusher_32": {
+        "size": [
+          38.7,
+          37.5,
+          14.2
+        ],
+        "volume_cm3": 7.3,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "starfish_clay_cutter-cutter_40": {
+        "size": [
+          46.7,
+          45.1,
+          12.0
+        ],
+        "volume_cm3": 3.4,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "starfish_clay_cutter-pusher_40": {
+        "size": [
+          46.7,
+          45.1,
+          14.2
+        ],
+        "volume_cm3": 11.7,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      }
+    }
+  },
+  "sun_clay_cutter": {
+    "model": "sun_clay_cutter.py",
+    "set": [],
+    "parts": {
+      "sun_clay_cutter-cutter_22": {
+        "size": [
+          28.7,
+          28.7,
+          12.0
+        ],
+        "volume_cm3": 2.3,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "sun_clay_cutter-pusher_22": {
+        "size": [
+          28.7,
+          28.7,
+          14.2
+        ],
+        "volume_cm3": 2.7,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "sun_clay_cutter-cutter_30": {
+        "size": [
+          36.7,
+          36.7,
+          12.0
+        ],
+        "volume_cm3": 3.2,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "sun_clay_cutter-pusher_30": {
+        "size": [
+          36.7,
+          36.7,
+          14.2
+        ],
+        "volume_cm3": 5.4,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "sun_clay_cutter-cutter_38": {
+        "size": [
+          44.7,
+          44.7,
+          12.0
+        ],
+        "volume_cm3": 4.1,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "sun_clay_cutter-pusher_38": {
+        "size": [
+          44.7,
+          44.7,
+          14.2
+        ],
+        "volume_cm3": 9.0,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      }
+    }
+  },
+  "cactus_clay_cutter": {
+    "model": "cactus_clay_cutter.py",
+    "set": [],
+    "parts": {
+      "cactus_clay_cutter-cutter_24": {
+        "size": [
+          21.8,
+          30.7,
+          12.0
+        ],
+        "volume_cm3": 2.2,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "cactus_clay_cutter-pusher_24": {
+        "size": [
+          21.8,
+          30.7,
+          14.2
+        ],
+        "volume_cm3": 2.1,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "cactus_clay_cutter-cutter_32": {
+        "size": [
+          26.8,
+          38.7,
+          12.0
+        ],
+        "volume_cm3": 3.0,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "cactus_clay_cutter-pusher_32": {
+        "size": [
+          26.8,
+          38.7,
+          14.2
+        ],
+        "volume_cm3": 4.6,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "cactus_clay_cutter-cutter_40": {
+        "size": [
+          31.8,
+          46.7,
+          12.0
+        ],
+        "volume_cm3": 3.8,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "cactus_clay_cutter-pusher_40": {
+        "size": [
+          31.8,
+          46.7,
+          14.2
+        ],
+        "volume_cm3": 7.4,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      }
+    }
+  },
+  "honeycomb_hexagon_clay_cutter": {
+    "model": "honeycomb_hexagon_clay_cutter.py",
+    "set": [],
+    "parts": {
+      "honeycomb_hexagon_clay_cutter-cutter_22": {
+        "size": [
+          26.1,
+          28.7,
+          12.0
+        ],
+        "volume_cm3": 1.7,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "honeycomb_hexagon_clay_cutter-pusher_22": {
+        "size": [
+          26.1,
+          28.7,
+          14.2
+        ],
+        "volume_cm3": 3.5,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "honeycomb_hexagon_clay_cutter-cutter_30": {
+        "size": [
+          33.2,
+          36.7,
+          12.0
+        ],
+        "volume_cm3": 2.3,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "honeycomb_hexagon_clay_cutter-pusher_30": {
+        "size": [
+          33.2,
+          36.7,
+          14.2
+        ],
+        "volume_cm3": 7.1,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "honeycomb_hexagon_clay_cutter-cutter_38": {
+        "size": [
+          40.2,
+          44.7,
+          12.0
+        ],
+        "volume_cm3": 3.0,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "honeycomb_hexagon_clay_cutter-pusher_38": {
+        "size": [
+          40.2,
+          44.7,
+          14.2
+        ],
+        "volume_cm3": 11.7,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      }
+    }
+  },
+  "organic_pebble_clay_cutter": {
+    "model": "organic_pebble_clay_cutter.py",
+    "set": [],
+    "parts": {
+      "organic_pebble_clay_cutter-cutter_24": {
+        "size": [
+          30.7,
+          28.0,
+          12.0
+        ],
+        "volume_cm3": 1.8,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "organic_pebble_clay_cutter-pusher_24": {
+        "size": [
+          30.7,
+          28.0,
+          14.2
+        ],
+        "volume_cm3": 4.5,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "organic_pebble_clay_cutter-cutter_32": {
+        "size": [
+          38.7,
+          35.0,
+          12.0
+        ],
+        "volume_cm3": 2.4,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "organic_pebble_clay_cutter-pusher_32": {
+        "size": [
+          38.7,
+          35.0,
+          14.2
+        ],
+        "volume_cm3": 8.1,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "organic_pebble_clay_cutter-cutter_40": {
+        "size": [
+          46.7,
+          42.1,
+          12.0
+        ],
+        "volume_cm3": 2.9,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "organic_pebble_clay_cutter-pusher_40": {
+        "size": [
+          46.7,
+          42.1,
+          14.2
+        ],
+        "volume_cm3": 13.1,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      }
+    }
+  },
+  "scalloped_arch_clay_cutter": {
+    "model": "scalloped_arch_clay_cutter.py",
+    "set": [],
+    "parts": {
+      "scalloped_arch_clay_cutter-cutter_24": {
+        "size": [
+          28.9,
+          30.7,
+          12.0
+        ],
+        "volume_cm3": 2.1,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "scalloped_arch_clay_cutter-pusher_24": {
+        "size": [
+          28.9,
+          30.7,
+          14.2
+        ],
+        "volume_cm3": 5.8,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "scalloped_arch_clay_cutter-cutter_32": {
+        "size": [
+          36.3,
+          38.7,
+          12.0
+        ],
+        "volume_cm3": 2.7,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "scalloped_arch_clay_cutter-pusher_32": {
+        "size": [
+          36.3,
+          38.7,
+          14.2
+        ],
+        "volume_cm3": 10.6,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "scalloped_arch_clay_cutter-cutter_40": {
+        "size": [
+          43.7,
+          46.7,
+          12.0
+        ],
+        "volume_cm3": 3.4,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "scalloped_arch_clay_cutter-pusher_40": {
+        "size": [
+          43.7,
+          46.7,
+          14.2
+        ],
+        "volume_cm3": 16.8,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      }
+    }
+  },
+  "puffy_star_clay_cutter": {
+    "model": "puffy_star_clay_cutter.py",
+    "set": [],
+    "parts": {
+      "puffy_star_clay_cutter-cutter_22": {
+        "size": [
+          28.7,
+          27.8,
+          12.0
+        ],
+        "volume_cm3": 1.6,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "puffy_star_clay_cutter-pusher_22": {
+        "size": [
+          28.7,
+          27.8,
+          14.2
+        ],
+        "volume_cm3": 3.1,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "puffy_star_clay_cutter-cutter_30": {
+        "size": [
+          36.7,
+          35.4,
+          12.0
+        ],
+        "volume_cm3": 2.1,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "puffy_star_clay_cutter-pusher_30": {
+        "size": [
+          36.7,
+          35.4,
+          14.2
+        ],
+        "volume_cm3": 5.9,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "puffy_star_clay_cutter-cutter_38": {
+        "size": [
+          44.7,
+          43.1,
+          12.0
+        ],
+        "volume_cm3": 2.7,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "puffy_star_clay_cutter-pusher_38": {
+        "size": [
+          44.7,
+          43.1,
+          14.2
+        ],
+        "volume_cm3": 9.6,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      }
+    }
+  },
+  "ginkgo_leaf_clay_cutter": {
+    "model": "ginkgo_leaf_clay_cutter.py",
+    "set": [],
+    "parts": {
+      "ginkgo_leaf_clay_cutter-cutter_24": {
+        "size": [
+          30.7,
+          30.4,
+          12.0
+        ],
+        "volume_cm3": 2.1,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "ginkgo_leaf_clay_cutter-pusher_24": {
+        "size": [
+          30.7,
+          30.4,
+          14.2
+        ],
+        "volume_cm3": 2.0,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "ginkgo_leaf_clay_cutter-cutter_32": {
+        "size": [
+          38.7,
+          38.3,
+          12.0
+        ],
+        "volume_cm3": 2.8,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "ginkgo_leaf_clay_cutter-pusher_32": {
+        "size": [
+          38.7,
+          38.3,
+          14.2
+        ],
+        "volume_cm3": 4.2,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "ginkgo_leaf_clay_cutter-cutter_40": {
+        "size": [
+          46.7,
+          46.2,
+          12.0
+        ],
+        "volume_cm3": 3.4,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "ginkgo_leaf_clay_cutter-pusher_40": {
+        "size": [
+          46.7,
+          46.2,
+          14.2
+        ],
+        "volume_cm3": 7.1,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      }
+    }
+  },
+  "bumblebee_clay_cutter": {
+    "model": "bumblebee_clay_cutter.py",
+    "set": [],
+    "parts": {
+      "bumblebee_clay_cutter-cutter_22": {
+        "size": [
+          28.7,
+          28.6,
+          12.0
+        ],
+        "volume_cm3": 1.9,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "bumblebee_clay_cutter-pusher_22": {
+        "size": [
+          28.7,
+          28.6,
+          14.2
+        ],
+        "volume_cm3": 3.0,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "bumblebee_clay_cutter-cutter_30": {
+        "size": [
+          36.7,
+          36.5,
+          12.0
+        ],
+        "volume_cm3": 2.6,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "bumblebee_clay_cutter-pusher_30": {
+        "size": [
+          36.7,
+          36.5,
+          14.2
+        ],
+        "volume_cm3": 6.0,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "bumblebee_clay_cutter-cutter_38": {
+        "size": [
+          44.7,
+          44.5,
+          12.0
+        ],
+        "volume_cm3": 3.3,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "bumblebee_clay_cutter-pusher_38": {
+        "size": [
+          44.7,
+          44.5,
+          14.2
+        ],
+        "volume_cm3": 9.8,
         "bodies": 1,
         "watertight": true,
         "checks_ok": true

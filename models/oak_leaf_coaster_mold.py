@@ -19,6 +19,15 @@ from cadkit.relief import *
 
 DESCRIPTION = "4 in round plaster coaster mold with oak leaf relief"
 
+PRODUCT = dict(
+    title="Oak Leaf Coaster Mold",
+    category="molds",
+    tags=["mold", "coaster", "plaster", "resin", "oak leaf", "botanical"],
+    printers=["a1", "a1mini"],
+    cast_material="plaster or resin",
+)
+LICENSE_NOTES = None   # original artwork; the default licence applies
+
 PARAMS = dict(
     diameter=101.6,     # coaster diameter at its face
     thickness=8.0,      # coaster thickness = cavity depth

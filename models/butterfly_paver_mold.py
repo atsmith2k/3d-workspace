@@ -1,18 +1,43 @@
-"""Cement paver mold with a butterfly design (5 in / 127 mm).
+"""Mold for a 5 in (127 mm) cement garden paver in the shape of a butterfly.
 
-style=shaped : the paver itself is butterfly-shaped; its face gets grooved veins,
-               a border line, spots and eyespots, and a raised body.
-style=square : a 5 x 5 in square paver with a raised butterfly whose veins and spots
-               are grooved into it, plus grooved antennae.
+The finished paver is a butterfly silhouette about 1 in thick, its face carrying a fine
+border line, wing veins, two spots on each forewing and an eyespot on each hindwing,
+all cast as crisp grooves, with the body standing slightly proud. Pour cement, let it
+cure, flex the mold and lift it off. Every wall and rib is drafted so the paver releases
+cleanly, and the mold prints opening-up with no supports in about two hours on a Bambu
+A1 or A1 mini.
 
-The paver is cast face-down, so a rib on the mold floor becomes a groove in the paver
-and a pocket in the floor becomes a raised area. Every wall and rib is tapered (draft)
-so the cured paver releases. Prints opening-up with no supports.
+A square variant (`style=square`, 5 x 5 in) raises the whole butterfly on a square
+paver and adds grooved antennae.
+
+Spec:
+  object:       open-top mold for a 5 in cement paver shaped like a butterfly (or a
+                square paver with a raised butterfly), cast face-down
+  overall:      about 137 x 129 x 30 mm (shaped), 137 x 137 x 30 mm (square); floor 5,
+                wall 4, cavity 25.4 deep
+  casting:      127 mm wide, 25.4 mm (1 in) thick paver; veins, border, spots and
+                eyespots grooved 2 mm deep and 1.9 mm wide; body raised 2 mm
+  orientation:  flat base on the bed, cavity opening up; supports expected: none
+  must have:    2 deg draft on the cavity wall, 10 deg on the ribs; the slits between
+                body and hindwings and between fore- and hindwing are webbed over so no
+                mold wall is thinner than 1.2 mm
+  tolerances:   none (no mating parts)
+
+Units: mm. Z is up and the part sits on Z=0 in the orientation it should print.
 """
 from cadkit.checks import *
 from cadkit.relief import *
 
 DESCRIPTION = "5 in cement paver mold with butterfly relief (shaped or square)"
+
+PRODUCT = dict(
+    title="Butterfly Paver Mold",
+    category="molds",
+    tags=["mold", "paver", "cement", "garden", "butterfly"],
+    printers=["a1", "a1mini"],
+    cast_material="cement",
+)
+LICENSE_NOTES = None   # original artwork; the default licence applies
 
 
 def checks(p):
@@ -58,6 +83,7 @@ FORE_SPOTS = [(51, 48, 4.0), (42, 53, 2.4)]
 EYESPOT = (33, -39, 6.0, 3.8, 1.6)  # x, y, ring outer r, ring inner r, pupil r
 ANTENNA = ((1.5, 39), (6, 56), (18, 63))
 ANTENNA_TIP_R = 2.0
+TIP_ROUND = 0.55   # opening radius on clipped vein ends (removes slivers under 1.1 wide)
 EMBED = 0.1
 
 
@@ -67,6 +93,23 @@ def wings():
 
 def body():
     return ellipse(0, -2, 5.0, 33.0) + circle(0, 35.5, 5.2)
+
+
+WEB_RADIUS = 3.0         # closes any slit narrower than 2x this anywhere on the outline
+WEB_RADIUS_LOWER = 6.0   # and wider ones below the forewings (tail and wing junction)
+
+
+def silhouette():
+    """Wings and body as one outline for the cavity. The slits between the body and
+    each wing root, and between fore- and hindwing near the body, are only 1-3 units
+    wide: in the mold they would be fins under 1.2 mm. A morphological closing
+    (grow, then shrink) webs them over; the stronger closing is limited to below the
+    forewings so the head keeps its shape."""
+    shape = wings() + body()
+    closed = grow(grow(shape, WEB_RADIUS), -WEB_RADIUS)
+    closed_low = grow(grow(shape, WEB_RADIUS_LOWER), -WEB_RADIUS_LOWER)
+    lower = CrossSection.square((160, 80), center=True).translate((0, -32))
+    return shape + closed + (closed_low ^ lower)
 
 
 def pattern(widen, line_width, border):
@@ -79,7 +122,9 @@ def pattern(widen, line_width, border):
     veins = CrossSection()
     for v in VEINS:
         veins += mirror_x(stroke(bezier(*v), line_width + 2 * widen))
-    art = veins ^ region
+    # clipping a stroke obliquely leaves a sharp tip thinner than a printable rib;
+    # an opening (shrink, then grow) rounds those off and keeps the full-width strokes
+    art = grow(grow(veins ^ region, -TIP_ROUND), TIP_ROUND)
     for x, y, r in FORE_SPOTS:
         art += mirror_x(circle(x, y, r + widen))
     art += mirror_x(circle(ex, ey, ro + widen) - circle(ex, ey, ri - widen) + circle(ex, ey, rp + widen))
@@ -105,7 +150,7 @@ def build(p):
 
     if p.style == "shaped":
         art_k = k
-        outline = scaled(wings() + body(), k)
+        outline = scaled(silhouette(), k)
         shell = extrude(grow(outline, lean + p.wall), p.floor + p.thickness)
         relief = body()               # raised on the paver -> pocket in the floor
         lines = lambda w: pattern(w, p.line_width / art_k, border=True)
@@ -114,7 +159,7 @@ def build(p):
         art_k = k * 0.84
         outline = grow(CrossSection.square((p.size - 6, p.size - 6), center=True), 3.0)
         shell = extrude(grow(outline, lean + p.wall), p.floor + p.thickness)
-        relief = wings() + body()     # whole butterfly raised on the paver
+        relief = silhouette()         # whole butterfly raised on the paver
         lines = lambda w: pattern(w, p.line_width / art_k, border=False)
         line_height = d * 0.7         # grooves cut into the raised butterfly
     else:

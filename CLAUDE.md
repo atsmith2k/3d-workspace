@@ -35,7 +35,7 @@ import the STL into Tinkercad (or any slicer/CAD app), so every STL must import 
      two section views (cut through the centre, or `--section y=10 --section x=0`), and
      the stats. Faces are tinted **red** where they overhang; **yellow dots** mark spots
      where the wall is under 1.2 mm; section tiles show cut material in **orange**.
-   - `report.txt`
+   - `build.json` (every number above, structured) and `report.txt` (composed from it)
 6. **Read the preview PNG and look at it** before calling a model done. Check proportions,
    that details actually show, nothing is floating, and the print orientation is sane.
    Use the section tiles to confirm floor and wall thickness, cavities and hidden holes;
@@ -51,9 +51,22 @@ import the STL into Tinkercad (or any slicer/CAD app), so every STL must import 
    layer count, whether supports were generated, and writes the sliced project 3MF.
    Options: `--printer a1mini`, `--layer-height 0.28`, `--infill 20`, `--supports`,
    `--filament "Bambu PETG Basic"`. Tell the user the print time and filament on delivery.
+   Each slice is recorded in `output/<name>/slice.json` (keyed by the 3MF stem, so A1
+   and A1 mini slices coexist) and `report.txt` is recomposed from `build.json` +
+   `slice.json`; a slice whose STL has since changed is marked STALE there.
 8. Deliver: send the preview PNG, the STL and the `_<printer>.3mf` project to the user
    (SendUserFile), and summarize size, print orientation, print time, supports needed,
    and anything they should know.
+
+Selling a model: `cad publish models/<name>.py --refresh` rebuilds it in full, slices
+it for every printer in `PRODUCT["printers"]` whose bed it fits, renders a clean
+`<name>_product.png` and `<name>_hero.png` (1600 px, white, no overlays), pulls the
+slicer's plate pictures out of the 3MFs, writes `<name>_print_notes.txt` and a
+`manifest.json` (schema `cadkit-product/1`) the shop ingests. The manifest's `sellable`
+gate wants: watertight single body, every check PASS, no WARNING lines, no fit
+interference, a fresh 3MF per supported printer, the product render and notes.
+Without `--refresh` it reuses the existing build and slices and only re-slices what
+is missing or stale.
 
 Variants: `cad build models/x.py --set style=square --set thickness=30` writes to
 `output/x_square_30/`. Use `--name` to pick the folder name, `--fast` for a quick coarse
@@ -68,7 +81,8 @@ Linux and Git Bash. Both wrap `.venv` Python `-m cadkit`. Other commands: `cad l
 (models and build status), `cad selftest` (regression suite: builds every model in
 `tests/expected.json` and compares size, volume and checks with the recorded values;
 also says which slicers were found; set `CAD_BAMBU` / `CAD_SLICER` for unusual installs).
-After changing anything in `cadkit/` run `cad selftest`. After finishing a new model,
+After changing anything in `cadkit/` run `cad selftest` and
+`.venv/Scripts/python -m pytest tests -q`. After finishing a new model,
 or deliberately changing an existing one, add or refresh its entry with
 `cad selftest --update` (add the model's key, file and `--set` list to the JSON first)
 so later helper changes cannot silently break it.
@@ -83,11 +97,32 @@ model rather than copying it. Name new models in snake_case after the object.
 from cadkit.checks import *
 DESCRIPTION = "one line"
 PARAMS = dict(width=40.0, style="a")   # every tunable dimension; types drive --set parsing
+PRODUCT = dict(title="...", category="molds", tags=[...], printers=["a1", "a1mini"],
+               cast_material="cement", post_processing=None, sellable=None)  # optional
+LICENSE_NOTES = "..."                  # optional; replaces the default licence text
+MIN_WALL = 0.4                         # optional; thin-wall warning floor (blades); dict per part ok
 def checks(p):                         # or a static CHECKS = [...] list
     return [dims(x=p.width), hole(6.4, at=(10, 10)), solid((0, 0, 1)), no_overhang()]
 def build(p):                          # p.width, p.style ...
     return part                        # or {"lid": a, "base": b} for multi-part prints
 ```
+
+`PRODUCT`, `LICENSE_NOTES` and an optional `display(p)` (product-shot poses, like `assembly`;
+otherwise overlapping parts are laid side by side) are read by `cad publish` only.
+`MIN_WALL` lowers the thin-wall warning threshold for walls that are thin on purpose
+(cutter blade edges); the report still shows the share under 1.2 mm.
+`PRODUCT["title"]` may use `{param}` placeholders so `--set` variants get their own titles.
+Molds should also define `casting(p)` returning the piece the mold makes (usually
+`cast_of(build(p))` from `cadkit.relief`; pass `minus=` a core, `flip=False` for upright
+casts); `cad publish` renders it as `<name>_cast.png` in cement grey, since buyers judge
+a mold by what comes out of it.
+`sellable=None` lets the gate decide, `True` sells despite caveats (they stay listed
+as reasons), `False` keeps the model off the shop. The `Spec:` block is parsed into the
+manifest, so keep its `key: value` lines (`orientation` ends up in the print notes).
+**Cite external dimension sources.** When a fit dimension comes from someone else's
+published model, a datasheet or a teardown, say so in the Spec and in `LICENSE_NOTES`,
+and set `sellable=False` until that source's licence has been checked
+(`models/sequoia_ashtray_bin.py` is the pattern).
 
 `build` may return a build123d Part/Solid, a manifold3d `Manifold`, or a `trimesh.Trimesh`.
 A dict exports each part as its own STL (`<name>-<part>.stl`); then `checks` may return
@@ -106,7 +141,7 @@ The same measurements are available in `cadkit/measure.py` and from `cad measure
 | Kernel | Use for | Helpers |
 |---|---|---|
 | **build123d** (OpenCascade B-rep) | Engineered parts: enclosures, brackets, adapters, anything with fillets, chamfers, holes, threads, exact fits. Exports STEP too. | `from cadkit.cad import *`: `closed_spline`, `clip`, `draft_extrude`, `faces_of` |
-| **manifold3d** (mesh CSG) | Decorative and organic work: reliefs, molds with artwork, patterns, lots of strokes/spots. Fast and never fails on intricate booleans. STL only. | `from cadkit.relief import *`: `smooth_shape`, `stroke`, `bezier`, `circle`, `ellipse`, `mirror_x`, `grow`, `extrude`, `drafted`, `draft_offset`, `text` |
+| **manifold3d** (mesh CSG) | Decorative and organic work: reliefs, molds with artwork, patterns, lots of strokes/spots. Fast and never fails on intricate booleans. STL only. | `from cadkit.relief import *`: `smooth_shape`, `stroke`, `bezier`, `circle`, `ellipse`, `mirror_x`, `grow`, `extrude`, `drafted`, `tapered`, `draft_offset`, `text`, `cast_of` |
 | **SDF** (implicit, meshed by manifold) | Blends, lattices and gyroid infill, shells, twists, repeats: `smooth_union` instead of fillets, `lattice_fill` to lighten a part. Returns a Manifold, so it combines with relief shapes and `text`. | `from cadkit.sdf import *`: `sphere`, `box`, `cylinder`, `capsule`, `torus`, `plane`, `union`, `intersect`, `subtract`, `smooth_*`, `twist`, `bend`, `repeat`, `shell`, `gyroid`, `schwarz_p`, `diamond`, `lattice_fill`, `build_sdf`, `to_sdf` |
 
 Worked examples: `models/butterfly_paver_mold.py` (manifold relief mold),
@@ -134,6 +169,12 @@ box), `lid` (plate with inner lip, returned in print pose), `boss` / `add_bosses
 standoff, hook, knob, clip, handle or channel from primitives, and copy their loft and
 sweep setup (section planes from `Plane(origin, x_dir, z_dir)`, `path @ 0` / `path % 0`
 for the sweep start) rather than improvising.
+
+**Clay cutters** (`from cadkit.cutter import *`, manifold): `Art(outline, cutouts,
+imprints, bars_x, bars_y)` plus `cutter_set(art, p)` gives a cutter and a pusher per size
+in `p.sizes` (outline blade, cut-through inner blades, recessed imprint blades, support
+bars, pusher prongs). Merge `CUTTER_PARAMS` into PARAMS, set `MIN_WALL = CUTTER_MIN_WALL`,
+and use `cutter_checks(p)` / `cutter_assembly(p)` / `cutter_display(p)`. Worked model: `heart_hoop_clay_cutter`.
 
 **Images and SVGs** (`from cadkit.image import *`): `trace("logo.png", width=60)` turns a
 logo, sketch or photo silhouette into a CrossSection (holes kept); `svg_shape("x.svg",
@@ -163,7 +204,9 @@ Definitions live in `cadkit/printers.py`. When the user doesn't say which printe
 the A1 and keep parts under 175 mm so they also fit the mini when possible.
 
 `cad slice` uses Bambu Studio's own CLI and system presets, so the time and filament are
-what Bambu Studio will show, and it writes `output/<name>/<name>_<printer>.3mf`: a sliced
+what Bambu Studio will show (each preset goes in with its `inherits` chain and `include`
+templates merged, `_flatten_preset`; passed raw, the CLI silently falls back to generic
+G-code, a 200 mm bed and a 2 mm3/s flow limit), and it writes `output/<name>/<name>_<printer>.3mf`: a sliced
 project the user opens in Bambu Studio and sends to the printer as is. Hand that 3MF to
 the user along with the STL. `--filament "Bambu PETG Basic"` picks another Bambu filament
 preset; `--layer-height` picks the matching Bambu quality preset (0.08 Extra Fine, 0.12
@@ -218,21 +261,35 @@ Bambu A1 series design notes (0.4 mm nozzle, 0.42 mm line width, 0.2 mm layers):
 - build123d: `extrude(taper>0)` goes through LocOpe_DPrism and can **segfault** on thin or
   traced shapes; use `draft_extrude` from `cadkit.cad`. Spline faces built from clockwise
   points face -Z and won't fuse with other faces; `closed_spline` fixes that.
+- manifold `drafted` stacks slices, so a tall drafted wall comes out as visible stair
+  steps (and the casting copies them). Use `tapered` for body walls and round pins;
+  keep `drafted` for spiky art and for domes (one slice per 0.2 mm layer).
 - build123d tapers on large, intricate art (many joined strokes) are slow (minutes) and
   fail often. Do that kind of work in manifold3d instead.
 - SDF: write functions with numpy ufuncs (`np.sqrt`, `np.maximum`...) so the grid is
   evaluated at once; `math` functions force a slow point-by-point path. An open lattice
   band thinner than ~2 cells breaks into pieces; closed-skin `lattice_fill` is robust.
   `from build123d import *` shadows single-letter names like `M` (it is a unit).
+- Full builds re-export every STL through Bambu Studio's CLI (`slicer.bambu_export_stl`,
+  `--arrange 0 --orient 0` so the pose and coordinates stay put): the shipped file is the
+  mesh Bambu Studio itself loads and repairs, and the checks run on it. The build line
+  `bambu    kept cadkit's STL: ...` means its export was rejected and why.
 - Mesh cleanup and float32 rounding are handled in `cadkit/mesh.py`; if a build reports
   NOT watertight, look for coplanar or touching geometry in the model first.
+- manifold3d can return a solid that touches itself at a vertex or edge (two indices,
+  one position): valid for manifold, but slicers weld by position and then flag
+  "reversed faces" / non-manifold edges. `mesh.unpinch` pulls such vertices 0.004 mm
+  apart before export and the watertight check welds by position like a slicer; a
+  `note: separated N self-touching vertices` line in the build output means it fired.
 
 ## Layout
 
 ```
-cadkit/          harness: __main__ (CLI), mesh (convert/clean/check), render (preview), cad + relief helpers
+cadkit/          harness: __main__ (CLI), mesh (convert/clean/check), render (preview + product),
+                 outputs (build.json / slice.json / report.txt), publish (manifest, notes, gate)
 models/          one script per object (_template.py is the starting point); commit these
 output/          generated files (gitignored); rebuilt from models/
+tests/           expected.json (selftest) and pytest suite (`.venv/Scripts/python -m pytest tests -q`)
 scripts/setup.py one-step install + self-test
 cad, cad.cmd     CLI wrappers (macOS/Linux/Git Bash, Windows)
 docs/            README images
