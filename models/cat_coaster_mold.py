@@ -18,7 +18,7 @@ coaster's face edge is bevelled and nothing sharp holds it in the mold.
 
 Spec:
   object:       open-top mold for a 100 mm cat coaster, 10 mm thick, cast face-down
-  overall:      head ~108 x 104 x 14 mm; paw and moon ~108 dia x 14 mm (fit the A1 mini)
+  overall:      head ~108 x 104 x 14 mm; paw and moon ~108 dia x 14 mm (fit a 180 mm bed)
   casting:      head 100 x ~96 mm; paw and moon 100 mm round; 10 mm thick
   mates with:   nothing
   orientation:  opening up, flat floor on the bed; supports expected: none
