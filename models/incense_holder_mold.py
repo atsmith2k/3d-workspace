@@ -3,13 +3,12 @@ tall.
 
 A shallow well catches the ash, and the hole in its centre holds a stick upright (it
 fits sticks with a 1.5-2.5 mm core); cones sit in the well too. Pour, screed the back
-flat, and lift it out once cured. Prints opening-up with no supports in about 1.5 hours on
-a Bambu A1 or A1 mini.
+flat, and lift it out once cured. Prints opening-up with no supports in about 1.5 hours.
 
 Spec:
   object:       mold for a cement / Jesmonite incense stick holder (also takes cones)
   overall:      holder 120 x 72 mm, 22 mm tall; well 6 mm deep with an 8 mm rim;
-                mold ~128 x 80 x 25 mm (fits the A1 mini)
+                mold ~128 x 80 x 25 mm (fits a 180 mm bed)
   mates with:   incense sticks with a 1.5-2.5 mm core; hole 3.2 mm at the well widening
                 from 2.4 mm at the bottom, 12 mm deep
   orientation:  opening up, flat floor on the bed, no supports

@@ -3,12 +3,11 @@ design, 62 mm across and 6 mm thick, with a raised hexagon at the centre.
 
 Each snowflake has a hanging hole in its top arm for a ribbon or hook. Fill the
 cavities level, let them set, and tip them out. They take paint, gilding or glitter
-well. The mold is one flat plate that prints with no supports in about 2 hours and fits
-the A1 mini bed.
+well. The mold is one flat plate that prints with no supports in about 2 hours.
 
 Spec:
   object:       mold for four plaster / Jesmonite / resin snowflake ornaments, 62 mm each
-  overall:      plate ~145 x 145 x 9 mm (fits the A1 mini)
+  overall:      plate ~145 x 145 x 9 mm (fits a 180 mm bed)
   mates with:   ribbon or hook through a 3.2 mm hole (pin 3.4 mm at the floor, drafted)
   orientation:  opening up, flat floor on the bed, no supports
   must have:    4 designs; arms 6.5 mm wide, branches 4.5 mm; ornament 6 mm thick;

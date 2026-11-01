@@ -4,13 +4,12 @@ Choose the version in the title. The fluted tray is 100 mm across with 28 rounde
 around the outside; the heart tray is 100 x 85 mm. Both have a smooth, shallow well
 11 mm deep for rings, keys or a candle. Pour, screed the
 back flat, and lift it out once cured; every surface is tapered so it releases from the
-rigid mold. Prints opening-up with no supports in under 2 hours on a Bambu A1 or A1
-mini.
+rigid mold. Prints opening-up with no supports in under 2 hours.
 
 Spec:
   object:       mold for a 100 mm cement / plaster / Jesmonite ring dish
   overall:      tray 100 mm across the flutes at the top, 20 mm tall; well 82 mm across,
-                11 mm deep; mold ~108 x 108 x 23 mm (fits the A1 mini)
+                11 mm deep; mold ~108 x 108 x 23 mm (fits a 180 mm bed)
   mates with:   nothing
   orientation:  opening up, flat floor on the bed, no supports
   must have:    shape fluted (28 flutes) or round; flat rim 9 mm; dome profile with draft at

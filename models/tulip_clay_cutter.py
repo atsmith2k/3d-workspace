@@ -4,7 +4,7 @@ mark the petals, for spring and Easter earrings, in three sizes with a pusher fo
 Press the cutter into rolled clay (2-3 mm), lift, and push the piece out with the
 matching pusher. Each cutter has a flat back with a finger flange, a sharp single-line
 edge, imprint blades 1.5 mm shorter than the edge so they press the petal lines without cutting through, and support bars across the back that sit well clear of the clay.
-Prints edge-up with no supports on a Bambu A1 or A1 mini.
+Prints edge-up with no supports.
 
 Spec:
   object:       polymer-clay cutter set, three-petal tulip head with petal imprints

@@ -4,7 +4,7 @@ blades that press the rainbow bands into the clay, in three sizes with a pusher 
 Press the cutter into rolled clay (2-3 mm), lift, and push the piece out with the
 matching pusher. Each cutter has a flat back with a finger flange, a sharp single-line
 edge, imprint blades 1.5 mm shorter than the edge so they press the bands without cutting through, and support bars across the back that sit well clear of the clay.
-Prints edge-up with no supports on a Bambu A1 or A1 mini.
+Prints edge-up with no supports.
 
 Spec:
   object:       polymer-clay cutter set, rainbow arch with band imprints

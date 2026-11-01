@@ -4,7 +4,7 @@ Writes into output/<name>/:
     <name>_product.png      clean 1600 x 1600 iso render, white background
     <name>_hero.png         same, lower and more frontal camera
     <name>_cast.png         molds with casting(p): the piece the mold makes, cement grey
-    <stem>_plate.png        the slicer's own plate picture per sliced 3MF
+    <part>.3mf              the buyer's project file: a plain, unsliced 3MF (written by `cad publish`)
     <name>_print_notes.txt  what the buyer needs to know (deterministic bytes)
     <name>_preview.glb      low-poly, unit-scaled viewer mesh for the shop's 3D canvas
     manifest.json           schema cadkit-product/1, everything the shop ingests
@@ -16,8 +16,9 @@ A model can steer it with two optional constants:
     LICENSE_NOTES = "..."   # replaces DEFAULT_LICENSE in the notes and manifest
 
 `gate()` decides `sellable`: watertight single body, every check PASS, no warnings,
-no fit interference, a fresh slice + 3MF per supported printer, product render and
-notes present. A dirty git tree is a reason, not a block. PRODUCT["sellable"]=True
+no fit interference, a 3MF per part and a fresh slice per supported printer (the slices
+give the time and filament estimates; they are not shipped), product render and notes
+present. Nothing the buyer receives names a printer: the models are printer-neutral. A dirty git tree is a reason, not a block. PRODUCT["sellable"]=True
 overrides (reasons stay as caveats); False blocks.
 """
 import re
@@ -237,15 +238,11 @@ def collect_files(out, name, parts, printers):
         part = data.get("part", fname)
         add(out / f"{fname}.stl", "stl", part=part)
         add(out / f"{fname}.step", "step", part=part)
-        for key in printers:
-            add(out / f"{fname}_{key}.3mf", "3mf", part=part, printer=key)
+        add(out / f"{fname}.3mf", "3mf", part=part)
     add(out / f"{name}_product.png", "png", kind="product")
     add(out / f"{name}_hero.png", "png", kind="hero")
     add(out / f"{name}_cast.png", "png", kind="cast")
     add(out / f"{name}_preview.png", "png", kind="check_sheet")
-    for fname in parts:
-        for key in printers:
-            add(out / f"{fname}_{key}_plate.png", "png", kind="plate", part=parts[fname].get("part", fname), printer=key)
     add(out / f"{name}_print_notes.txt", "txt", kind="print_notes")
     add(out / f"{name}_preview.glb", "glb", kind="viewer")
     return files
@@ -361,14 +358,14 @@ def gate(m):
             reasons.append(f"fit: {q['a']} vs {q['b']} interfere by {q['interference_mm3']} mm3")
     if not m.get("printers_supported"):
         reasons.append("no supported printer: the part is larger than every requested bed")
-    have_3mf = {(f.get("part"), f.get("printer")) for f in m.get("files", []) if f["role"] == "3mf"}
+    have_3mf = {f.get("part") for f in m.get("files", []) if f["role"] == "3mf"}
     have_slice = {(s["part"], s["printer"]) for s in m.get("slices", [])}
     for p in m.get("parts", []):
+        if p["part"] not in have_3mf:
+            reasons.append(f"{p['name']}: no 3MF")
         for key in m.get("printers_supported", []):
             if (p["name"], key) not in have_slice:
                 reasons.append(f"{p['name']}: no fresh slice for {key}")
-            if (p["part"], key) not in have_3mf:
-                reasons.append(f"{p['name']}: no {key} 3MF")
     roles = {f["role"] for f in m.get("files", [])}
     if "stl" not in roles:
         reasons.append("no STL in the folder")
@@ -408,17 +405,13 @@ def print_notes_text(m):
     """The buyer-facing notes. No timestamps: identical inputs give identical bytes."""
     lines = [m["title"], m.get("summary", ""), ""]
     slices = m.get("slices", [])
-    names = {s["printer"]: s.get("printer_name") or s["printer"] for s in slices}
-    for key in m.get("printers_supported", []):
-        names.setdefault(key, printersmod.PRINTERS.get(key, {}).get("name", key))
     materials = sorted({s.get("material") for s in slices if s.get("material")})
-    presets = sorted({s.get("filament_preset") for s in slices if s.get("filament_preset")})
     lh = sorted({s.get("layer_height_mm") for s in slices if s.get("layer_height_mm")})
     infill = sorted({s.get("infill_pct") for s in slices if s.get("infill_pct") is not None})
-    sup = "none needed" if not any((s.get("supports") or {}).get("generated") for s in slices) else "yes, included in the 3MF"
+    sup = "none needed" if not any((s.get("supports") or {}).get("generated") for s in slices) else "needed: turn supports on in your slicer"
     lines += ["PRINTING",
-              "  printers:     " + (", ".join(names[k] for k in names) or "any 0.4 mm nozzle FDM printer"),
-              "  material:     " + (", ".join(materials) or "PLA") + (f" ({', '.join(presets)})" if presets else ""),
+              "  printer:      any FDM printer with a 0.4 mm nozzle",
+              "  material:     " + (", ".join(materials) or "PLA"),
               "  layer height: " + (", ".join(f"{v:g} mm" for v in lh) or "0.2 mm")
               + "; infill " + (", ".join(f"{v:g}%" for v in infill) or "15%")
               + "; supports " + sup,
@@ -430,17 +423,21 @@ def print_notes_text(m):
         lines.append(f"  parts:        {len(parts)}")
         for p in parts:
             lines.append(f"    {p['part']}: {_size_text(p.get('size_mm'), p.get('size_in'))}")
-    if slices:
-        lines.append("  estimates:")
-        for s in slices:
-            who = f"{s.get('printer_name') or s['printer']}" + (f", {s['part']}" if len(parts) > 1 else "")
-            lines.append(f"    {who}: {_hm(s.get('print_time_s'))}, {s.get('filament_g', 0):.0f} g / "
-                         f"{s.get('filament_m', 0):.1f} m {s.get('material') or ''}, {s.get('layers', 0)} layers".rstrip())
+    # One estimate per part, from the first slice of it: a guide, since time varies by printer.
+    first = {}
+    for s in slices:
+        first.setdefault(s["part"], s)
+    if first:
+        lines.append("  estimates:    (a guide; print time varies by printer and settings)")
+        for part, s in first.items():
+            who = f"{part}: " if len(parts) > 1 else ""
+            lines.append(f"    {who}about {_hm(s.get('print_time_s'))}, {s.get('filament_g', 0):.0f} g / "
+                         f"{s.get('filament_m', 0):.1f} m {s.get('material') or ''}".rstrip())
     else:
         lines.append("  estimates:    not sliced yet")
     lines.append("  files:")
     for f in m.get("files", []):
-        what = {"stl": "mesh for any slicer", "3mf": f"sliced Bambu Studio project for the {names.get(f.get('printer'), f.get('printer'))}, open and print",
+        what = {"stl": "mesh for any slicer", "3mf": "3MF of the model, opens in any slicer",
                 "step": "editable CAD (Fusion, FreeCAD, Onshape)", "txt": "these notes",
                 "glb": "low-poly preview for the shop's 3D viewer (not printable)",
                 "png": {"product": "product picture", "hero": "product picture", "check_sheet": "engineering check sheet",
@@ -542,8 +539,6 @@ def validate_manifest(m):
         if "/" in str(f.get("path", "")) or "\\" in str(f.get("path", "")):
             bad.append(f"{tag}path must be a bare file name")
         paths.add(f.get("path"))
-        if f.get("role") == "3mf" and not f.get("printer"):
-            bad.append(tag + "3mf without printer")
         if f.get("role") == "glb" and f.get("kind") != "viewer":
             bad.append(tag + "glb must be kind viewer")
     for i, s in enumerate(m.get("slices") or []):
@@ -552,8 +547,7 @@ def validate_manifest(m):
                            ("print_time_s", int), ("layers", int), ("filament_g", (int, float)),
                            ("filament_m", (int, float)), ("supports", dict), ("file", str)):
             need(key, types, s, tag)
-        if s.get("file") and s["file"] not in paths:
-            bad.append(f"{tag}file {s['file']} is not in files[]")
+        # A slice's own 3MF stays in the output folder: slices only feed the estimates.
     images = m.get("images") or {}
     for key in ("product", "hero", "check_sheet"):
         if key not in images:

@@ -6,7 +6,7 @@ fluted holder for a 7/8 in taper candle (56 mm across, 48 mm tall). The tealight
 lift them out; the taper pocket narrows slightly so the candle wedges upright. Pour, tap
 out the air, screed the back flat, and lift the holder out once cured: every wall is
 tapered so it releases from the rigid mold. Prints opening-up with no supports in about
-1-2 hours on a Bambu A1 or A1 mini.
+1-2 hours.
 
 Spec:
   object:       mold for a cement / Jesmonite candle holder, poured straight into the print

@@ -4,8 +4,7 @@ for statement earrings, in three sizes with a pusher for each.
 Press the cutter into rolled clay, lift, and push the piece out with the pusher: the
 window comes out with it in one go, so both hearts in a pair match. Each cutter has a
 flat back and a finger flange, a sharp single-line edge, and support bars across the
-back that sit well clear of the clay. Prints edge-up with no supports on a Bambu A1 or
-A1 mini, about 15 minutes per cutter.
+back that sit well clear of the clay. Prints edge-up with no supports, about 15 minutes per cutter.
 
 Spec:
   object:       polymer-clay cutter set, open heart (hoop) earring shape

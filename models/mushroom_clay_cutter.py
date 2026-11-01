@@ -4,7 +4,7 @@ round spots cut out and the gill line pressed in, in three sizes with a pusher f
 Press the cutter into rolled clay (2-3 mm), lift, and push the piece out with the
 matching pusher. Each cutter has a flat back with a finger flange, a sharp single-line
 edge, inner blades that cut the three spots and a recessed imprint blade for the gill line in the same press, and support bars across the back that sit well clear of the clay.
-Prints edge-up with no supports on a Bambu A1 or A1 mini.
+Prints edge-up with no supports.
 
 Spec:
   object:       polymer-clay cutter set, toadstool mushroom with three spot windows and a gill-line imprint

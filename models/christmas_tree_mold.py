@@ -3,13 +3,12 @@ eight-pointed star that tapers to a small tip, 100 mm tall and 60 mm across.
 
 Pour into the upright mold, screed the base flat, and lift the tree out once cured; the
 taper itself lets it release cleanly. Leave it raw, paint the tip gold, or make a few in
-different finishes. Prints tip-down with no supports in under 2 hours on a Bambu A1 or
-A1 mini.
+different finishes. Prints tip-down with no supports in under 2 hours.
 
 Spec:
   object:       mold for a cement / plaster / Jesmonite tabletop Christmas tree
   overall:      tree 60 mm across the star points at the base, 100 mm tall, 6 mm tip;
-                mold ~66 x 66 x 103 mm (fits the A1 mini)
+                mold ~66 x 66 x 103 mm (fits a 180 mm bed)
   mates with:   nothing
   orientation:  opening up, tip down, base disc on the bed, no supports
   must have:    8-point star section, inner/outer radius 0.72, linear taper (smooth sides),
