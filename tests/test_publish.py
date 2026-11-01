@@ -36,6 +36,7 @@ def make_folder(tmp_path, name="d20_paver_mold", printers=("a1", "a1mini"), part
     for part in parts:
         fname = name if part == name else f"{name}-{part}"
         stl_sha = _write(out / f"{fname}.stl", f"solid {fname}\nendsolid\n".encode())
+        _write(out / f"{fname}.3mf", b"PK generic 3mf " + fname.encode())   # the buyer's printer-neutral 3MF
         checks = [dict(name="dims", ok=True, detail="x=136.3 z=24.0"),
                   dict(name="no_overhang", ok=not check_fail, detail="0 mm2 overhang")]
         build_parts[fname] = dict(
@@ -116,21 +117,21 @@ def test_manifest_is_valid_and_sellable(tmp_path):
 def test_files_whitelist_roles_and_hashes(tmp_path):
     m = compose(tmp_path)
     paths = {f["path"]: f for f in m["files"]}
-    assert set(paths) == {"d20_paver_mold.stl", "d20_paver_mold_a1.3mf", "d20_paver_mold_a1mini.3mf",
+    # Printer-neutral: one plain 3MF per part; the printer slices and their plate pictures stay behind.
+    assert set(paths) == {"d20_paver_mold.stl", "d20_paver_mold.3mf",
                           "d20_paver_mold_product.png", "d20_paver_mold_hero.png", "d20_paver_mold_preview.png",
-                          "d20_paver_mold_a1_plate.png", "d20_paver_mold_a1mini_plate.png",
                           "d20_paver_mold_print_notes.txt", "d20_paver_mold_preview.glb"}
     assert "zoom.png" not in paths and "report.txt" not in paths and "d20_paver_mold.gcode" not in paths
+    assert not any("a1" in p for p in paths)
     assert paths["d20_paver_mold.stl"]["role"] == "stl" and paths["d20_paver_mold.stl"]["part"] == "d20_paver_mold"
-    assert paths["d20_paver_mold_a1mini.3mf"]["role"] == "3mf" and paths["d20_paver_mold_a1mini.3mf"]["printer"] == "a1mini"
+    assert paths["d20_paver_mold.3mf"]["role"] == "3mf" and "printer" not in paths["d20_paver_mold.3mf"]
     assert paths["d20_paver_mold_print_notes.txt"]["role"] == "txt"
     assert paths["d20_paver_mold_preview.glb"]["role"] == "glb" and paths["d20_paver_mold_preview.glb"]["kind"] == "viewer"
     f = paths["d20_paver_mold.stl"]
     assert f["bytes"] == len(b"solid d20_paver_mold\nendsolid\n")
     assert f["sha256"] == _sha(b"solid d20_paver_mold\nendsolid\n")
     assert m["images"] == dict(product="d20_paver_mold_product.png", hero="d20_paver_mold_hero.png",
-                               check_sheet="d20_paver_mold_preview.png",
-                               thumbnails=["d20_paver_mold_a1_plate.png", "d20_paver_mold_a1mini_plate.png"])
+                               check_sheet="d20_paver_mold_preview.png", thumbnails=[])
 
 
 def test_slices_per_printer(tmp_path):
@@ -162,7 +163,6 @@ def test_validate_catches_broken_manifests(tmp_path):
     bad["schema"] = "cadkit-product/0"
     bad["slug"] = "D20_paver"
     bad["files"][0]["sha256"] = "nope"
-    bad["slices"][0]["file"] = "missing.3mf"
     del bad["parts"][0]["checks_ok"]
     bad["files"].append(dict(role="gcode", path="x.gcode", bytes=1, sha256="0" * 64))
     bad["files"].append(dict(role="glb", path="y.glb", bytes=1, sha256="0" * 64))
@@ -170,7 +170,6 @@ def test_validate_catches_broken_manifests(tmp_path):
     assert any("schema" in p for p in problems)
     assert any("slug" in p for p in problems)
     assert any("sha256" in p for p in problems)
-    assert any("missing.3mf" in p for p in problems)
     assert any("checks_ok" in p for p in problems)
     assert any("role 'gcode'" in p for p in problems)
     assert any("glb must be kind viewer" in p for p in problems)
@@ -239,7 +238,6 @@ def test_gate_needs_render_notes_and_every_printer(tmp_path):
     m = compose(tmp_path / "b", printers=("a1",))
     assert m["sellable"] is False
     assert any("no fresh slice for a1mini" in r for r in m["reasons"])
-    assert any("no a1mini 3MF" in r for r in m["reasons"])
 
 
 def test_gate_dirty_tree_is_a_reason_not_a_block(tmp_path):
@@ -349,7 +347,7 @@ def test_print_notes_sections_and_determinism(tmp_path):
     for section in ("PRINTING", "USING THE MOLD", "NOTES", "LICENSE"):
         assert f"\n{section}\n" in text
     assert text.startswith("D20 Paver Mold\n")
-    assert "Bambu Lab A1 mini: 9h 2m, 81 g / 26.7 m PLA, 120 layers" in text
+    assert "about 9h 2m, 81 g / 26.7 m PLA" in text and "Bambu" not in text
     assert "136.3 x 136.3 x 24.0 mm (5.37 x 5.37 x 0.94 in)" in text
     assert "cast material: cement" in text
     assert "release agent" in text
@@ -447,3 +445,19 @@ def test_tapered_grows_by_lean_with_straight_sides():
     b = m.bounding_box()
     assert [round(v, 3) for v in b] == [-16.5, -6.5, 2, 26.5, 16.5, 12]
     assert m.num_tri() == 12
+
+
+def test_print_notes_name_no_printer(tmp_path):
+    m = compose(tmp_path)
+    notes = publish.print_notes_text(m)
+    assert "Bambu" not in notes and "A1" not in notes
+    assert "any FDM printer" in notes and "opens in any slicer" in notes
+    assert "about 9h 2m" in notes and notes.count("about 9h 2m") == 1
+
+
+def test_a_part_without_its_3mf_is_not_sellable(tmp_path):
+    out, build, slices = make_folder(tmp_path)
+    (out / "d20_paver_mold.3mf").unlink()
+    m = publish.compose_manifest(out, build, slices, dict(name="d20_paver_mold", description="", product={}),
+                                 git=dict(commit="c" * 40, dirty=False))
+    assert m["sellable"] is False and "d20_paver_mold: no 3MF" in m["reasons"]

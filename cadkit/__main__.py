@@ -30,6 +30,7 @@ from . import mesh as meshmod
 from . import outputs
 from . import printers
 from . import publish as publishmod
+from . import threemf
 from . import slicer
 from .render import CAST_TINT, HERO_CAM, render_product, render_sheet
 
@@ -473,6 +474,11 @@ def cmd_publish(args):
     for stem, s in slices.items():
         if s.get("file") and not outputs.slice_is_stale(s, out):
             slicer.extract_plate_png(out / s["file"], out / f"{stem}_plate.png")
+    # The buyer's project file is a plain, unsliced 3MF per part: printer-neutral, opens in any
+    # slicer. The printer slices above stay in the folder for the time and filament estimates.
+    for fname, part in build.get("parts", {}).items():
+        if (out / part["stl"]).exists():
+            threemf.stl_to_3mf(out / part["stl"], out / f"{fname}.3mf")
     meshes = {part.get("part", fname): trimesh.load(out / part["stl"])
               for fname, part in build.get("parts", {}).items() if (out / part["stl"]).exists()}
     if meshes:

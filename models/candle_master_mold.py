@@ -8,12 +8,12 @@ the housing tube over the base, seal the joint with a little clay, and pour sili
 the rim. The pin on top of the master leaves a ready-made wick hole through the silicone.
 Demold, and pour wax into the silicone through its open end, which forms the candle's
 flat base. Mix about 300 ml of silicone (ribbed 303 ml, faceted 275 ml, twisted 315 ml).
-Both parts print with no supports, about 2.5 hours each, on a Bambu A1 or A1 mini.
+Both parts print with no supports, about 2.5 hours each.
 
 Spec:
   object:       two-part master + housing for casting a silicone pillar-candle mold
   overall:      ribbed: master on a 101 mm base, 97 mm tall plus a 10.5 mm wick pin;
-                housing 96 mm across, 104 mm tall (fits the A1 mini)
+                housing 96 mm across, 104 mm tall (fits a 180 mm bed)
   casting:      candle = the master body; silicone wall 10 mm round the candle and
                 10 mm over its top; wick hole 2.5 mm through the top
   mates with:   housing bore slides over the base spigot, 0.25 mm clearance per side,

@@ -4,7 +4,7 @@ each topped with its own raised design (leaf, flower, heart, sprig, star and dai
 Pour silicone into the box to just over the rim, let it cure and peel it out: you have a
 six-cavity wax-melt mold that copies every design. The melts come out 30 x 30 mm and
 14 mm thick with the design raised on their face. Mix about 130 ml of silicone. Prints in
-one piece, open side up, with no supports, in under 2 hours on a Bambu A1 or A1 mini.
+one piece, open side up, with no supports, in under 2 hours.
 
 Spec:
   object:       one-piece silicone mold master (positive + mold box) for six wax melts

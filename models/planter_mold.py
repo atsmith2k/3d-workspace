@@ -5,12 +5,12 @@ Fill the cup about two-thirds with cement, press the core in until its flange re
 the rim (its skirt centres it, so the wall comes out even), and weigh it down while the
 cement cures. Four vents in the flange let air and excess cement out. A pin on the cup
 floor forms the drainage hole; poke through any thin skin left over it. Both parts
-print with no supports, about 4 hours together, and fit the A1 mini bed.
+print with no supports, about 4 hours together.
 
 Spec:
   object:       two-part mold for an 80 mm cement / Jesmonite planter with a drain hole
   overall:      planter 80 mm across the top, 75 mm tall, wall 8, floor 10, drain 10 mm;
-                mold cup ~86 x 86 x 78 mm; core ~92 x 92 x 68 mm (both fit the A1 mini)
+                mold cup ~86 x 86 x 78 mm; core ~92 x 92 x 68 mm (both fit a 180 mm bed)
   mates with:   core skirt over the cup: cup outer 86 mm, skirt bore 86.6 (0.3 per side);
                 core sits 0.3 mm above the drain pin so the pin never props it up
   orientation:  cup opening up on its floor; core flange down on the bed, frustum up;

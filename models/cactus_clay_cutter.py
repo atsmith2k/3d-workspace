@@ -4,7 +4,7 @@ the pot rim pressed in, in three sizes with a pusher for each.
 Press the cutter into rolled clay (2-3 mm), lift, and push the piece out with the
 matching pusher. Each cutter has a flat back with a finger flange, a sharp single-line
 edge, recessed imprint blades that press the ribs and pot rim in the same press, and support bars across the back that sit well clear of the clay.
-Prints edge-up with no supports on a Bambu A1 or A1 mini.
+Prints edge-up with no supports.
 
 Spec:
   object:       polymer-clay cutter set, two-armed saguaro cactus in a pot with rib and rim imprints

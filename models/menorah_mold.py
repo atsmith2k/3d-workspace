@@ -5,12 +5,12 @@ The finished menorah is 168 mm long, 30 mm deep and 26 mm tall, with the shamash
 12 mm higher. The cups take standard 9-10 mm Hanukkah candles and narrow slightly so
 the candles stand straight. Cement does not burn, which makes it a good material for a
 menorah. Pour, screed the back flat, and lift it out once cured. Prints opening-up with
-no supports in under 2 hours, and fits the A1 mini bed.
+no supports in under 2 hours.
 
 Spec:
   object:       mold for a cement / Jesmonite menorah, poured straight into the print
   overall:      menorah 168 x 30 mm, 26 mm tall, shamash block 12 mm higher;
-                mold ~176 x 38 x 44 mm, fits the A1 mini bed (180 mm)
+                mold ~176 x 38 x 44 mm, fits a 180 mm bed
   mates with:   standard Hanukkah candles, 9-10 mm at the base; cup 10.2 mm at the bottom
                 widening at 4 deg to ~12 mm at the rim, 13 deep, so candles wedge upright
   orientation:  opening up, flat floor on the bed, no supports

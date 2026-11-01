@@ -3,12 +3,12 @@ its face that follow the outline: a 100 mm hexagon, or a 105 x 89 mm heart (see 
 
 The coaster is 10 mm thick, and the back is the pour side: screed it flat and add cork
 or felt pads. Make a set in different colours, or pair it with the oak leaf coaster mold.
-Prints opening-up with no supports in under an hour on a Bambu A1 or A1 mini.
+Prints opening-up with no supports in under an hour.
 
 Spec:
   object:       mold for a 100 mm hexagon coaster, 10 mm thick
   overall:      coaster 100 mm across the flats (115.5 across the corners);
-                mold ~108 x 123 x 13 mm (fits the A1 mini)
+                mold ~108 x 123 x 13 mm (fits a 180 mm bed)
   mates with:   nothing
   orientation:  opening up, flat floor on the bed, no supports
   heart:        shape=heart: a 105 x 89 mm heart, grooves 9 and 18 mm in, following

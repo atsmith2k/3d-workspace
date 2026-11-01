@@ -7,7 +7,7 @@ the formed lid slips about 5 mm down over the formed box and sits snug. Both buc
 taper at 5 deg so the sheet lets go, have rounded top edges so it doesn't tear, and have
 a small vent at the heart's notch so the sheet pulls into it. Print them solid-ish (four
 walls) so they don't soften under the heater. Both print with no supports in under an
-hour on a Bambu A1 or A1 mini.
+hour.
 
 Spec:
   object:       two vacuum-forming bucks (box + lid) for a heart treat box

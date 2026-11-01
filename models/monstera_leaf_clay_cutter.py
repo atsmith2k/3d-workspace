@@ -4,7 +4,7 @@ midrib imprint, a year-round boho earring shape, in three sizes with a pusher fo
 Press the cutter into rolled clay (2-3 mm), lift, and push the piece out with the
 matching pusher. Each cutter has a flat back with a finger flange, a sharp single-line
 edge, a midrib imprint blade 1.5 mm shorter than the edge so it presses a groove without cutting through, and support bars across the back that sit well clear of the clay.
-Prints edge-up with no supports on a Bambu A1 or A1 mini.
+Prints edge-up with no supports.
 
 Spec:
   object:       polymer-clay cutter set, monstera leaf with edge slits and a midrib imprint
