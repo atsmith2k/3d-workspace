@@ -43,6 +43,7 @@ class Element:
     name: str = ""
     trim_after: bool = False
     ink: dict = field(default_factory=dict)
+    area: object = None           # fabric it must cover, when not plain geom (satin rings)
 
     @property
     def bounds(self):
@@ -92,6 +93,8 @@ class Design:
         for k, v in dict(spacing=spacing, pull=pull, underlay=underlay).items():
             if v is not None:
                 p[k] = v
+        if len(path) > 2 and np.allclose(path[0], path[-1]):
+            p.update(closed=True, rungs=[])           # a ring: no start/end seam
         return self._add("satin", (left, right), color, p, name, trim_after, ink)
 
     def satin_rails(self, left, right, color, spacing=None, pull=None, underlay=None,
@@ -118,19 +121,29 @@ class Design:
                 p[k] = v
         return self._add("run", np.asarray(path, float), color, p, name, trim_after, ink)
 
-    def outline(self, shape, color, width=None, name="", corner=50.0, **kw):
-        """Border every ring of a shape: a satin of `width` mm centred on the edge, or
-        a bean-stitch run when width is None. Satin borders are split into separate
-        columns at corners sharper than `corner` degrees (a column turning a sharp
-        corner folds over itself: bunching and long stitches)."""
+    def outline(self, shape, color, width=None, name="", clean=None, fan=100.0, **kw):
+        """Border every ring of a shape: one continuous satin ring `width` mm wide centred
+        on the edge, or a bean-stitch run when width is None.
+
+        Satin rings sew as a single closed column, the way a patch border is digitized:
+        the outline is first cleaned of jags narrower than `clean` mm (default 0.4 x
+        width; a satin cannot follow them), corners up to `fan` degrees get mitred
+        rails, sharper ones pivot round the inside corner in a fan of stitches. No
+        breaks, one start, one tie-off."""
         out = []
+        if width:
+            r = 0.4 * width if clean is None else clean
+            if r > 0:
+                shape = smooth_outline(shape, r)
         for i, ring_pts in enumerate(S.outline_paths(shape)):
-            nm = f"{name or 'outline'} {i + 1}"
+            nm = f"{name or 'outline'} {i + 1}" if len(S.outline_paths(shape)) > 1 else (name or "outline")
             if width:
-                pieces = split_corners(ring_pts, corner, trim=0.45 * width)
-                for j, piece in enumerate(pieces):
-                    out.append(self.satin(_resample(piece, 1.0), width, color,
-                                          name=nm + (f".{j + 1}" if len(pieces) > 1 else ""), **kw))
+                left, right, rungs = ring_rails(ring_pts, width, fan)
+                el = self.satin_rails(left, right, color, name=nm, **kw)
+                el.params.update(closed=True, rungs=rungs, width=float(width))
+                from shapely.geometry import LinearRing
+                el.area = LinearRing(ring_pts).buffer(width / 2, join_style="mitre", mitre_limit=2.0)
+                out.append(el)
             else:
                 kw.setdefault("bean", 1)
                 out.append(self.run(ring_pts, color, name=nm, **kw))
@@ -156,6 +169,95 @@ class Design:
             if not seq or seq[-1] != el.color:
                 seq.append(el.color)
         return seq
+
+
+def smooth_outline(shape, r):
+    """The shape with jags narrower than 2r removed (a morphological open and close with
+    mitred joins, so real corners stay sharp), then simplified to 0.1 mm."""
+    kw = dict(join_style="mitre", mitre_limit=3.0)
+    g = shape.buffer(-r, **kw).buffer(r, **kw).buffer(r, **kw).buffer(-r, **kw)
+    g = g.simplify(0.1)
+    return g if not g.is_empty else shape
+
+
+def ring_rails(ring, width, fan=100.0, step=1.0):
+    """Rails for a satin column round a closed ring: (left, right, rungs). Point i of
+    one rail pairs with point i of the other; `rungs` are the indices of the pairs
+    that sit on ring corners (written as Ink/Stitch rungs). Corners turning up to `fan`
+    degrees are mitred; sharper ones keep the inside rail on one pivot point while the
+    outside rail runs round an arc, so stitches fan round the corner."""
+    from shapely.geometry import LinearRing
+    pts = np.asarray(ring, float)
+    if np.allclose(pts[0], pts[-1]):
+        pts = pts[:-1]
+    if not LinearRing(pts).is_ccw:
+        pts = pts[::-1]
+    keep = [0]                                      # drop near-duplicate points
+    for i in range(1, len(pts)):
+        if np.linalg.norm(pts[i] - pts[keep[-1]]) > 0.3:
+            keep.append(i)
+    pts = pts[keep]
+    if np.linalg.norm(pts[0] - pts[-1]) <= 0.3:
+        pts = pts[:-1]
+    n = len(pts)
+    h = width / 2
+    d_out = np.roll(pts, -1, 0) - pts
+    seg = np.linalg.norm(d_out, axis=1)
+    t_out = d_out / seg[:, None]
+    t_in = np.roll(t_out, 1, 0)
+    seg_in = np.roll(seg, 1)
+    nrm = lambda t: np.c_[-t[:, 1], t[:, 0]]          # left normal
+    n_in, n_out = nrm(t_in), nrm(t_out)
+    turn = np.degrees(np.arctan2(t_in[:, 0] * t_out[:, 1] - t_in[:, 1] * t_out[:, 0],
+                                 np.einsum("ij,ij->i", t_in, t_out)))
+    L, R, corner = [], [], []
+    for i in range(n):
+        v = pts[i]
+        m = n_in[i] + n_out[i]
+        m = m / (np.linalg.norm(m) + 1e-12)
+        half = np.radians(abs(turn[i])) / 2
+        # mitre distance, capped so the point stays within half of each adjacent segment
+        reach = 0.5 * min(seg[i], seg_in[i])
+        D = min(h / max(np.cos(half), 1e-6), np.hypot(h, reach))
+        if abs(turn[i]) <= fan:
+            L.append(v + m * D)
+            R.append(v - m * D)
+            corner.append(len(L) - 1)
+            continue
+        # fan: pivot on the inside, arc on the outside
+        a0, a1 = (-n_in[i], -n_out[i]) if turn[i] > 0 else (n_in[i], n_out[i])
+        k = max(2, int(np.ceil(abs(turn[i]) / 15)))
+        ang0, ang1 = np.arctan2(a0[1], a0[0]), np.arctan2(a1[1], a1[0])
+        da = (ang1 - ang0 + np.pi) % (2 * np.pi) - np.pi
+        pivot = v + m * D if turn[i] > 0 else v - m * D
+        # walk the pivot a little along the corner so the fan's inside ends don't all
+        # land in one hole (thread pile-up, needle breaks)
+        walk = min(0.5, 0.25 * min(seg[i], seg_in[i]))
+        mid = len(L) + k // 2
+        for j in range(k + 1):
+            a = ang0 + da * j / k
+            arc = v + h * np.array([np.cos(a), np.sin(a)])
+            f = j / k
+            piv = pivot - t_in[i] * walk * (1 - f) + t_out[i] * walk * f
+            (L, R)[int(turn[i] > 0)].append(arc)
+            (R, L)[int(turn[i] > 0)].append(piv)
+        corner.append(mid)
+    L, R = np.array(L), np.array(R)
+    # densify the straights so both rails keep the pairing between corners
+    outL, outR, idx = [], [], []
+    for i in range(len(L)):
+        j = (i + 1) % len(L)
+        mid_len = np.linalg.norm((L[j] + R[j]) / 2 - (L[i] + R[i]) / 2)
+        k = max(1, int(np.ceil(mid_len / step)))
+        if i in corner:
+            idx.append(len(outL))
+        for s in range(k):
+            f = s / k
+            outL.append(L[i] + (L[j] - L[i]) * f)
+            outR.append(R[i] + (R[j] - R[i]) * f)
+    outL.append(outL[0])
+    outR.append(outR[0])
+    return np.array(outL), np.array(outR), idx
 
 
 def split_corners(ring, corner=50.0, trim=0.0):

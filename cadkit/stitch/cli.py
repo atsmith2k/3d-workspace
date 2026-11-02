@@ -21,6 +21,7 @@ from . import checks as C
 from . import engines, pattern as P
 from .design import DEFAULT_HOOP, HOOPS
 from .render import render_sheet
+from .threads import thread_label
 from .svg import to_svg
 
 ROOT = Path(__file__).resolve().parent.parent.parent
@@ -92,31 +93,45 @@ def cmd_build(args):
     t1 = time.time()
     pat, engine, notes = engines.stitch(design, svg_path, args.engine)
     P.name_threads(pat, design.colors() if len(pat.threadlist) == len(design.colors()) else None)
-    plan = P.plan_of(pat)
-    density = C.density_grid(plan)
     print(f"stitched with {engine} in {time.time() - t1:.1f}s")
+    engine_plan = P.plan_of(pat)
+
+    # write the machine files, then check and report on the file the user gets (the
+    # writers add trims and split long stitches); formats without exact colours fall
+    # back to the engine's plan
+    formats = [f.strip().lower() for f in args.formats.split(",") if f.strip()]
+    written = P.write_all(pat, out / name, formats)
+    back = P.plan_of(P.read(written[formats[0]]))
+    plan = back if formats[0] == "pes" else engine_plan
+    density = C.density_grid(plan)
+    rw, rh = back.size
+    reread = (f"files    {', '.join(p.name for p in written.values())}; "
+              f"{'checked' if plan is back else 're-read'}: {formats[0]} "
+              f"({back.penetrations:,} stitches, {rw:.1f} x {rh:.1f} mm, {len(back.colors)} colours)")
 
     hoop_wh = HOOPS[hoop_name]
     lines, warns, fits = plan_lines(plan, density, hoop_name, hoop_wh, engine)
+    if abs(rw - engine_plan.size[0]) > 1.0 or abs(rh - engine_plan.size[1]) > 1.0:
+        warns.append(f"WARNING {formats[0]} re-read size {rw:.1f} x {rh:.1f} differs from the "
+                     f"engine's {engine_plan.size[0]:.1f} x {engine_plan.size[1]:.1f}")
     thin = C.thin_features(design, 1.0)
     for nm, area, (x, y) in [t for t in thin if t[1] == 0.0 or t[1] > 3.0][:5]:
         warns.append(f"WARNING thin: {nm} has parts under 1 mm wide near ({x:.0f}, {y:.0f})"
                      + (f", {area:.1f} mm2" if area else ""))
+    gaps = sorted(C.coverage_gaps(plan, design), key=lambda g: -g[1])
+    worst = gaps[0] if gaps else ("", 0.0, (0, 0))
+    lines.append(f"coverage largest bare patch {worst[1]:.1f} mm2" +
+                 (f" ({worst[0]} near ({worst[2][0]:.0f}, {worst[2][1]:.0f}))" if worst[1] > 0.2 else ""))
+    for nm, area, (x, y) in [g for g in gaps if g[1] > 1.0][:5]:
+        warns.append(f"WARNING bare: {nm} leaves {area:.1f} mm2 of fabric showing near "
+                     f"({x:.0f}, {y:.0f}): a break in a border or between fill sections")
     ctx = SimpleNamespace(plan=plan, design=design, params=ns, hoop=(hoop_name, hoop_wh),
                           density=density, name=name)
     spec = mod.checks(ns) if callable(getattr(mod, "checks", None)) else getattr(mod, "CHECKS", [])
     results = C.check_results(spec, ctx)
     check_lines = [C.format_check(r) for r in results]
 
-    formats = [f.strip().lower() for f in args.formats.split(",") if f.strip()]
-    written = P.write_all(pat, out / name, formats)
-    back = P.plan_of(P.read(written[formats[0]]))
-    rw, rh = back.size
-    reread = (f"files    {', '.join(p.name for p in written.values())}; {formats[0]} re-read: "
-              f"{back.penetrations:,} stitches, {rw:.1f} x {rh:.1f} mm, {len(back.colors)} colours")
-    if abs(rw - plan.size[0]) > 1.0 or abs(rh - plan.size[1]) > 1.0:
-        warns.append(f"WARNING {formats[0]} re-read size {rw:.1f} x {rh:.1f} differs from the plan")
-
+    lines += [f"thread {i + 1}  {c}  {thread_label(c)}" for i, c in enumerate(plan.colors)]
     report = lines + [reread] + check_lines + [f"note     {n}" for n in notes] + warns
     ok = fits and all(r["ok"] for r in results)
     print()
@@ -127,8 +142,11 @@ def cmd_build(args):
               f"hoop: {hoop_name} ({hoop_wh[0]} x {hoop_wh[1]} mm)", ""]
     if not args.no_render:
         png = out / f"{name}_preview.png"
+        detail = getattr(args, "detail", None) or getattr(mod, "DETAIL", None)
+        if isinstance(detail, str):
+            detail = tuple(float(v) for v in detail.split(","))
         render_sheet(plan, density, png, f"{name}   {engine}", report, hoop_wh,
-                     _block_stitches(plan))
+                     _block_stitches(plan), detail=detail)
         print(f"\n  preview  {png.relative_to(ROOT) if png.is_relative_to(ROOT) else png}")
     if args.compare:
         _compare(design, svg_path, engine, plan)
@@ -204,8 +222,48 @@ def cmd_list(args):
     return 0
 
 
+SIM_DIR = ROOT / "tools" / "stitchsim"
+
+
+def sim_binary(build=True):
+    """Path to the stitchsim simulator, building it with cargo the first time."""
+    import shutil
+    import subprocess
+    exe = SIM_DIR / "target" / "release" / ("stitchsim.exe" if sys.platform == "win32" else "stitchsim")
+    if exe.exists() or not build:
+        return exe if exe.exists() else None
+    if shutil.which("cargo") is None:
+        sys.exit("stitchsim is not built and cargo was not found: install Rust (rustup.rs), "
+                 "then run `cargo build --release` in tools/stitchsim")
+    print("building stitchsim (first run, ~1 min)...")
+    subprocess.run(["cargo", "build", "--release"], cwd=SIM_DIR, check=True)
+    return exe
+
+
+def cmd_sim(args):
+    """Open a stitch file, or a design's built PES, in the stitchsim simulator."""
+    import subprocess
+    path = Path(args.file)
+    if path.suffix == ".py":                     # a design: its built PES
+        path = OUT / path.stem / f"{path.stem}.pes"
+        if not path.exists():
+            sys.exit(f"{path} not built yet: run `cad stitch build {args.file}` first")
+    if not path.exists():
+        sys.exit(f"no such file: {path}")
+    exe = sim_binary()
+    cmd = [str(exe), str(path.resolve())]
+    if args.screenshot:
+        cmd += ["--screenshot", str(Path(args.screenshot).resolve()), "--at", str(args.at)]
+        return subprocess.run(cmd).returncode
+    if args.info:
+        return subprocess.run([str(exe), "--info", str(path.resolve())]).returncode
+    subprocess.Popen(cmd)
+    print(f"stitchsim: {path.name}  (Space play, arrows step, PgUp/PgDn colours, F fit)")
+    return 0
+
+
 def add_parser(sub):
-    st = sub.add_parser("stitch", help="embroidery designs: build, inspect, new, list")
+    st = sub.add_parser("stitch", help="embroidery designs: build, inspect, sim, new, list")
     ss = st.add_subparsers(dest="stitch_cmd", required=True)
     b = ss.add_parser("build", help="design -> SVG + PES/DST/JEF..., checks, preview")
     b.add_argument("model")
@@ -217,6 +275,7 @@ def add_parser(sub):
     b.add_argument("--formats", default=",".join(P.FORMATS), help="comma-separated, first is re-read to verify")
     b.add_argument("--no-render", action="store_true")
     b.add_argument("--compare", action="store_true", help="also stitch with the other engine and compare")
+    b.add_argument("--detail", metavar="X,Y", help="centre of the preview detail tile, mm (default: densest spot)")
     i = ss.add_parser("inspect", help="stats and preview of any stitch file (PES, DST, JEF, EXP, VP3...)")
     i.add_argument("file")
     i.add_argument("--hoop", default=DEFAULT_HOOP, choices=list(HOOPS))
@@ -225,8 +284,14 @@ def add_parser(sub):
     n.add_argument("name")
     n.add_argument("description", nargs="?", default="")
     ss.add_parser("list", help="designs and whether they are built; Ink/Stitch status")
+    m = ss.add_parser("sim", help="watch a stitch file (or a design's PES) sew in the stitchsim viewer")
+    m.add_argument("file", help="PES/PEC/DST/EXP/JEF file, or designs/<name>.py")
+    m.add_argument("--info", action="store_true", help="print the simulator's stats instead of opening it")
+    m.add_argument("--screenshot", metavar="PNG", help="render one frame to a PNG and exit")
+    m.add_argument("--at", default="1.0", help="with --screenshot: share sewn (0..1) or stitch count")
     return st
 
 
 def run(args):
-    return dict(build=cmd_build, inspect=cmd_inspect, new=cmd_new, list=cmd_list)[args.stitch_cmd](args)
+    return dict(build=cmd_build, inspect=cmd_inspect, new=cmd_new, list=cmd_list,
+                sim=cmd_sim)[args.stitch_cmd](args)

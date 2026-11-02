@@ -30,6 +30,7 @@ def checks(p):
         max_density(3.5),
         long_stitches(7.0),
         min_feature(1.0),
+        coverage(1.0),
         stitches(max=20000),
     ]
 
@@ -37,6 +38,6 @@ def checks(p):
 def design(p):
     d = Design()
     body = heart(p.width)
-    d.fill(body, p.color, angle=30, name="heart")
+    d.fill(tuck(body, 1.6), p.color, angle=30, name="heart")   # stops under the border
     d.outline(body, "black", width=1.6, name="border")
     return d

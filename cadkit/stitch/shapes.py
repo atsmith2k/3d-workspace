@@ -13,7 +13,7 @@ from shapely.geometry import LineString, MultiPolygon, Polygon
 from shapely.ops import unary_union
 
 __all__ = ["circle", "ellipse", "rect", "rounded_rect", "poly", "smooth", "star", "heart",
-           "ring", "regular_polygon", "union", "knockout", "grow", "shrink", "move", "rotate", "scale",
+           "ring", "regular_polygon", "union", "knockout", "tuck", "grow", "shrink", "move", "rotate", "scale",
            "mirror_x", "from_cs", "text_shape", "svg", "trace", "line", "arc", "bezier",
            "spline", "circle_path", "outline_paths", "centered", "polygons_of"]
 
@@ -93,6 +93,14 @@ def knockout(shape, *above, overlap=0.4, min_width=1.0):
     if min_width:
         cut = cut.buffer(-min_width / 2, quad_segs=8).buffer(min_width / 2, quad_segs=8)
     return cut
+
+
+def tuck(shape, border, overlap=0.6):
+    """The fill area for a shape that gets a satin border `border` mm wide centred on
+    its edge: the fill stops `overlap` mm past the border's inner edge. A fill running
+    all the way under the border doubles the thread there (stiff, dense corners); the
+    overlap keeps fabric from showing when the fill pulls in."""
+    return shape.buffer(-(border / 2 - overlap), join_style="mitre", mitre_limit=3.0)
 
 
 def grow(shape, mm):

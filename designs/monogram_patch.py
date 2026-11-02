@@ -36,6 +36,7 @@ def checks(p):
         max_density(3.5),
         long_stitches(7.0),
         min_feature(1.0),
+        coverage(1.0),
         stitches(max=15000),
     ]
 

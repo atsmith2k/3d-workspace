@@ -208,7 +208,10 @@ is how they validate and digitise by hand).
 2. `cad stitch new <name> "<description>"`, fill in the Spec (size, hoop, fabric and
    stabiliser, threads in sewing order, every feature with a size, density limit), turn
    it into `checks(p)`: `size`, `hoop`, `colors`, `max_density`, `long_stitches`,
-   `min_feature`, `stitches`, `trims`, `jump_threads`, `short_stitches`, `custom`.
+   `min_feature`, `coverage`, `stitches`, `trims`, `jump_threads`, `short_stitches`,
+   `custom`. Always include `coverage(1.0)`: it rasterises the delivered stitches and
+   fails on bare fabric inside any fill, satin or outline band, or in a slot between
+   elements (a broken border, a fill pulled back too far, a gap between fill sections).
 3. Write `design(p)` returning a `Design` (`from cadkit.stitch import *`):
    `d.fill(shape, color, angle, spacing, underlay, method)`, `d.satin(path, width, color)`,
    `d.satin_rails(left, right, color)`, `d.run(path, color, bean=1)`,
@@ -222,9 +225,21 @@ is how they validate and digitise by hand).
    `.pes .dst .jef .exp .vp3 .xxx`, `_preview.png`, `build.json`, `report.txt`.
    `--engine inkstitch` (default when installed: Ink/Stitch 3 run headlessly on the SVG)
    or `native` (built-in); `--compare` runs both. `--hoop`, `--set`, `--formats pes,dst`.
-5. Read the preview: the sewn render (does it read at size?), the sewing order (jump
+5. Read the preview: the sewn render (does it read at size?), the **detail** tile (24 mm
+   at thread scale, centred on the densest spot or `--detail x,y` / `DETAIL = (x, y)`:
+   row texture, satin edges and corners, travel left on top), the sewing order (jump
    threads red, colour starts numbered), the density map (green fine, yellow dense,
-   red too dense). Every check PASS, no WARNING lines. `cad stitch inspect file.pes`
+   red too dense). Look at the detail tile on every border corner that worries you.
+   Every check PASS, no WARNING lines; the `coverage` report line names the largest
+   bare patch. `cad stitch sim <file.pes | designs/<name>.py>` opens the stitchsim
+   viewer (`tools/stitchsim`, Rust/egui) to watch it sew stitch by stitch; add
+   `--screenshot out.png --at 0.5` for a frame you can read without a window, or
+   `--info` for its stats (they match pyembroidery's; `tests/test_stitch.py` checks).
+   `--realistic --article tshirt|pants|cap|tote` stages a realistic render on a garment
+   (the viewer also has these as a "Realistic" toggle and a "Stage on" panel).
+   The viewer also flags problem areas (long / tiny stitches, density over 3.5, needle
+   pile-ups, untrimmed jumps, missing tie-ins/offs, hoop overflow); `--info` lists
+   them, so run `cad stitch sim <file> --info` on files the user brings in. `cad stitch inspect file.pes`
    reports on any stitch file, including ones the user made.
 6. Deliver the PES (or their format), the SVG and the preview with SendUserFile; say the
    size, stitch count, colours in order with the nearest Brother thread, sew time, and
@@ -236,18 +251,30 @@ Digitising rules the checks enforce or the preview shows:
 - Never stack fills: `knockout(lower, *upper)` cuts the lower fill out under everything
   sewn on top, keeping 0.4 mm overlap, and drops slivers. Density over ~3.5 thread
   layers (fill ~1, satin ~1.7) puckers and breaks needles.
-- Satin columns 1-7 mm wide (wider snags: use a fill); satin borders are split at sharp
-  corners by `outline`. Fill row spacing 0.4 mm normal, 0.35 for lettering, 0.45-0.5 light.
+- Satin columns 1-7 mm wide (wider snags: use a fill). `outline(shape, color, width=)`
+  sews each ring as **one continuous satin column**: jags narrower than 0.4 x width are
+  cleaned off first (a satin cannot follow them), corners up to 100 deg are mitred,
+  sharper ones fan round a walking pivot. Never border a shape with separate satin
+  pieces: every join is a visible break plus a tie-off and a trim. A closed path passed
+  to `satin()` is treated as a ring too. (Ink/Stitch mis-sews closed rails, so the SVG
+  writes a ring as two open columns meeting exactly at corners, with rungs.)
+- A fill under a satin border stops under it: `fill(tuck(shape, border_width))` leaves
+  0.6 mm overlap instead of doubling the thread under the whole border (dense corners,
+  stiff edge). Fill row spacing 0.4 mm normal, 0.35 for lettering, 0.45-0.5 light.
   Vary fill angles between neighbouring areas so they read apart.
 - Nothing narrower than 1 mm in a fill; lettering as fill needs >= 6 mm cap height
   (bold sans), smaller text needs satin lettering in Ink/Stitch.
 - Towels: water-soluble topper; knits: cut-away stabiliser; wovens: tear-away.
+- Machine files snap stitches to 0.1 mm, so 0.4 mm rows really sit 0.35-0.42 apart;
+  thread spreads to ~0.45 mm and closes them. The preview draws thread at that width.
 - PES is written as version 6 so exact RGB travels; DST carries no colours, JEF snaps to
   Janome's palette. The `~Brother <name>` in the report is the nearest spool.
 
 Worked examples: `designs/mountain_badge.py` (8-colour layered patch with knockouts and
 banner lettering), `designs/monogram_patch.py` (fill, lettering, bean-stitch ring, satin
-border). Code: `cadkit/stitch/` (`design`, `shapes`, `svg` writer, `engines`, `native`
+border), `designs/indiana_state.py` (map outline from public-domain boundary data,
+continuous satin border over a tucked fill, script lettering with a knocked-out halo).
+Code: `cadkit/stitch/` (`design`, `shapes`, `svg` writer, `engines`, `native`
 engine, `pattern` reader/writers, `checks`, `render`, `cli`); tests in `tests/test_stitch.py`.
 
 ## Printers
@@ -345,6 +372,7 @@ cadkit/          harness: __main__ (CLI), mesh (convert/clean/check), render (pr
 models/          one script per object (_template.py is the starting point); commit these
 designs/         one script per embroidery design (_template.py); `cad stitch build`
 cadkit/stitch/   embroidery harness (Design, stitch engines, PES/DST writers, checks, preview)
+tools/stitchsim/ Rust embroidery simulator (PES/DST/EXP/JEF viewer); `cad stitch sim`
 output/          generated files (gitignored); rebuilt from models/
 tests/           expected.json (selftest) and pytest suite (`.venv/Scripts/python -m pytest tests -q`)
 scripts/setup.py one-step install + self-test

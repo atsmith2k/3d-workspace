@@ -39,13 +39,47 @@ def rgb(hexcolor):
     return tuple(int(h[i:i + 2], 16) for i in (0, 2, 4))
 
 
-def nearest_brother(hexcolor):
-    """(name, '#rrggbb') of the closest Brother PEC palette thread (redmean distance)."""
-    r, g, b = rgb(hexcolor)
+def lab(hexcolor):
+    """sRGB '#rrggbb' -> CIE L*a*b* (D65)."""
+    def lin(v):
+        v /= 255
+        return v / 12.92 if v <= 0.04045 else ((v + 0.055) / 1.055) ** 2.4
+    r, g, b = (lin(v) for v in rgb(hexcolor))
+    x = (0.4124 * r + 0.3576 * g + 0.1805 * b) / 0.95047
+    y = 0.2126 * r + 0.7152 * g + 0.0722 * b
+    z = (0.0193 * r + 0.1192 * g + 0.9505 * b) / 1.08883
 
-    def dist(t):
-        r2, g2, b2 = rgb(_hex(t))
-        rm = (r + r2) / 2
-        return (2 + rm / 256) * (r - r2) ** 2 + 4 * (g - g2) ** 2 + (2 + (255 - rm) / 256) * (b - b2) ** 2
-    t = min(_PEC, key=dist)
+    def f(t):
+        return t ** (1 / 3) if t > 0.008856 else 7.787 * t + 16 / 116
+    fx, fy, fz = f(x), f(y), f(z)
+    return 116 * fy - 16, 500 * (fx - fy), 200 * (fy - fz)
+
+
+def delta_e94(c1, c2):
+    """CIE94 colour difference between two hex colours (graphic arts weights)."""
+    L1, a1, b1 = lab(c1)
+    L2, a2, b2 = lab(c2)
+    C1, C2 = (a1 * a1 + b1 * b1) ** 0.5, (a2 * a2 + b2 * b2) ** 0.5
+    dH2 = max(0.0, (a1 - a2) ** 2 + (b1 - b2) ** 2 - (C1 - C2) ** 2)
+    return ((L1 - L2) ** 2 + ((C1 - C2) / (1 + 0.045 * C1)) ** 2
+            + dH2 / (1 + 0.015 * C1) ** 2) ** 0.5
+
+
+def nearest_brother(hexcolor):
+    """(name, '#rrggbb') of the closest Brother PEC palette thread (CIE94: unlike plain
+    RGB distance it keeps a dark navy from matching grey)."""
+    t = min(_PEC, key=lambda t: delta_e94(hexcolor, _hex(t)))
     return t.description, _hex(t)
+
+
+CLOSE = 8.0         # CIE94 distance beyond which the palette has no real match
+
+
+def thread_label(hexcolor):
+    """'~ Brother Orange (dE 3.7)', or a note that the palette has nothing close, so the
+    user buys the thread by colour instead of grabbing the wrong spool."""
+    name, h = nearest_brother(hexcolor)
+    de = delta_e94(hexcolor, h)
+    if de <= CLOSE:
+        return f"~ Brother {name} (dE {de:.1f})"
+    return f"no close Brother match (nearest {name}, dE {de:.0f}): use the hex"

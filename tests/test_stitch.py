@@ -11,7 +11,7 @@ import pytest
 from cadkit.stitch import Design, circle, heart, knockout, rect, text_shape
 from cadkit.stitch import checks as C
 from cadkit.stitch import cli, engines, native, pattern as P
-from cadkit.stitch.design import split_corners
+from cadkit.stitch.design import _resample, ring_rails, split_corners
 from cadkit.stitch.svg import to_svg
 
 from conftest import ROOT
@@ -129,3 +129,135 @@ def test_inkstitch_engine(tmp_path):
     rc, args = _build("monogram_patch", tmp_path, "inkstitch")
     assert rc == 0, args.build_data["parts"]["monogram_patch"]["lines"]
     assert args.build_data["engine"].startswith("inkstitch")
+
+
+def test_outline_is_one_continuous_ring():
+    d = Design()
+    d.outline(heart(60), "black", width=2.5)
+    assert len(d.elements) == 1                        # not split at the tip and notch
+    left, right = d.elements[0].geom
+    assert np.allclose(left[0], left[-1]) and len(left) == len(right)
+    w = np.linalg.norm(left - right, axis=1)
+    assert w.min() > 1.0 and w.max() < 2.5 * 1.7       # mitres and fans stay sane
+    plan = P.plan_of(native.build_pattern(d), recenter=False)
+    assert plan.trims == 1 and len(plan.runs) == 1     # one start, one tie-off
+
+
+def test_coverage_catches_broken_border_and_pulled_fill():
+    shape = heart(60)
+    def gaps(d):
+        return max(a for _, a, _ in C.coverage_gaps(P.plan_of(native.build_pattern(d)), d))
+    ok = Design()
+    ok.fill(C.S.tuck(shape, 2.5), "#c8102e")
+    ok.outline(shape, "black", width=2.5)
+    assert gaps(ok) < 1.0
+    plan = P.plan_of(native.build_pattern(ok))         # a 3 mm break in the border
+    tip = np.array([0.0, -26.5]) + (np.array(plan.bounds[:2]) + plan.bounds[2:]) / 2
+    runs = []
+    for b, r in plan.runs:                             # block 1 is the border
+        keep = np.linalg.norm(r - tip, axis=1) > 1.5 if b == 1 else np.ones(len(r), bool)
+        idx = np.split(np.arange(len(r)), np.nonzero(np.diff(keep))[0] + 1)
+        runs += [(b, r[i]) for i in idx if keep[i[0]] and len(i) > 1]
+    plan.runs = runs
+    assert max(a for _, a, _ in C.coverage_gaps(plan, ok)) > 1.0
+    pulled = Design()                                  # fill stops short of the border
+    pulled.fill(shape.buffer(-3), "#c8102e")
+    pulled.outline(shape, "black", width=2.5)
+    assert gaps(pulled) > 1.0
+
+
+def test_native_travel_makes_no_tiny_stitches():
+    d = Design()
+    d.fill(circle(0, 0, 25) - rect(30, 4), "#2e8b3a")  # two islands of rows, edge travel
+    L = P.plan_of(native.build_pattern(d)).stitch_lengths()
+    assert (L < 0.3).mean() < 0.03
+
+
+def test_ring_satin_svg_is_two_open_halves():
+    d = Design()
+    d.outline(heart(60), "black", width=2.5)
+    root = ET.fromstring(to_svg(d).encode())
+    paths = root.findall(".//{http://www.w3.org/2000/svg}path")
+    assert [p.get("id") for p in paths] == ["el001a", "el001b"]
+    assert all("Z" not in p.get("d") for p in paths)   # Ink/Stitch mis-sews closed rails
+
+
+@pytest.mark.skipif(engines.find_inkstitch() is None, reason="Ink/Stitch not installed")
+def test_inkstitch_sews_ring_border_cleanly(tmp_path):
+    d = Design()
+    d.hoop = "4x4"
+    d.outline(heart(60), "black", width=2.5)
+    svg = tmp_path / "ring.svg"
+    svg.write_text(to_svg(d), encoding="utf-8")
+    plan = P.plan_of(engines.run_inkstitch(svg)[0])
+    assert plan.stitch_lengths().max() < 7.0
+    assert C.coverage_gaps(plan, d)[0][1] < 1.0
+
+
+@pytest.mark.skipif(cli.sim_binary(build=False) is None, reason="stitchsim not built")
+@pytest.mark.parametrize("fmt", ["pes", "dst", "exp", "jef"])
+def test_stitchsim_reads_what_we_write(tmp_path, fmt):
+    """The Rust simulator decodes every format we write the same way pyembroidery does."""
+    import subprocess
+    out = P.write_all(native.build_pattern(square_design()), tmp_path / "sq", (fmt,))[fmt]
+    info = subprocess.run([str(cli.sim_binary(build=False)), "--info", str(out)],
+                          capture_output=True, text=True, check=True).stdout
+    got = dict(line.split(None, 1) for line in info.splitlines() if line.strip())
+    plan = P.plan_of(P.read(out))
+    assert int(got["stitches"]) == plan.penetrations
+    assert int(got["colours"].split()[0]) == len(plan.colors)
+    w, h = (float(v) for v in got["size"].replace(" mm", "").split(" x "))
+    assert abs(w - plan.size[0]) < 0.11 and abs(h - plan.size[1]) < 0.11
+    if fmt == "pes":
+        assert "#c8102e" in info                      # exact RGB from the PES v6 header
+
+
+def bad_pattern():
+    """A stitch file with one of every problem stitchsim flags (0.1 mm units, Y down)."""
+    pat = pe.EmbPattern()
+    pat.add_thread(pe.EmbThread("#c8102e"))
+    pat.add_thread(pe.EmbThread("#1f5fbf"))
+    s = lambda x, y: pat.add_stitch_absolute(pe.STITCH, x, y)
+    for x, y in [(0, 0), (4, 0), (0, 0), (4, 0)]:                    # tie-in
+        s(x, y)
+    for i in range(30):                                               # long satin: 10 mm, then 14 mm
+        s(i * 4, 0 if i % 2 else (100 if i < 15 else 140))
+    for layer in range(8):                                            # 8 stacked fills: far too dense
+        for row in range(50):
+            y = 300 + row * 4
+            for x in (range(0, 200, 25) if row % 2 == 0 else range(200, 0, -25)):
+                s(x, y)
+    for i in range(4):                                                # tiny stitches in a row, mid-run
+        s(200 + (i % 2) * 2, 520)
+    s(240, 520)
+    for i in range(10):                                               # needle pile-up on one point
+        s(300, 520)
+        s(300 + (30 if i % 2 else -30), 540)
+    s(300, 520)
+    pat.add_stitch_absolute(pe.JUMP, 700, 520)                        # untrimmed 40 mm jump
+    for x in range(700, 900, 25):
+        s(x, 520)
+    pat.add_stitch_absolute(pe.TRIM, 900, 520)                        # ends with no tie-off
+    pat.add_command(pe.COLOR_CHANGE)
+    pat.add_stitch_absolute(pe.JUMP, 0, 900)
+    for x in range(0, 300, 25):                                       # starts with no tie-in
+        s(x, 900)
+    pat.add_command(pe.END)
+    return pat
+
+
+@pytest.mark.skipif(cli.sim_binary(build=False) is None, reason="stitchsim not built")
+def test_stitchsim_flags_problems(tmp_path):
+    import subprocess
+    exe = str(cli.sim_binary(build=False))
+    bad = P.write_all(bad_pattern(), tmp_path / "bad", ("pes",))["pes"]
+    info = subprocess.run([exe, "--info", str(bad)], capture_output=True, text=True, check=True).stdout
+    for kind in ("stitch too long", "far too dense", "tiny stitches", "needle pile-up", "no tie-off", "no tie-in"):
+        assert kind in info, (kind, info)
+    # PES turns every jump into a trim; EXP keeps the jump untrimmed
+    exp = P.write_all(bad_pattern(), tmp_path / "bad", ("exp",))["exp"]
+    info = subprocess.run([exe, "--info", str(exp)], capture_output=True, text=True, check=True).stdout
+    assert "untrimmed jump" in info, info
+    good = P.write_all(native.build_pattern(square_design()), tmp_path / "ok", ("pes",))["pes"]
+    clean = subprocess.run([exe, "--info", str(good)], capture_output=True, text=True, check=True).stdout
+    assert "problems    0" in clean, clean

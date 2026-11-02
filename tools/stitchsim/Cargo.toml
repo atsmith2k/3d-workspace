@@ -1,0 +1,21 @@
+[package]
+name = "stitchsim"
+version = "0.1.0"
+edition = "2021"
+description = "Fast, lightweight machine-embroidery simulator: open a PES/DST/EXP/JEF file and watch it sew"
+license = "MIT"
+
+[dependencies]
+eframe = { version = "0.37", default-features = false, features = ["glow", "default_fonts", "wayland", "x11"] }
+rfd = "0.17"
+png = "0.18"
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+strip = true
+panic = "abort"
+
+[profile.dev.package."*"]
+opt-level = 2

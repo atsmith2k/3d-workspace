@@ -11,7 +11,7 @@ from dataclasses import dataclass, field
 import numpy as np
 import pyembroidery as pe
 
-from .threads import nearest_brother
+from .threads import CLOSE, delta_e94, nearest_brother
 
 FORMATS = ("pes", "dst", "jef", "exp", "vp3", "xxx")
 
@@ -146,15 +146,17 @@ def read(path):
 
 
 def name_threads(pattern, colors=None):
-    """Give every thread a description with the closest Brother palette name."""
+    """Name every thread after the closest Brother palette colour, or by its hex when the
+    palette has nothing close (a machine screen saying "Dark Gray" for navy misleads)."""
     for i, t in enumerate(pattern.threadlist):
         hexc = "#%06x" % (t.color & 0xFFFFFF)
         if colors and i < len(colors):
             t.set_color(*[int(colors[i][j:j + 2], 16) for j in (1, 3, 5)])
             hexc = colors[i]
-        name, _ = nearest_brother(hexc)
-        t.description = name
-        t.brand = "Brother (nearest)"
+        name, h = nearest_brother(hexc)
+        close = delta_e94(hexc, h) <= CLOSE
+        t.description = name if close else hexc
+        t.brand = "Brother (nearest)" if close else ""
     return pattern
 
 

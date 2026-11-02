@@ -114,6 +114,7 @@ Run from the repo root. Windows: `cad ...`; macOS/Linux/Git Bash: `./cad ...`
 | `cad list` | List models and whether they're built |
 | `cad stitch build designs/<name>.py [--engine inkstitch\|native] [--hoop 5x7]` | Embroidery: Ink/Stitch SVG + PES/DST/JEF/EXP/VP3/XXX, checks, preview (see below) |
 | `cad stitch inspect file.pes` | Stats, density map and preview of any stitch file |
+| `cad stitch sim file.pes` (or `designs/<name>.py`) | Watch it sew in the stitchsim viewer ([tools/stitchsim](tools/stitchsim/README.md), Rust; built with cargo on first use) |
 | `cad stitch new <name> "description"` / `cad stitch list` | Start a design / list designs and Ink/Stitch status |
 
 ## Embroidery designs
@@ -126,10 +127,11 @@ SVGs or traced images), and `cad stitch build` writes `output/embroidery/<name>/
   stitch parameters as `inkstitch:*` attributes. Open it in Inkscape to see or tweak
   exactly what was asked for (Extensions > Ink/Stitch > Params), and re-export from there.
 - `<name>.pes` (PES v6, exact thread colours), `.dst`, `.jef`, `.exp`, `.vp3`, `.xxx`
-- `<name>_preview.png`: thread render on fabric with the hoop, sewing order with jump
-  threads, a thread-layer density map, the thread list with the nearest Brother colours
+- `<name>_preview.png`: thread render on fabric with the hoop, a 24 mm detail at thread
+  scale (densest spot, or `--detail x,y`), sewing order with jump threads, a thread-layer
+  density map, the thread list with the nearest Brother colours
 - `build.json`, `report.txt`: size, stitch count, colours, trims, jumps, thread length,
-  sew time, density, stitch lengths and every check
+  sew time, density, stitch lengths, coverage (largest bare patch) and every check
 
 Stitches come from [Ink/Stitch](https://inkstitch.org) run headlessly on the SVG when it is
 installed (found in the Inkscape extensions folder, or set `CAD_INKSTITCH`), so the files

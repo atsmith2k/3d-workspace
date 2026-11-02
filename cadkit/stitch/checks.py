@@ -15,8 +15,9 @@ from . import shapes as S
 from .design import HOOPS
 
 __all__ = ["size", "hoop", "stitches", "colors", "max_density", "long_stitches",
-           "short_stitches", "min_feature", "trims", "jump_threads", "custom",
-           "check_results", "format_check", "run_checks", "density_grid", "thin_features"]
+           "short_stitches", "min_feature", "trims", "jump_threads", "coverage", "custom",
+           "check_results", "format_check", "run_checks", "density_grid", "thin_features",
+           "coverage_gaps"]
 
 THREAD_W = 0.3      # mm, 40 wt polyester lying flat
 CELL = 1.0          # density grid cell, mm
@@ -161,3 +162,105 @@ def jump_threads(over_mm=3.0, max=0):
         n = sum(1 for _, a, b, t in c.plan.jumps if not t and np.linalg.norm(b - a) > over_mm)
         return n <= max, f"{n} untrimmed jumps over {over_mm} mm"
     return Check("jump_threads", fn)
+
+
+SPREAD = 0.45       # mm a sewn row covers once the thread flattens (40 wt, tension on)
+PX = 10             # coverage raster, pixels per mm
+CLOSE_GAP = 1.2     # mm; gaps between elements narrower than twice this count as bare
+
+
+def _area_of(el):
+    """The fabric area an element is meant to cover (fills and satins; runs cover none)."""
+    from shapely.geometry import Polygon
+    if getattr(el, "area", None) is not None:
+        return el.area
+    if el.kind == "fill":
+        return el.geom
+    if el.kind == "satin":
+        left, right = el.geom
+        ring = np.vstack([left, right[::-1]])
+        return Polygon(ring).buffer(0)
+    return None
+
+
+def coverage_gaps(plan, design, inset=0.35, spread=SPREAD):
+    """[(element name, gap mm2, (x, y))]: the largest patch of each fill or satin that no
+    stitch of its colour covers (a sewn row covers `spread` mm; the outer `inset` mm is
+    ignored, pull and the border take that). Bare fabric inside a shape is a break in
+    a border, a hole between fill sections or rows pulled apart."""
+    from PIL import Image, ImageDraw
+    from scipy import ndimage
+    from shapely import contains_xy
+    bx0, by0, bx1, by1 = design.bounds()
+    px0, py0, px1, py1 = plan.bounds
+    off = np.array([(px0 + px1 - bx0 - bx1) / 2, (py0 + py1 - by0 - by1) / 2])
+    W, H = int((bx1 - bx0 + 4) * PX), int((by1 - by0 + 4) * PX)
+    ox, oy = bx0 - 2, by0 - 2
+
+    def pix(p):
+        p = np.asarray(p) - off
+        return list(zip((p[:, 0] - ox) * PX, (H - (p[:, 1] - oy) * PX)))
+
+    sewn = {}
+    for block, run in plan.runs:
+        c = plan.colors[block]
+        if c not in sewn:
+            sewn[c] = Image.new("L", (W, H), 0)
+        if len(run) > 1:
+            ImageDraw.Draw(sewn[c]).line(pix(run), fill=255, width=max(1, round(spread * PX)))
+    xs = ox + (np.arange(W) + 0.5) / PX
+    ys = oy + (H - np.arange(H) - 0.5) / PX
+    gx, gy = np.meshgrid(xs, ys)
+    from shapely.ops import unary_union
+    allsewn = np.zeros((H, W), bool)
+    for im in sewn.values():
+        allsewn |= np.asarray(im) > 0
+    areas = [(el.name, el.color, _area_of(el)) for el in design.elements]
+    areas = [a for a in areas if a[2] is not None]
+    # the whole design too, any thread: catches gaps *between* elements (a fill pulled
+    # back from its border too far, shapes that should touch)
+    # (enclosed slots that closing by CLOSE_GAP fills: that narrow a slot between shapes
+    # is a mistake, and a counter that narrow fills in when sewn anyway; notches in the
+    # outer silhouette are left alone)
+    whole = []
+    if areas:
+        from shapely.geometry import Polygon
+        u = unary_union([a for *_, a in areas])
+        holes = unary_union([Polygon(r) for g in S.polygons_of(u) for r in g.interiors])
+        slots = u.buffer(CLOSE_GAP).buffer(-CLOSE_GAP).difference(u).intersection(holes)
+        if not slots.is_empty:
+            whole = [("design (between elements)", None, slots.buffer(inset))]
+    out = []
+    for name, color, area in areas + whole:
+        if color is not None and color not in sewn:
+            continue
+        area = area.buffer(-inset)
+        if area.is_empty:
+            continue
+        a0, b0, a1, b1 = area.bounds
+        cols = slice(max(0, int((a0 - ox) * PX)), min(W, int((a1 - ox) * PX) + 2))
+        rows = slice(max(0, int(H - (b1 - oy) * PX) - 1), min(H, int(H - (b0 - oy) * PX) + 1))
+        want = contains_xy(area, gx[rows, cols], gy[rows, cols])
+        cover = allsewn if color is None else np.asarray(sewn[color]) > 0
+        bare = want & ~cover[rows, cols]
+        lab, n = ndimage.label(bare)
+        if not n:
+            continue
+        sizes = ndimage.sum(bare, lab, range(1, n + 1))
+        k = int(np.argmax(sizes))
+        yy, xx = np.nonzero(lab == k + 1)
+        out.append((name, float(sizes[k]) / PX ** 2,
+                    (float(gx[rows, cols][yy[0], xx[0]]), float(gy[rows, cols][yy[0], xx[0]]))))
+    return out
+
+
+def coverage(max_mm2=1.0):
+    """Every fill and satin is covered by its own thread: no bare patch over `max_mm2`
+    (a gap in a border, a hole between fill sections)."""
+    def fn(c):
+        bad = [g for g in coverage_gaps(c.plan, c.design) if g[1] > max_mm2]
+        if not bad:
+            return True, f"no bare patch over {max_mm2} mm2"
+        bad.sort(key=lambda g: -g[1])
+        return False, "; ".join(f"{n} {a:.1f} mm2 at ({x:.0f},{y:.0f})" for n, a, (x, y) in bad[:4])
+    return Check("coverage", fn)

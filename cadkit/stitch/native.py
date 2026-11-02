@@ -21,6 +21,7 @@ from .threads import nearest_brother
 LOCK = 0.4          # lock stitch length mm
 TRIM_OVER = 3.0     # jumps longer than this get a trim
 TRAVEL_STITCH = 2.5
+SHORT_INSET = 0.3   # share of the column a satin short stitch stops short by
 
 
 # ---------- running stitch ----------
@@ -36,6 +37,19 @@ def resample(path, length):
         n = max(1, int(np.ceil(d / length - 1e-9)))
         out += [a + (b - a) * (i / n) for i in range(1, n + 1)]
     return np.asarray(out)
+
+
+def even(path, length):
+    """Points evenly spaced along a path, about `length` apart, first and last kept;
+    vertices in between are not (a buffered outline has many 0.03 mm apart, and each
+    would become a stitch)."""
+    path = np.asarray(path, float)
+    L = np.r_[0, np.cumsum(np.linalg.norm(np.diff(path, axis=0), axis=1))]
+    if L[-1] < 1e-6:
+        return path[:1]
+    n = max(1, int(np.ceil(L[-1] / length - 1e-9)))
+    t = np.linspace(0, L[-1], n + 1)
+    return np.c_[np.interp(t, L, path[:, 0]), np.interp(t, L, path[:, 1])]
 
 
 def running(path, length=2.5, repeats=1, bean=0):
@@ -124,6 +138,7 @@ def _travel(shape, a, b):
     if LineString([a, b]).within(shape.buffer(0.05)):
         return resample(np.array([a, b]), TRAVEL_STITCH)[1:]
     best = None
+    inner = inner.simplify(0.05)
     for poly in S.polygons_of(inner):
         for ring in [poly.exterior, *poly.interiors]:
             line = LineString(ring.coords)
@@ -139,7 +154,7 @@ def _travel(shape, a, b):
                 best = seg
     if best is None:
         return None
-    return np.vstack([resample(np.vstack([a, best, b]), TRAVEL_STITCH)[1:]])
+    return even(np.vstack([a, best, b]), TRAVEL_STITCH)[1:]
 
 
 def _ring_part(line, t0, t1):
@@ -249,6 +264,13 @@ def satin(left, right, p):
         t = np.array([0, L])
     pl = _at(left - u * pull, s, t)
     pr = _at(right + u * pull, s, t)
+    # short stitches: where one rail is compressed (the inside of a curve or a fan
+    # corner) every other stitch stops short of it, so the ends don't pile into one hole
+    for a, b in ((pl, pr), (pr, pl)):
+        gap = np.r_[np.inf, np.linalg.norm(np.diff(a[::2], axis=0), axis=1)]
+        tight = np.repeat(gap < 0.25 * sp * 2, 2)[:len(t)]
+        short = tight & (np.arange(len(t)) % 4 < 2)
+        a[short] += (b[short] - a[short]) * SHORT_INSET
     zz = np.array([pl[i] if i % 2 == 0 else pr[i] for i in range(len(t))])
     passes.append(zz[::-1] if end_at_start else zz)
     return [np.vstack(passes)]
