@@ -6,6 +6,7 @@
   python -m cadkit new foo "one-line description"
   python -m cadkit list
   python -m cadkit selftest
+  python -m cadkit stitch build designs/foo.py   (embroidery: see cadkit/stitch/cli.py)
 
 `build` runs the model's build(p), checks the result is printable, and writes
 output/<model>/<model>.stl (+ .step for B-rep models), preview.png, build.json and
@@ -678,12 +679,14 @@ def main():
     sub.add_parser("list", help="list models and whether they have been built")
     t = sub.add_parser("selftest", help="regression suite: build every recorded model and compare")
     t.add_argument("--update", action="store_true", help="re-record tests/expected.json from this run")
+    from .stitch import cli as stitch_cli
+    stitch_cli.add_parser(sub)
     args = ap.parse_args()
     if args.cmd == "build" and args.sweep:
         sys.exit(cmd_sweep(args))
     commands = dict(build=cmd_build, slice=cmd_slice, measure=cmd_measure, new=cmd_new,
                     list=cmd_list, selftest=cmd_selftest, lint=cmd_lint, trace=cmd_trace,
-                    publish=cmd_publish)
+                    publish=cmd_publish, stitch=stitch_cli.run)
     sys.exit(commands[args.cmd](args))
 
 

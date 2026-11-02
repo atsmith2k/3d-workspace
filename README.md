@@ -112,6 +112,29 @@ Run from the repo root. Windows: `cad ...`; macOS/Linux/Git Bash: `./cad ...`
 | `cad selftest [--update]` | Regression suite over `tests/expected.json` (`--update` re-records) |
 | `cad new <name> "description"` | Start a model from the template |
 | `cad list` | List models and whether they're built |
+| `cad stitch build designs/<name>.py [--engine inkstitch\|native] [--hoop 5x7]` | Embroidery: Ink/Stitch SVG + PES/DST/JEF/EXP/VP3/XXX, checks, preview (see below) |
+| `cad stitch inspect file.pes` | Stats, density map and preview of any stitch file |
+| `cad stitch new <name> "description"` / `cad stitch list` | Start a design / list designs and Ink/Stitch status |
+
+## Embroidery designs
+
+The same generative loop works for machine embroidery. Describe the design; Claude writes
+`designs/<name>.py` (fills, satin columns and running stitches built from shapes, text,
+SVGs or traced images), and `cad stitch build` writes `output/embroidery/<name>/`:
+
+- `<name>.svg`: Ink/Stitch-ready artwork, one path per element in sewing order with its
+  stitch parameters as `inkstitch:*` attributes. Open it in Inkscape to see or tweak
+  exactly what was asked for (Extensions > Ink/Stitch > Params), and re-export from there.
+- `<name>.pes` (PES v6, exact thread colours), `.dst`, `.jef`, `.exp`, `.vp3`, `.xxx`
+- `<name>_preview.png`: thread render on fabric with the hoop, sewing order with jump
+  threads, a thread-layer density map, the thread list with the nearest Brother colours
+- `build.json`, `report.txt`: size, stitch count, colours, trims, jumps, thread length,
+  sew time, density, stitch lengths and every check
+
+Stitches come from [Ink/Stitch](https://inkstitch.org) run headlessly on the SVG when it is
+installed (found in the Inkscape extensions folder, or set `CAD_INKSTITCH`), so the files
+match what Ink/Stitch itself would save; otherwise a built-in engine is used. Both read
+back through the same checks.
 
 ## Editing a result in Tinkercad
 
@@ -125,3 +148,5 @@ Python 3.12, 3.13 or 3.14 on Windows, macOS or Linux. Setup installs the rest in
 `cad slice` is optional and needs [Bambu Studio](https://bambulab.com/en/download/studio)
 installed (or PrusaSlicer as a fallback); both are found automatically in their default
 locations, or set `CAD_BAMBU` / `CAD_SLICER` to the binary.
+`cad stitch` works without extra software; with Inkscape + Ink/Stitch (3.x) installed it
+uses Ink/Stitch's stitch engine.

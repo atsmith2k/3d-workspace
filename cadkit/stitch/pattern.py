@@ -1,0 +1,170 @@
+"""Read any stitch pattern (from either engine, or a PES/DST/JEF file the user has)
+into a StitchPlan the checks and the preview work on, and write the machine files.
+
+A StitchPlan is mm with Y up, centred on the stitch extents:
+  runs   [(block, (N, 2) points)]  continuous sewn stitches; a new run follows a jump
+  jumps  [(block, a, b, trimmed)]  thread carried from one run to the next
+  colors ['#rrggbb', ...]          one per colour block, in sewing order
+"""
+from dataclasses import dataclass, field
+
+import numpy as np
+import pyembroidery as pe
+
+from .threads import nearest_brother
+
+FORMATS = ("pes", "dst", "jef", "exp", "vp3", "xxx")
+
+
+@dataclass
+class StitchPlan:
+    runs: list
+    jumps: list
+    colors: list
+    penetrations: int = 0
+    trims: int = 0
+    names: list = field(default_factory=list)
+
+    @property
+    def points(self):
+        return np.vstack([r for _, r in self.runs]) if self.runs else np.zeros((0, 2))
+
+    @property
+    def bounds(self):
+        p = self.points
+        return (*p.min(0), *p.max(0))
+
+    @property
+    def size(self):
+        x0, y0, x1, y1 = self.bounds
+        return x1 - x0, y1 - y0
+
+    def segments(self):
+        """(block, a, b) arrays of every sewn stitch."""
+        blk, a, b = [], [], []
+        for block, r in self.runs:
+            if len(r) > 1:
+                a.append(r[:-1])
+                b.append(r[1:])
+                blk.append(np.full(len(r) - 1, block))
+        if not a:
+            return np.zeros(0, int), np.zeros((0, 2)), np.zeros((0, 2))
+        return np.concatenate(blk), np.vstack(a), np.vstack(b)
+
+    def stitch_lengths(self):
+        _, a, b = self.segments()
+        return np.linalg.norm(b - a, axis=1)
+
+    def thread_length_m(self):
+        """Top thread estimate: sewn length + 0.4 mm take-up per penetration + jumps."""
+        sewn = self.stitch_lengths().sum()
+        jumps = sum(np.linalg.norm(b - a) for _, a, b, _ in self.jumps)
+        return (sewn + 0.4 * self.penetrations + jumps) / 1000
+
+    def sew_minutes(self, spm=650):
+        """Rough machine time: stitches at `spm` + 8 s per trim + 30 s per colour change."""
+        return self.penetrations / spm + self.trims * 8 / 60 + (len(self.colors) - 1) * 0.5
+
+
+def plan_of(pattern, recenter=True):
+    runs, jumps = [], []
+    colors = []
+    threads = list(pattern.threadlist)
+    names = []
+
+    def thread(i):
+        if i < len(threads):
+            t = threads[i]
+            return "#%06x" % (t.color & 0xFFFFFF), (t.description or "")
+        return "#808080", ""
+
+    block, cur, last_pen, trimmed, pens, trims = 0, [], None, False, 0, 0
+    c, n = thread(0)
+    colors.append(c)
+    names.append(n)
+
+    def close():
+        nonlocal cur
+        if cur:
+            runs.append((block, np.asarray(cur)))
+        cur = []
+
+    for x, y, cmd in pattern.stitches:
+        cmd &= pe.COMMAND_MASK
+        p = (x / 10.0, -y / 10.0)
+        if cmd == pe.STITCH:
+            if not cur and last_pen is not None:
+                if np.hypot(p[0] - last_pen[0], p[1] - last_pen[1]) > 1e-6:
+                    jumps.append((block, np.array(last_pen), np.array(p), trimmed))
+            if not cur:
+                trimmed = False
+            cur.append(p)
+            last_pen = p
+            pens += 1
+        elif cmd == pe.JUMP:
+            close()
+        elif cmd == pe.TRIM:
+            close()
+            if last_pen is not None and not trimmed:
+                trims += 1
+            trimmed = True
+        elif cmd in (pe.COLOR_CHANGE, pe.COLOR_BREAK, pe.NEEDLE_SET):
+            close()
+            if pens == 0 and cmd != pe.COLOR_CHANGE:
+                continue
+            if cmd == pe.NEEDLE_SET and not runs:
+                continue
+            block += 1
+            last_pen, trimmed = None, False
+            c, n = thread(block)
+            colors.append(c)
+            names.append(n)
+        elif cmd == pe.END:
+            break
+    close()
+    # drop empty trailing colour blocks
+    used = {b for b, _ in runs}
+    keep = [i for i in range(len(colors)) if i in used]
+    remap = {old: new for new, old in enumerate(keep)}
+    runs = [(remap[b], r) for b, r in runs]
+    jumps = [(remap[b], a, bb, t) for b, a, bb, t in jumps if b in remap]
+    plan = StitchPlan(runs, jumps, [colors[i] for i in keep], pens, trims,
+                      [names[i] for i in keep])
+    if recenter and runs:
+        x0, y0, x1, y1 = plan.bounds
+        c = np.array([(x0 + x1) / 2, (y0 + y1) / 2])
+        plan.runs = [(b, r - c) for b, r in plan.runs]
+        plan.jumps = [(b, a - c, bb - c, t) for b, a, bb, t in plan.jumps]
+    return plan
+
+
+def read(path):
+    pat = pe.read(str(path))
+    if pat is None:
+        raise ValueError(f"pyembroidery could not read {path}")
+    return pat
+
+
+def name_threads(pattern, colors=None):
+    """Give every thread a description with the closest Brother palette name."""
+    for i, t in enumerate(pattern.threadlist):
+        hexc = "#%06x" % (t.color & 0xFFFFFF)
+        if colors and i < len(colors):
+            t.set_color(*[int(colors[i][j:j + 2], 16) for j in (1, 3, 5)])
+            hexc = colors[i]
+        name, _ = nearest_brother(hexc)
+        t.description = name
+        t.brand = "Brother (nearest)"
+    return pattern
+
+
+def write_all(pattern, out_stem, formats=FORMATS):
+    """Write the pattern in every format; returns {fmt: path}. PES is version 6 so the
+    exact RGB of every thread travels with the file."""
+    written = {}
+    for fmt in formats:
+        path = out_stem.with_suffix("." + fmt)
+        settings = {"version": "6t"} if fmt == "pes" else {}
+        pe.write(pattern, str(path), settings)
+        written[fmt] = path
+    return written

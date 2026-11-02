@@ -195,6 +195,61 @@ mirror=False)` from `cadkit.cad`, or `text_solid(...)` to place yourself. manifo
 for `extrude`/`grow`/`drafted`. Cap height >= 5 mm, raised 0.6 mm (3 layers), bold for
 small sizes; mirror text on mold floors.
 
+## Embroidery designs (`cad stitch`)
+
+Same loop as models, for machine embroidery: the user describes a design, Claude writes
+`designs/<name>.py`, builds it, looks at the preview, iterates, and hands back the PES
+(and the Ink/Stitch SVG, so they can open and tweak it in Inkscape + Ink/Stitch, which
+is how they validate and digitise by hand).
+
+1. Clarify only what changes the stitching: finished size, hoop (default `4x4`, 100 x 100
+   field; also 5x7, 6x10, 8x8, 8x12), what it sews on (knit/towel/cap/patch), number of
+   colours, lettering. Their machine format is PES (Brother) unless they say otherwise.
+2. `cad stitch new <name> "<description>"`, fill in the Spec (size, hoop, fabric and
+   stabiliser, threads in sewing order, every feature with a size, density limit), turn
+   it into `checks(p)`: `size`, `hoop`, `colors`, `max_density`, `long_stitches`,
+   `min_feature`, `stitches`, `trims`, `jump_threads`, `short_stitches`, `custom`.
+3. Write `design(p)` returning a `Design` (`from cadkit.stitch import *`):
+   `d.fill(shape, color, angle, spacing, underlay, method)`, `d.satin(path, width, color)`,
+   `d.satin_rails(left, right, color)`, `d.run(path, color, bean=1)`,
+   `d.outline(shape, color, width=None|mm)`, `d.text(string, size, color)`. Shapes are
+   shapely: `circle`, `ellipse`, `rect`, `rounded_rect`, `poly`, `smooth`, `star`,
+   `heart`, `ring`, `text_shape`, `svg("x.svg", width=)`, `trace("img.png", width=)`,
+   and `a | b`, `a - b`, `a & b`. Paths: `line`, `arc`, `bezier`, `spline`,
+   `circle_path`, `outline_paths`. Any other Ink/Stitch parameter passes through as a
+   keyword (`fill_method="contour_fill"`, `stroke_method="ripple_stitch"`...).
+4. `cad stitch build designs/<name>.py` writes `output/embroidery/<name>/`: `<name>.svg`,
+   `.pes .dst .jef .exp .vp3 .xxx`, `_preview.png`, `build.json`, `report.txt`.
+   `--engine inkstitch` (default when installed: Ink/Stitch 3 run headlessly on the SVG)
+   or `native` (built-in); `--compare` runs both. `--hoop`, `--set`, `--formats pes,dst`.
+5. Read the preview: the sewn render (does it read at size?), the sewing order (jump
+   threads red, colour starts numbered), the density map (green fine, yellow dense,
+   red too dense). Every check PASS, no WARNING lines. `cad stitch inspect file.pes`
+   reports on any stitch file, including ones the user made.
+6. Deliver the PES (or their format), the SVG and the preview with SendUserFile; say the
+   size, stitch count, colours in order with the nearest Brother thread, sew time, and
+   the stabiliser.
+
+Digitising rules the checks enforce or the preview shows:
+- Sewing order = the order elements are added: background fills first, details on top,
+  outlines and lettering last. One colour change per colour where possible.
+- Never stack fills: `knockout(lower, *upper)` cuts the lower fill out under everything
+  sewn on top, keeping 0.4 mm overlap, and drops slivers. Density over ~3.5 thread
+  layers (fill ~1, satin ~1.7) puckers and breaks needles.
+- Satin columns 1-7 mm wide (wider snags: use a fill); satin borders are split at sharp
+  corners by `outline`. Fill row spacing 0.4 mm normal, 0.35 for lettering, 0.45-0.5 light.
+  Vary fill angles between neighbouring areas so they read apart.
+- Nothing narrower than 1 mm in a fill; lettering as fill needs >= 6 mm cap height
+  (bold sans), smaller text needs satin lettering in Ink/Stitch.
+- Towels: water-soluble topper; knits: cut-away stabiliser; wovens: tear-away.
+- PES is written as version 6 so exact RGB travels; DST carries no colours, JEF snaps to
+  Janome's palette. The `~Brother <name>` in the report is the nearest spool.
+
+Worked examples: `designs/mountain_badge.py` (8-colour layered patch with knockouts and
+banner lettering), `designs/monogram_patch.py` (fill, lettering, bean-stitch ring, satin
+border). Code: `cadkit/stitch/` (`design`, `shapes`, `svg` writer, `engines`, `native`
+engine, `pattern` reader/writers, `checks`, `render`, `cli`); tests in `tests/test_stitch.py`.
+
 ## Printers
 
 The user prints on a **Bambu Lab A1** (default, 256 x 256 x 256 mm bed) and an
@@ -288,6 +343,8 @@ Bambu A1 series design notes (0.4 mm nozzle, 0.42 mm line width, 0.2 mm layers):
 cadkit/          harness: __main__ (CLI), mesh (convert/clean/check), render (preview + product),
                  outputs (build.json / slice.json / report.txt), publish (manifest, notes, gate)
 models/          one script per object (_template.py is the starting point); commit these
+designs/         one script per embroidery design (_template.py); `cad stitch build`
+cadkit/stitch/   embroidery harness (Design, stitch engines, PES/DST writers, checks, preview)
 output/          generated files (gitignored); rebuilt from models/
 tests/           expected.json (selftest) and pytest suite (`.venv/Scripts/python -m pytest tests -q`)
 scripts/setup.py one-step install + self-test

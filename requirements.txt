@@ -6,4 +6,6 @@ rtree==1.4.1
 numpy==2.5.4
 pillow==13.0.0
 vtracer==0.6.15
+pyembroidery==1.5.1
+shapely==2.2.0
 pytest==8.4.2
