@@ -266,7 +266,7 @@ def publish(model_path, build_fn, load_model, parse_overrides, out_root, sim_exe
         attributes=dict(
             hoop_size=" / ".join(f"{s['label']} ({s['size_mm'][0]:.0f} x {s['size_mm'][1]:.0f} mm)" for s in size_info),
             stitch_count=" / ".join(f"{s['stitches']:,}" for s in size_info),
-            thread_colors=len(rows), formats=[f.upper() for f in FORMATS],
+            thread_colors=len(rows), formats=[f.upper() for f in FORMATS] + ["SVG"],
             sizes=[s["label"] for s in size_info]),
         license=license_text,
         shop=dict(price_usd=product.get("price_usd", 3.99), commercial_price_usd=product.get("commercial_price_usd", 12.99),
@@ -363,7 +363,7 @@ def bundle(collection, title, out_root, members, price_usd=19.99, commercial_pri
               title=f"{title}: {len(ms)} Embroidery Designs Bundle", summary=blurb.split("\n")[0] if blurb else "",
               description=blurb, category="embroidery", collection=collection,
               bundle_of=[m["slug"] for m in ms], members=[m["title"] for m in ms],
-              attributes=dict(thread_colors=len(used), formats=[f.upper() for f in FORMATS],
+              attributes=dict(thread_colors=len(used), formats=[f.upper() for f in FORMATS] + ["SVG"],
                               sizes=sorted({s["label"] for m in ms for s in m["sizes"]}),
                               stitch_count=f"{min(m['sizes'][0]['stitches'] for m in ms):,} to "
                                            f"{max(m['sizes'][-1]['stitches'] for m in ms):,}"),
