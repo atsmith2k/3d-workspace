@@ -102,6 +102,9 @@ impl Real {
 /// The texture's mid-tone is ~0.75, so the tint is lifted to keep the thread's colour
 /// in the body of the thread and leave room for the highlight.
 fn lighten(c: Color32) -> Color32 {
-    let f = |v: u8| (v as f32 * 1.08 + 8.0).min(255.0) as u8;
+    // divide out the texture's average brightness (~0.8), scaling all three channels
+    // together so the hue and saturation stay the thread's own
+    let k = (1.0 / 0.8f32).min(255.0 / c.r().max(c.g()).max(c.b()).max(1) as f32);
+    let f = |v: u8| (v as f32 * k).min(255.0) as u8;
     Color32::from_rgb(f(c.r()), f(c.g()), f(c.b()))
 }

@@ -9,7 +9,7 @@ Design coordinates are Y up; SVG is Y down.
 from xml.sax.saxutils import escape
 
 import numpy as np
-from shapely.geometry import LineString, MultiLineString
+from shapely.geometry import LineString, MultiLineString, Polygon
 
 from . import shapes as S
 from .design import HOOPS, DEFAULT_HOOP
@@ -84,7 +84,10 @@ def sew_parts(design):
     parts = []
     for el in design.elements:
         if el.kind == "fill":
-            parts += [(el, poly) for poly in S.polygons_of(el.geom)]
+            # holes under 2 mm2 close up when sewn anyway, and Ink/Stitch's auto-fill can
+            # fail on them: fill them in
+            parts += [(el, Polygon(poly.exterior, [r for r in poly.interiors if Polygon(r).area >= 2.0]))
+                      for poly in S.polygons_of(el.geom)]
         else:
             parts.append((el, el.geom))
     out = []
@@ -155,6 +158,12 @@ def to_svg(design, title="design"):
            '<g inkscape:groupmode="layer" inkscape:label="Embroidery" id="layer1">']
     parts = sew_parts(design)
     for i, (el, geom, trim) in enumerate(parts):
+        # lock stitches only where the thread is cut: a tie-in after a trim or colour
+        # change, a tie-off before one. A piece that runs on from (or into) its
+        # neighbour needs neither (Ink/Stitch ties: 0 both, 1 before, 2 after, 3 neither)
+        cut_before = i == 0 or parts[i - 1][2] or parts[i - 1][0].color != el.color
+        cut_after = trim or i + 1 == len(parts) or parts[i + 1][0].color != el.color
+        ties = {(True, True): 0, (True, False): 1, (False, True): 2, (False, False): 3}[(bool(cut_before), bool(cut_after))]
         if el.kind == "fill":
             d = []
             for ring in [geom.exterior, *geom.interiors]:
@@ -181,7 +190,7 @@ def to_svg(design, title="design"):
         else:
             d = ["M " + pts(geom)]
             style = f"fill:none;stroke:{el.color};stroke-width:0.25;stroke-dasharray:0.5,0.25"
-        attrs = " ".join(f'inkstitch:{k}="{_fmt(v)}"' for k, v in ink_params(el, trim).items())
+        attrs = " ".join(f'inkstitch:{k}="{_fmt(v)}"' for k, v in {**ink_params(el, trim), "ties": ties}.items())
         out.append(f'<path id="el{i + 1:03d}" inkscape:label="{escape(f"{i + 1:02d} {el.name}")}" '
                    f'style="{style}" {attrs} d="{" ".join(d)}"/>')
     out += ["</g>", "</svg>", ""]

@@ -64,13 +64,41 @@ def run_inkstitch(svg_path, timeout=600):
         return pat, err
 
 
+def _run_with_fallback(svg_path, notes, tries=8):
+    """Run Ink/Stitch; when its auto-fill fails on an element ("Failed on ... (el123)"),
+    switch that element to Ink/Stitch's legacy fill (simpler, handles odd geometry) in
+    the SVG and try again. Each switch is reported in the notes."""
+    import re
+    svg_path = Path(svg_path)
+    for _ in range(tries):
+        try:
+            return run_inkstitch(svg_path)
+        except RuntimeError as e:
+            m = re.search(r"Failed on .*?\((el\d+)\)", str(e))
+            if not m or "autofill" not in str(e).lower():
+                raise
+            el = m.group(1)
+            text = svg_path.read_text(encoding="utf-8")
+            new = re.sub(rf'(<path id="{el}"[^>]*?inkstitch:fill_method=")auto_fill(")', r"\g<1>legacy_fill\g<2>", text)
+            if new == text:
+                raise
+            svg_path.write_text(new, encoding="utf-8")
+            notes.append(f"{el}: Ink/Stitch auto-fill failed, sewn with legacy fill instead")
+    return run_inkstitch(svg_path)
+
+
 def stitch(design, svg_path, engine="auto"):
     """(EmbPattern, engine_used, notes)."""
     notes = []
     if engine == "auto":
         engine = "inkstitch" if find_inkstitch() else "native"
     if engine == "inkstitch":
-        pat, err = run_inkstitch(svg_path)
+        pat, err = _run_with_fallback(svg_path, notes)
+        reach = getattr(design, "sew_jumps_mm", None)
+        if reach:
+            from .pattern import sew_short_jumps
+            n = sew_short_jumps(pat, reach)
+            notes.append(f"{n} jumps of up to {reach:g} mm sewn as travel stitches (design.sew_jumps_mm)")
         if err:
             notes += [f"inkstitch: {line}" for line in err.splitlines()[-5:] if line.strip()]
         return pat, f"inkstitch {inkstitch_version()}", notes

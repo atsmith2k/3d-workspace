@@ -63,7 +63,8 @@ def thin_features(design, mm=1.0):
                 if big.area > 0.5:                         # a sliver is one long piece
                     c = big.representative_point()
                     out.append((el.name, big.area, (c.x, c.y)))
-        elif el.kind == "satin" and el.params["width_min"] < mm:
+        elif el.kind == "satin" and (el.params["width_body"] < mm if el.params.get("taper")
+                                     else el.params["width_min"] < mm):
             left, right = el.geom
             i = int(np.argmin(np.linalg.norm(left - right, axis=1)))
             out.append((el.name, 0.0, tuple((left[i] + right[i]) / 2)))
@@ -183,6 +184,18 @@ def _area_of(el):
     return None
 
 
+def _thread(draw, pts, width):
+    """Draw stitches `width` px wide measured across the thread. PIL measures a line's
+    width along its major axis, so a diagonal stitch drawn plainly comes out up to 30 %
+    thin and diagonal fill rows would leave fake gaps between them."""
+    pts = np.asarray(pts, float)
+    for a, b in zip(pts[:-1], pts[1:]):
+        d = b - a
+        L = float(np.hypot(*d))
+        k = L / max(abs(d[0]), abs(d[1]), 1e-9) if L > 0 else 1.0
+        draw.line([tuple(a), tuple(b)], fill=255, width=max(1, int(np.ceil(width * k))))
+
+
 def coverage_gaps(plan, design, inset=0.35, spread=SPREAD):
     """[(element name, gap mm2, (x, y))]: the largest patch of each fill or satin that no
     stitch of its colour covers (a sewn row covers `spread` mm; the outer `inset` mm is
@@ -201,13 +214,37 @@ def coverage_gaps(plan, design, inset=0.35, spread=SPREAD):
         p = np.asarray(p) - off
         return list(zip((p[:, 0] - ox) * PX, (H - (p[:, 1] - oy) * PX)))
 
-    sewn = {}
+    sewn, by_block = {}, {}
     for block, run in plan.runs:
         c = plan.colors[block]
         if c not in sewn:
             sewn[c] = Image.new("L", (W, H), 0)
+        if block not in by_block:
+            by_block[block] = Image.new("L", (W, H), 0)
         if len(run) > 1:
-            ImageDraw.Draw(sewn[c]).line(pix(run), fill=255, width=max(1, round(spread * PX)))
+            _thread(ImageDraw.Draw(sewn[c]), pix(run), spread * PX)
+            _thread(ImageDraw.Draw(by_block[block]), pix(run), spread * PX)
+    # stitches sewn after an element hide it as well as its own thread does: per colour
+    # block, everything sewn in the blocks after it (when the design's blocks line up
+    # with the file's)
+    blocks, cur = [], None
+    for el in design.elements:
+        if el.color != cur:
+            blocks.append(el.color)
+            cur = el.color
+    block_of, b, cur = {}, -1, None
+    for el in design.elements:
+        if el.color != cur:
+            b += 1
+            cur = el.color
+        block_of[el.name] = b
+    later = {}
+    if blocks == list(plan.colors):
+        acc = np.zeros((H, W), bool)
+        for blk in range(len(blocks) - 1, -1, -1):
+            later[blk] = acc.copy()
+            if blk in by_block:
+                acc |= np.asarray(by_block[blk]) > 0
     xs = ox + (np.arange(W) + 0.5) / PX
     ys = oy + (H - np.arange(H) - 0.5) / PX
     gx, gy = np.meshgrid(xs, ys)
@@ -241,8 +278,20 @@ def coverage_gaps(plan, design, inset=0.35, spread=SPREAD):
         cols = slice(max(0, int((a0 - ox) * PX)), min(W, int((a1 - ox) * PX) + 2))
         rows = slice(max(0, int(H - (b1 - oy) * PX) - 1), min(H, int(H - (b0 - oy) * PX) + 1))
         want = contains_xy(area, gx[rows, cols], gy[rows, cols])
-        cover = allsewn if color is None else np.asarray(sewn[color]) > 0
+        if color is None:
+            cover = allsewn
+        else:
+            cover = np.asarray(sewn[color]) > 0
+            if block_of.get(name) in later:
+                cover = cover | later[block_of[name]]
         bare = want & ~cover[rows, cols]
+        lab, n = ndimage.label(bare)
+        if not n:
+            continue
+        # hairlines between rows (files snap to 0.1 mm, so rows can sit 0.5 mm apart)
+        # close up when the thread spreads: only patches 0.3 mm thick somewhere count
+        thick = ndimage.maximum(ndimage.distance_transform_edt(bare), lab, range(1, n + 1))
+        bare = np.isin(lab, 1 + np.nonzero(np.asarray(thick) >= 1.5)[0])
         lab, n = ndimage.label(bare)
         if not n:
             continue

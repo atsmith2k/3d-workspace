@@ -267,6 +267,21 @@ Digitising rules the checks enforce or the preview shows:
 - Towels: water-soluble topper; knits: cut-away stabiliser; wovens: tear-away.
 - Machine files snap stitches to 0.1 mm, so 0.4 mm rows really sit 0.35-0.42 apart;
   thread spreads to ~0.45 mm and closes them. The preview draws thread at that width.
+- Designs from a reference image (realistic animals, portraits): `cadkit.stitch.artwork`
+  `Artwork(path, width).tones(k)` cuts the subject out, reduces it to k thread tones,
+  merges specks and sub-`min_width` slivers into neighbours and vectorises each tone;
+  `art.by_flow(shape, cell)` / `art.angle_in(shape)` give fill angles along the hair /
+  grain read from the image. Fewer tones plus small patches at different angles keep the
+  texture (a change of stitch direction reads as a change of shade in thread): 4 fur
+  tones in ~10 mm patches looked like the 8-tone version at 30 % fewer stitches.
+  `designs/grizzly_salmon.py` is the worked example.
+- Machine efficiency: the SVG writer asks Ink/Stitch for lock stitches only where the
+  thread is cut; the PES/DST writers trim every jump, so `pattern.sew_short_jumps` sews
+  jumps up to 3 mm (or `design.sew_jumps_mm`, e.g. 8 for many touching fur patches) as
+  travel and locks both ends of the jumps that stay. Run `cad stitch sim <file> --info`
+  after a build: it flags missing tie-ins/offs and needle pile-ups.
+- `d.satin(..., taper=True)` for columns that come to a point on purpose (claws, thorns,
+  leaf tips): min_feature then only needs the body to be 1 mm wide.
 - PES is written as version 6 so exact RGB travels; DST carries no colours, JEF snaps to
   Janome's palette. The `~Brother <name>` in the report is the nearest spool.
 

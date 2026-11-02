@@ -160,9 +160,81 @@ def name_threads(pattern, colors=None):
     return pattern
 
 
+SHORT_JUMP = 3.0    # mm; untrimmed jumps up to this are sewn as stitches
+
+
+def sew_short_jumps(pattern, max_mm=SHORT_JUMP):
+    """Turn untrimmed jumps of up to `max_mm` into plain stitches, in place; returns how
+    many. Engines jump between touching pieces (Ink/Stitch between elements), and the
+    PES writer puts a trim on every jump, so each would cost the machine a trim (and
+    leave a tail to tie in). Digitising software sews such short moves instead. Jumps
+    that stay jumps get lock stitches on both sides, since the writer will cut them."""
+    out, pending, last, n = [], [], None, 0
+    for x, y, cmd in pattern.stitches:
+        c = cmd & pe.COMMAND_MASK
+        if c == pe.JUMP and last is not None:
+            pending.append((x, y, cmd))
+            continue
+        if c == pe.STITCH and pending:
+            dist = ((x - last[0]) ** 2 + (y - last[1]) ** 2) ** 0.5 / 10.0
+            if dist <= max_mm:
+                # sew the move in stitches of at most 3 mm
+                k = max(1, int(np.ceil(dist / 3.0)))
+                for i in range(1, k + 1):
+                    out.append((last[0] + (x - last[0]) * i / k, last[1] + (y - last[1]) * i / k, pe.STITCH))
+                n += 1
+                pending = []
+                last = (x, y)
+                out.append((x, y, cmd))
+                continue
+            else:
+                # a real move: the writer will trim it, so lock the thread both sides
+                out += ([] if _locked(out) else _lock(last, out)) + pending
+                out += _lock((x, y), None, toward=last)          # back along the jump
+            pending = []
+        elif pending:
+            out += pending
+            pending = []
+        if c in (pe.TRIM, pe.COLOR_CHANGE, pe.STOP, pe.END):
+            last = None                     # a cut thread: the next jump must stay a jump
+        elif c == pe.STITCH:
+            last = (x, y)
+        out.append((x, y, cmd))
+    pattern.stitches = out + pending
+    return n
+
+
+def _locked(out, mm=1.2):
+    """True when the thread already ends in a lock: the last stitches go back and forth
+    over the same tiny stitch (a, b, a, b), not just a fill row turning round."""
+    pts = [(x, y) for x, y, c in out[-8:] if (c & pe.COMMAND_MASK) == pe.STITCH][-4:]
+    if len(pts) < 4:
+        return False
+    close = lambda p, q: abs(p[0] - q[0]) + abs(p[1] - q[1]) <= 1
+    a, b, c, d = pts
+    short = ((a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2) ** 0.5 < mm * 10
+    return short and close(a, c) and close(b, d)
+
+
+def _lock(at, out, toward=None, mm=0.4):
+    """Lock stitches at `at` (0.1 mm units): two tiny stitches out and back along the
+    last stitch's direction (or toward `toward`), so a cut thread cannot pull out."""
+    x, y = at
+    if toward is None:
+        prev = next(((px, py) for px, py, c in reversed(out or []) if (c & pe.COMMAND_MASK) == pe.STITCH
+                     and (px, py) != (x, y)), None)
+        toward = prev if prev is not None else (x + 1, y)
+    dx, dy = toward[0] - x, toward[1] - y
+    L = (dx * dx + dy * dy) ** 0.5 or 1.0
+    ux, uy = dx / L * mm * 10, dy / L * mm * 10
+    return [(x + ux, y + uy, pe.STITCH), (x, y, pe.STITCH), (x + ux, y + uy, pe.STITCH), (x, y, pe.STITCH)]
+
+
 def write_all(pattern, out_stem, formats=FORMATS):
     """Write the pattern in every format; returns {fmt: path}. PES is version 6 so the
-    exact RGB of every thread travels with the file."""
+    exact RGB of every thread travels with the file. Short untrimmed jumps are sewn
+    first (sew_short_jumps), so the writers don't turn each into a trim."""
+    sew_short_jumps(pattern)
     written = {}
     for fmt in formats:
         path = out_stem.with_suffix("." + fmt)

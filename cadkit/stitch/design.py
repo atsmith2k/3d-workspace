@@ -57,6 +57,10 @@ class Design:
     def __init__(self, hoop=None):
         self.hoop = hoop
         self.elements = []
+        # untrimmed jumps up to this many mm are sewn as travel stitches instead of being
+        # trimmed (the PES writer trims every jump); 3 mm by default when writing, more
+        # for designs whose same-colour pieces sit close (fur patches)
+        self.sew_jumps_mm = None
 
     def _add(self, kind, geom, color, params, name, trim_after, ink):
         el = Element(kind, geom, resolve_color(color), params,
@@ -81,11 +85,13 @@ class Design:
         return self._add("fill", shape, color, p, name, trim_after, ink)
 
     def satin(self, path, width, color, spacing=None, pull=None, underlay=None, name="",
-              trim_after=False, **ink):
+              trim_after=False, taper=False, **ink):
         """Satin column along a centreline path, `width` mm wide (a number, or one width
         per path point for a tapered column). 1-7 mm reads well; wider stitches snag,
         use a fill. `underlay` "auto" picks centre walk / contour / zigzag by width,
-        or pass a list of them, or "none"."""
+        or pass a list of them, or "none". `taper=True` marks a column that comes to a
+        point on purpose (claw, thorn, leaf tip): min_feature then only asks that its
+        body (median width) is 1 mm or more."""
         path = np.asarray(path, float)
         w = np.broadcast_to(np.asarray(width, float), (len(path),)).copy()
         left, right = _rails(path, w)
@@ -95,6 +101,8 @@ class Design:
                 p[k] = v
         if len(path) > 2 and np.allclose(path[0], path[-1]):
             p.update(closed=True, rungs=[])           # a ring: no start/end seam
+        if taper:
+            p.update(taper=True, width_body=float(np.median(w)))
         return self._add("satin", (left, right), color, p, name, trim_after, ink)
 
     def satin_rails(self, left, right, color, spacing=None, pull=None, underlay=None,
