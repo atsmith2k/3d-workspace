@@ -245,6 +245,27 @@ is how they validate and digitise by hand).
    size, stitch count, colours in order with the nearest Brother thread, sew time, and
    the stabiliser.
 
+Selling a design: `cad stitch publish designs/<name>.py` builds every size in
+`SIZES` (label, hoop, longest side: re-stitched per size, never a scaled file) in eight
+formats (PES PEC DST JEF EXP VP3 XXX U01), checks each with stitchsim (`problems 0`
+required), renders `<name>_product.png` (realistic, plain fabric) and garment mockups
+(`PRODUCT["mockups"]`), a thread chart, buyer notes, `<slug>.zip` (one folder per size)
+and `manifest.json` (schema `cadkit-embroidery/1`, `kind: "embroidery"`, attributes
+`hoop_size`, `stitch_count`, `thread_colors`, `formats` for the shop's spec band, suggested
+`shop` prices to confirm). `--no-refresh` reuses the size builds. `cad stitch bundle
+<collection> --title ... --blurb ...` makes a bundle product (cover grid, contents,
+zip of member zips, `bundle_of`) from every design whose `PRODUCT["collection"]` matches.
+The shop's `publish-models.mts` only ingests 3D models today; embroidery needs its own
+ingest step (and `--archive-pdfs` there would archive non-model products).
+
+Collections: `designs/_fall.py` is the pattern (Harvest Hollow): one palette of exact
+Brother threads shared by every design, `fit(d, size, hoop)` to draw once in a 100 mm
+nominal space and rebuild per size (wide designs may use a hoop's long side: machines
+rotate 90 deg, the hoop check accepts it and the buyer notes say so), and
+`standard_checks()`. Reusable shapes are in `cadkit/stitch/motifs.py`: `maple_leaf`
+(+ `maple_sectors`, `maple_veins`), `oak_leaf`, `leaf`, `acorn`, `pumpkin`, `wheat`,
+`petal_ring`, `tendril`, `spiral`, `scallop`, `dots`, `blade`.
+
 Digitising rules the checks enforce or the preview shows:
 - Sewing order = the order elements are added: background fills first, details on top,
   outlines and lettering last. One colour change per colour where possible.
@@ -265,6 +286,15 @@ Digitising rules the checks enforce or the preview shows:
 - Nothing narrower than 1 mm in a fill; lettering as fill needs >= 6 mm cap height
   (bold sans), smaller text needs satin lettering in Ink/Stitch.
 - Towels: water-soluble topper; knits: cut-away stabiliser; wovens: tear-away.
+- Lessons from the fall collection: start satin veins/stems clear of where other
+  columns meet (five columns into one hole is a pile-up); keep runs (side veins, grass)
+  2 mm inside an outline; never route a bean run back over its own holes (out-and-back
+  piles 9 penetrations: zigzag forward or draw grass blades as slim Vs); runs closer than
+  3 mm get joined by visible travel unless `trim_after=True`; back layers (petals) should
+  be wide enough to fill behind the front layer; leave 1.5 mm between an inner shape
+  and its parent's edge (thinner rims are dropped by knockout). The SVG sets Ink/Stitch's
+  `min_stitch_len_mm` 0.4 and triangle lock stitches at 1 mm (its default locks are
+  ~0.2 mm and the minimum length would merge them away).
 - Machine files snap stitches to 0.1 mm, so 0.4 mm rows really sit 0.35-0.42 apart;
   thread spreads to ~0.45 mm and closes them. The preview draws thread at that width.
 - Designs from a reference image (realistic animals, portraits): `cadkit.stitch.artwork`

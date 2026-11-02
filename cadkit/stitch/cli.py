@@ -36,11 +36,13 @@ def plan_lines(plan, density, hoop_name, hoop_wh, engine):
     long_n = int((L > 7.0).sum())
     short = float((L < 0.3).mean()) if len(L) else 0.0
     untrimmed = [np.linalg.norm(b - a) for _, a, b, t in plan.jumps if not t]
-    fits = sw <= hoop_wh[0] and sh <= hoop_wh[1]
+    upright = sw <= hoop_wh[0] and sh <= hoop_wh[1]
+    turned = not upright and sh <= hoop_wh[0] and sw <= hoop_wh[1]    # machines rotate 90 deg
+    fits = upright or turned
     lines = [
         f"engine   {engine}",
         f"size     {sw:.1f} x {sh:.1f} mm  (hoop {hoop_name} {hoop_wh[0]} x {hoop_wh[1]}: "
-        f"{'fits' if fits else 'DOES NOT FIT'})",
+        f"{'fits' if upright else 'fits rotated 90 deg' if turned else 'DOES NOT FIT'})",
         f"stitches {plan.penetrations:,}   colours {len(plan.colors)}   trims {plan.trims}   "
         f"jumps {len(plan.jumps)} ({sum(1 for u in untrimmed if u > 3)} untrimmed over 3 mm)",
         f"thread   ~{plan.thread_length_m():.0f} m top thread; sew time ~{plan.sew_minutes():.0f} min at 650 spm",
@@ -122,7 +124,8 @@ def cmd_build(args):
     worst = gaps[0] if gaps else ("", 0.0, (0, 0))
     lines.append(f"coverage largest bare patch {worst[1]:.1f} mm2" +
                  (f" ({worst[0]} near ({worst[2][0]:.0f}, {worst[2][1]:.0f}))" if worst[1] > 0.2 else ""))
-    for nm, area, (x, y) in [g for g in gaps if g[1] > 1.0][:5]:
+    # pockets between elements are the coverage check's call (a design may allow them)
+    for nm, area, (x, y) in [g for g in gaps if g[1] > 1.0 and not g[0].startswith("design (between")][:5]:
         warns.append(f"WARNING bare: {nm} leaves {area:.1f} mm2 of fabric showing near "
                      f"({x:.0f}, {y:.0f}): a break in a border or between fill sections")
     ctx = SimpleNamespace(plan=plan, design=design, params=ns, hoop=(hoop_name, hoop_wh),
@@ -262,6 +265,47 @@ def cmd_sim(args):
     return 0
 
 
+def cmd_publish(args):
+    """Every size, images, thread chart, notes, zip and manifest for a design."""
+    from ..__main__ import load_model, parse_overrides
+    from . import publish as PUB
+    exe = sim_binary()
+    rc = 0
+    for model in args.models:
+        m = PUB.publish(model, cmd_build, load_model, parse_overrides, Path(args.out or OUT), exe,
+                        refresh=not args.no_refresh)
+        state = "SELLABLE" if m["sellable"] else "NOT sellable: " + "; ".join(m["reasons"])
+        print(f"\n  {m['title']}  [{state}]")
+        for s in m["sizes"]:
+            print(f"    {s['label']:<4} {s['size_mm'][0]:.0f} x {s['size_mm'][1]:.0f} mm  {s['stitches']:,} st  "
+                  f"{s['colors']} colours  ~{s['sew_minutes']:.0f} min  problems {s['problems']}")
+        rc |= 0 if m["sellable"] else 1
+    return rc
+
+
+def cmd_bundle(args):
+    """A bundle product from every published design in a collection."""
+    from ..__main__ import load_model
+    from . import publish as PUB
+    members = []
+    for path in sorted((ROOT / "designs").glob("*.py")):
+        if path.name.startswith("_"):
+            continue
+        prod = getattr(load_model(path), "PRODUCT", {}) or {}
+        if prod.get("collection") == args.collection:
+            members.append(path.stem)
+    if not members:
+        sys.exit(f"no designs with PRODUCT collection '{args.collection}'")
+    missing = [m for m in members if not (Path(args.out or OUT) / m / "manifest.json").exists()]
+    if missing:
+        sys.exit(f"publish these first: {', '.join(missing)}")
+    bm = PUB.bundle(args.collection, args.title or args.collection.replace("-", " ").title(), Path(args.out or OUT),
+                    members, args.price, args.commercial_price, args.blurb or "")
+    print(f"  {bm['title']}: {len(members)} designs  [{'SELLABLE' if bm['sellable'] else 'NOT sellable'}]")
+    print(f"  {Path(args.out or OUT) / '_bundles' / args.collection}")
+    return 0 if bm["sellable"] else 1
+
+
 def add_parser(sub):
     st = sub.add_parser("stitch", help="embroidery designs: build, inspect, sim, new, list")
     ss = st.add_subparsers(dest="stitch_cmd", required=True)
@@ -284,6 +328,17 @@ def add_parser(sub):
     n.add_argument("name")
     n.add_argument("description", nargs="?", default="")
     ss.add_parser("list", help="designs and whether they are built; Ink/Stitch status")
+    pb = ss.add_parser("publish", help="every size, product images, thread chart, notes, zip, manifest")
+    pb.add_argument("models", nargs="+")
+    pb.add_argument("--out")
+    pb.add_argument("--no-refresh", action="store_true", help="reuse existing size builds")
+    bd = ss.add_parser("bundle", help="a bundle product from a collection's published designs")
+    bd.add_argument("collection")
+    bd.add_argument("--title")
+    bd.add_argument("--blurb")
+    bd.add_argument("--price", type=float, default=19.99)
+    bd.add_argument("--commercial-price", type=float, default=59.99)
+    bd.add_argument("--out")
     m = ss.add_parser("sim", help="watch a stitch file (or a design's PES) sew in the stitchsim viewer")
     m.add_argument("file", help="PES/PEC/DST/EXP/JEF file, or designs/<name>.py")
     m.add_argument("--info", action="store_true", help="print the simulator's stats instead of opening it")
@@ -294,4 +349,4 @@ def add_parser(sub):
 
 def run(args):
     return dict(build=cmd_build, inspect=cmd_inspect, new=cmd_new, list=cmd_list,
-                sim=cmd_sim)[args.stitch_cmd](args)
+                sim=cmd_sim, publish=cmd_publish, bundle=cmd_bundle)[args.stitch_cmd](args)

@@ -114,6 +114,8 @@ Run from the repo root. Windows: `cad ...`; macOS/Linux/Git Bash: `./cad ...`
 | `cad list` | List models and whether they're built |
 | `cad stitch build designs/<name>.py [--engine inkstitch\|native] [--hoop 5x7]` | Embroidery: Ink/Stitch SVG + PES/DST/JEF/EXP/VP3/XXX, checks, preview (see below) |
 | `cad stitch inspect file.pes` | Stats, density map and preview of any stitch file |
+| `cad stitch publish designs/<name>.py` | Embroidery product: every size, 8 formats, realistic product shot and mockups, thread chart, notes, zip, manifest |
+| `cad stitch bundle <collection>` | Bundle product (cover, contents, zip of zips) from a collection's published designs |
 | `cad stitch sim file.pes` (or `designs/<name>.py`) | Watch it sew in the stitchsim viewer ([tools/stitchsim](tools/stitchsim/README.md), Rust; built with cargo on first use) |
 | `cad stitch new <name> "description"` / `cad stitch list` | Start a design / list designs and Ink/Stitch status |
 

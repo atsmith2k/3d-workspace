@@ -261,3 +261,34 @@ def test_stitchsim_flags_problems(tmp_path):
     good = P.write_all(native.build_pattern(square_design()), tmp_path / "ok", ("pes",))["pes"]
     clean = subprocess.run([exe, "--info", str(good)], capture_output=True, text=True, check=True).stdout
     assert "problems    0" in clean, clean
+
+
+def test_scaled_design_restitches_at_size():
+    d = Design()
+    d.fill(rect(30, 20), "#c8102e", angle=0)
+    d.satin(np.array([[-10, 14], [10, 14]]), 2.0, "black")
+    big = d.scaled(1.5, 5.0, 0.0)
+    p0 = P.plan_of(native.build_pattern(d), recenter=False)
+    p1 = P.plan_of(native.build_pattern(big), recenter=False)
+    assert abs(p1.size[0] / p0.size[0] - 1.5) < 0.05           # bigger, not a resized file:
+    assert p1.penetrations > 1.8 * p0.penetrations              # rows keep their 0.4 mm spacing
+    assert abs(big.elements[1].params["width"] - 3.0) < 1e-6
+    assert abs(np.mean(p1.points[:, 0]) - np.mean(p0.points[:, 0]) * 1.5 - 5.0) < 1.0
+
+
+def test_hoop_check_accepts_a_rotated_design():
+    ctx = SimpleNamespace(plan=SimpleNamespace(size=(160.0, 86.0)), hoop=("5x7", (130, 180)))
+    ok, detail = C.hoop().fn(ctx)
+    assert ok and "rotated" in detail
+    ctx.plan.size = (190.0, 86.0)
+    assert not C.hoop().fn(ctx)[0]
+
+
+def test_motifs_are_valid_shapes():
+    from cadkit.stitch import motifs as M
+    shapes = [M.maple_leaf(60), M.oak_leaf(40, 4), M.leaf(20, 8, 0.3), *M.acorn(20)[:2],
+              *[s for _, s in M.pumpkin(60, 44, 2)[0]], *[s for _, s in M.maple_sectors(60)],
+              *M.wheat(50, 7, 5)[1], *M.petal_ring(12, 8, 12, 5, jitter=4)]
+    for s in shapes:
+        assert s.is_valid and not s.is_empty and s.area > 1
+    assert abs(sum(s.area for _, s in M.maple_sectors(60)) - M.maple_leaf(60).area) < 1.0

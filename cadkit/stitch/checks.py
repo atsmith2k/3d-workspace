@@ -94,7 +94,9 @@ def hoop(name=None, margin=0.0):
         W, H = HOOPS[hn] if isinstance(hn, str) else hn
         sw, sh = c.plan.size
         ok = sw + 2 * margin <= W and sh + 2 * margin <= H
-        return ok, f"{sw:.1f} x {sh:.1f} mm in {hn} ({W} x {H})"
+        # machines rotate a design 90 deg on screen: a wide design may use the long side
+        turned = not ok and sh + 2 * margin <= W and sw + 2 * margin <= H
+        return ok or turned, f"{sw:.1f} x {sh:.1f} mm in {hn} ({W} x {H})" + (", rotated 90 deg" if turned else "")
     return Check("hoop", fn)
 
 
@@ -264,7 +266,18 @@ def coverage_gaps(plan, design, inset=0.35, spread=SPREAD):
         from shapely.geometry import Polygon
         u = unary_union([a for *_, a in areas])
         holes = unary_union([Polygon(r) for g in S.polygons_of(u) for r in g.interiors])
-        slots = u.buffer(CLOSE_GAP).buffer(-CLOSE_GAP).difference(u).intersection(holes)
+        # a hole inside one element (a letter's counter) is that element's business,
+        # not a gap between elements
+        own = []
+        for i, (*_, a) in enumerate(areas):
+            others = unary_union([o for j, (*_, o) in enumerate(areas) if j != i])
+            for g in S.polygons_of(a):
+                for r in g.interiors:           # a counter: nothing else sews inside it
+                    hole = Polygon(r)
+                    if hole.intersection(others).area < 0.05 * hole.area:
+                        own.append(hole)
+        own = unary_union(own)
+        slots = u.buffer(CLOSE_GAP).buffer(-CLOSE_GAP).difference(u).intersection(holes).difference(own)
         if not slots.is_empty:
             whole = [("design (between elements)", None, slots.buffer(inset))]
     out = []
@@ -303,11 +316,16 @@ def coverage_gaps(plan, design, inset=0.35, spread=SPREAD):
     return out
 
 
-def coverage(max_mm2=1.0):
+def coverage(max_mm2=1.0, between_mm2=None):
     """Every fill and satin is covered by its own thread: no bare patch over `max_mm2`
-    (a gap in a border, a hole between fill sections)."""
+    (a gap in a border, a hole between fill sections). `between_mm2` relaxes only the
+    pockets of fabric enclosed between separate elements, for art whose gaps are part
+    of the look (petals round a flower); say why in the design's Spec."""
+    lim_between = max_mm2 if between_mm2 is None else between_mm2
+
     def fn(c):
-        bad = [g for g in coverage_gaps(c.plan, c.design) if g[1] > max_mm2]
+        bad = [g for g in coverage_gaps(c.plan, c.design)
+               if g[1] > (lim_between if g[0].startswith("design (between") else max_mm2)]
         if not bad:
             return True, f"no bare patch over {max_mm2} mm2"
         bad.sort(key=lambda g: -g[1])

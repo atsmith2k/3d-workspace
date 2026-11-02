@@ -7,7 +7,8 @@
 //!                                 to a PNG and exit
 //!
 //!     [--realistic] [--article tshirt|pants|cap|tote|plain] [--color 2=#ffd100 ...]
-//!     [--density] [--hoop 4x4]
+//!     [--density] [--hoop 4x4] [--clean] [--fabric #rrggbb]
+//!   --clean renders only the design (no panels, markers, needle or scale bar): product shots
 //!
 //! Keys: Space play/pause, Left/Right step (Shift x100), Home/End, PgUp/PgDn colour
 //! block, +/- speed, F fit design, I fit item, G ghost, J jumps, R real-time,
@@ -105,8 +106,11 @@ fn main() -> eframe::Result<()> {
         .collect();
     let color_vals: Vec<&String> = args.windows(2).filter(|w| w[0] == "--color").map(|w| &w[1]).collect();
     let density_map = args.iter().any(|a| a == "--density");
+    let clean = args.iter().any(|a| a == "--clean");
+    let fabric = flag("--fabric").and_then(|h| u32::from_str_radix(h.trim_start_matches('#'), 16).ok())
+        .map(|c| Color32::from_rgb((c >> 16) as u8, (c >> 8) as u8, c as u8));
     let hoop = flag("--hoop").and_then(|h| HOOPS.iter().position(|x| x.0 == h));
-    let skip: Vec<&String> = ["--screenshot", "--at", "--size", "--zoom", "--article", "--hoop"].iter().filter_map(|f| flag(f).map(|_| *f)).flat_map(|f| {
+    let skip: Vec<&String> = ["--screenshot", "--at", "--size", "--zoom", "--article", "--hoop", "--fabric"].iter().filter_map(|f| flag(f).map(|_| *f)).flat_map(|f| {
         let i = args.iter().position(|a| a == f).unwrap();
         [&args[i], &args[i + 1]]
     }).collect();
@@ -123,6 +127,12 @@ fn main() -> eframe::Result<()> {
         app.shot = shot;
         app.realistic = realistic;
         app.density_map = density_map;
+        if clean {
+            app.clean = true;
+            app.problems = false;
+            app.jumps = false;
+            app.ghost = false;
+        }
         if hoop.is_some() {
             app.hoop = hoop;
             app.reanalyze();
@@ -136,6 +146,9 @@ fn main() -> eframe::Result<()> {
         }
         if let Some(a) = article {
             app.set_article(a);
+        }
+        if let Some(c) = fabric {
+            *app.color_mut() = c;
         }
         Ok(Box::new(app))
     }))
@@ -275,6 +288,7 @@ struct App {
     ghost_chunks: Vec<Arc<Mesh>>,
     frame_ms: f32,
     shot: Option<Shot>,
+    clean: bool,
 }
 
 impl App {
@@ -312,6 +326,7 @@ impl App {
             ghost_chunks: Vec::new(),
             frame_ms: 0.0,
             shot: None,
+            clean: false,
         };
         if let Some(p) = initial {
             app.open(&p);
@@ -546,9 +561,11 @@ impl eframe::App for App {
         self.ensure_textures(ctx);
         let bg = if self.article == Article::Plain { self.color() } else { Color32::from_rgb(228, 226, 221) };
 
-        egui::Panel::top("top").show(ui, |ui| self.top_bar(ui));
-        egui::Panel::bottom("transport").show(ui, |ui| self.transport(ui));
-        egui::Panel::left("info").resizable(true).default_size(290.0).max_size(420.0).show(ui, |ui| self.side(ui));
+        if !self.clean {
+            egui::Panel::top("top").show(ui, |ui| self.top_bar(ui));
+            egui::Panel::bottom("transport").show(ui, |ui| self.transport(ui));
+            egui::Panel::left("info").resizable(true).default_size(290.0).max_size(420.0).show(ui, |ui| self.side(ui));
+        }
         egui::CentralPanel::default().frame(egui::Frame::NONE.fill(bg)).show(ui, |ui| self.canvas(ui));
         self.frame_ms = self.frame_ms * 0.9 + t0.elapsed().as_secs_f32() * 1000.0 * 0.1;
         self.screenshot(ctx);
@@ -1083,7 +1100,8 @@ impl App {
             Camera { center: [(x0 + x1) / 2.0, (y0 + y1) / 2.0], zoom }
         };
         if self.fit_pending || resp.double_clicked() {
-            self.cam = fit(&self.design_corners(), rect, 40.0);
+            let margin = if self.clean { rect.width().min(rect.height()) * 0.22 } else { 40.0 };
+            self.cam = fit(&self.design_corners(), rect, margin);
             self.fit_pending = false;
         }
         if self.fit_item_pending {
@@ -1297,6 +1315,9 @@ impl App {
             painter.text(pts[3] + Vec2::new(0.0, -4.0), egui::Align2::LEFT_BOTTOM,
                 format!("{:.0} x {:.0} mm", w * self.stage.scale, h * self.stage.scale),
                 egui::FontId::proportional(13.0), Color32::from_rgb(30, 120, 220));
+        }
+        if self.clean {
+            return;
         }
         // scale bar
         let mm = [1.0f32, 2.0, 5.0, 10.0, 20.0, 50.0, 100.0].into_iter().find(|v| v * cam.zoom > 60.0).unwrap_or(100.0);

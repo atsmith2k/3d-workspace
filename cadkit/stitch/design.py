@@ -165,6 +165,29 @@ class Design:
         return self.fill(shape, color, angle=angle if angle is not None else 90 - 15,
                          spacing=spacing, name=name or f"text {string}", **kw)
 
+    def scaled(self, k, dx=0.0, dy=0.0):
+        """A copy at k times the size then moved by (dx, dy), stitches regenerated (not a resized stitch file):
+        fills keep their row spacing and stitch length, satins get k times wider (so
+        draw them at the nominal size within 1-7 mm for every k you build)."""
+        from shapely import affinity
+        out = Design(self.hoop)
+        for el in self.elements:
+            if el.kind == "fill":
+                geom = affinity.translate(affinity.scale(el.geom, k, k, origin=(0, 0)), dx, dy)
+            elif el.kind == "satin":
+                geom = (el.geom[0] * k + (dx, dy), el.geom[1] * k + (dx, dy))
+            else:
+                geom = el.geom * k + (dx, dy)
+            params = dict(el.params)
+            if el.kind == "satin":
+                params["width"] = params["width"] * k
+                params["width_min"] = params["width_min"] * k
+            new = Element(el.kind, geom, el.color, params, el.name, el.trim_after, dict(el.ink))
+            if el.area is not None:
+                new.area = affinity.translate(affinity.scale(el.area, k, k, origin=(0, 0)), dx, dy)
+            out.elements.append(new)
+        return out
+
     # ---------- summaries ----------
     def bounds(self):
         b = np.array([el.bounds for el in self.elements])

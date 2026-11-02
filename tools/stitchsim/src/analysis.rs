@@ -331,6 +331,6 @@ fn locked(segs: &[crate::sim::Seg], k: usize, start: bool) -> bool {
         let va = [a.b[0] - a.a[0], a.b[1] - a.a[1]];
         let vb = [b.b[0] - b.a[0], b.b[1] - b.a[1]];
         let lb = (vb[0] * vb[0] + vb[1] * vb[1]).sqrt();
-        lb < 1.2 && va[0] * vb[0] + va[1] * vb[1] < 0.0
+        lb < 1.6 && va[0] * vb[0] + va[1] * vb[1] < 0.0
     })
 }
