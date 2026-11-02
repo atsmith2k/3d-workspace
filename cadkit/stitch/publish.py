@@ -45,8 +45,8 @@ DEFAULT_SIZES = [("4x4", "4x4", 95.0)]
 DEFAULT_LICENSE = (
     "Licensed, not sold. Personal licence: stitch the design as many times as you like "
     "for yourself and as gifts; no selling stitched items, no sharing or reselling the "
-    "files. Commercial licence: sell items you stitch with this design (up to 500 pieces "
-    "a year), no file resale or redistribution. Either way the design stays the "
+    "files. Commercial licence: sell items you stitch with this design, in any "
+    "quantity; no file resale or redistribution. Either way the design stays the "
     "author's. Always stitch a test piece first: fabrics and stabilisers vary."
 )
 STABILISER = (
