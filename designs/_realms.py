@@ -68,10 +68,10 @@ def hoop_for(size):
     return HOOPS["4x4"] if size <= 100 else HOOPS["5x7"]
 
 
-def product(title, summary, tags, description, mockups=("tshirt", "tote")):
+def product(title, summary, tags, description, mockups=("tshirt", "tote"), collection=COLLECTION):
     """A PRODUCT dict for a Realms & Relics design (collection, prices and base tags filled in).
     New designs go to the shop as drafts for review (`draft=True`)."""
     base = ["fantasy embroidery design", "machine embroidery", "fantasy", "rpg", "geek embroidery"]
     return dict(title=title, summary=summary, tags=list(dict.fromkeys(list(tags) + base)),
-                collection=COLLECTION, mockups=list(mockups), description=description,
+                collection=collection, mockups=list(mockups), description=description,
                 price_usd=PRICE_USD, commercial_price_usd=COMMERCIAL_PRICE_USD, draft=True)
