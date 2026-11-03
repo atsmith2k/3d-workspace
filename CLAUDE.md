@@ -5,6 +5,10 @@ looks at the renders, iterates, and hands back an STL. Modeling is fully generat
 the user does not model by hand here. If they want to tweak something themselves they
 import the STL into Tinkercad (or any slicer/CAD app), so every STL must import cleanly.
 
+Agents other than Claude Code: start at `AGENTS.md` (tool-neutral). Embroidery design
+judgement and the failures already hit are in `docs/agents/embroidery-playbook.md`; taking
+a design or model live on the shop is `docs/agents/shop-publishing.md`.
+
 ## Session start
 
 - If `.venv` is missing, or `cad selftest` fails, run setup first (README, "For Claude:
