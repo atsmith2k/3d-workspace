@@ -272,3 +272,101 @@ def blade(p0, height, lean=0.3, width=1.6):
 def taper(path, w0, w1):
     """Widths for a satin that tapers from w0 to w1 along `path`."""
     return np.linspace(w0, w1, len(path))
+
+
+# ---------- winter / Christmas ----------
+
+def snowflake(r=40.0, arms=6, branches=((0.42, 0.30), (0.70, 0.22)), start=90.0):
+    """Arm and branch centrelines of a dendrite snowflake: [(path, w_root, w_tip)].
+    Each arm runs from 0.12 r out to r; `branches` are (position along the arm,
+    branch length) pairs, both as fractions of r, sprouting at 55 deg either side."""
+    out = []
+    for i in range(arms):
+        a = math.radians(start + 360 * i / arms)
+        u = np.array([math.cos(a), math.sin(a)])
+        out.append((np.array([u * r * 0.12, u * r]), 2.2, 1.2))
+        for pos, length in branches:
+            base = u * r * pos
+            for side in (1, -1):
+                b = a + side * math.radians(55)
+                tip = base + np.array([math.cos(b), math.sin(b)]) * r * length
+                out.append((np.array([base, tip]), 1.6, 1.0))
+    return out
+
+
+def folk_star(r_out=40.0, r_in=None, points=8, start=90.0):
+    """A pointed folk star (8 points by default), the Scandinavian kind."""
+    return S.star(points, r_out, r_in or r_out * 0.52, rot=start)
+
+
+def bow(w=60.0, h=None):
+    """A ribbon bow `w` mm across: (left loop, right loop, knot, left tail, right tail),
+    the knot at the origin, tails hanging below with V-cut ends."""
+    h = h or w * 0.5
+    knot = S.ellipse(0, 0, w * 0.075, h * 0.2)
+
+    def loop(sign):
+        pts = [(0.03, 0.10), (0.18, 0.46), (0.38, 0.58), (0.50, 0.40), (0.48, 0.05),
+               (0.36, -0.20), (0.18, -0.24), (0.03, -0.10)]
+        return S.smooth([(sign * x * w, y * h) for x, y in pts], 10).buffer(0)
+
+    def tail(sign):
+        pts = [(0.03, -0.12), (0.12, -0.30), (0.24, -0.78), (0.30, -1.02), (0.24, -0.93),
+               (0.17, -1.06), (0.12, -0.80), (0.02, -0.30)]
+        return _poly([(sign * x * w, y * h) for x, y in pts])
+
+    return loop(-1), loop(1), knot, tail(-1), tail(1)
+
+
+def bauble(r=14.0, x=0.0, y=0.0):
+    """A round Christmas ornament: (ball, cap, hanger loop path), ball centred at (x, y)."""
+    ball = S.circle(x, y, r)
+    cap = S.rounded_rect(r * 0.62, r * 0.36, r * 0.08, x, y + r * 1.02)
+    hook = S.arc(x, y + r * 1.42, r * 0.22, -60, 240)
+    return ball, cap, hook
+
+
+def holly_leaf(length=26.0, width=None, spikes=3):
+    """A holly leaf along +X from the origin: spiky edges, `spikes` points a side."""
+    width = width or length * 0.42
+    n = spikes * 2 + 1
+    top, bot = [], []
+    for i in range(n + 1):
+        t = i / n
+        env = math.sin(math.pi * t) ** 0.7 * width / 2
+        dip = 1.0 if i % 2 == 0 else 0.62           # alternate points and scallops
+        x = t * length
+        top.append((x, env * (dip if 0 < i < n else 0)))
+        bot.append((x, -env * (dip if 0 < i < n else 0)))
+    return _poly(top + bot[::-1][1:-1])
+
+
+def holly_vein(length=26.0):
+    return np.array([(length * 0.08, 0.0), (length * 0.88, 0.0)])
+
+
+def mitten(h=50.0):
+    """A mitten `h` mm tall, cuff at the bottom, thumb on the right: (hand, cuff)."""
+    hand = S.smooth([(-0.30, 0.10), (-0.33, 0.55), (-0.22, 0.86), (0.00, 0.95), (0.20, 0.86),
+                     (0.27, 0.62), (0.30, 0.48), (0.44, 0.56), (0.52, 0.48), (0.46, 0.30),
+                     (0.32, 0.16), (0.30, 0.10)], 10)
+    hand = S.scale(hand, h, h).buffer(0)
+    cuff = S.rounded_rect(0.68 * h, 0.22 * h, 0.05 * h, -0.005 * h, 0.0)
+    return hand, cuff
+
+
+def candy_cane(h=70.0, hook=None):
+    """Centreline of a candy cane `h` mm tall, the hook curling left at the top."""
+    hook = hook or h * 0.2
+    straight = np.array([(0.0, -h / 2), (0.0, h / 2 - hook)])
+    arc = S.arc(-hook, h / 2 - hook, hook, 0, 180, res_deg=6)
+    return np.vstack([straight, arc[1:]])
+
+
+def gingerbread(h=70.0):
+    """A gingerbread figure `h` mm tall, centred on the origin."""
+    head = S.circle(0, h * 0.30, h * 0.17)
+    body = S.smooth([(-0.15, 0.13), (-0.45, 0.10), (-0.48, 0.00), (-0.18, -0.02), (-0.16, -0.18),
+                     (-0.32, -0.45), (-0.24, -0.50), (0.00, -0.24), (0.24, -0.50), (0.32, -0.45),
+                     (0.16, -0.18), (0.18, -0.02), (0.48, 0.00), (0.45, 0.10), (0.15, 0.13)], 10)
+    return unary_union([head, S.scale(body, h, h).buffer(0)]).buffer(h * 0.02).buffer(-h * 0.02)
