@@ -270,7 +270,8 @@ def publish(model_path, build_fn, load_model, parse_overrides, out_root, sim_exe
             sizes=[s["label"] for s in size_info]),
         license=license_text,
         shop=dict(price_usd=product.get("price_usd", 3.99), commercial_price_usd=product.get("commercial_price_usd", 12.99),
-                  collection_id="embroidery", price_note="suggested; confirm before publishing"),
+                  collection_id="embroidery", price_note="suggested; confirm before publishing",
+                  draft=bool(product.get("draft", False))),
         generated_at=outputs.now_iso(), git_commit=(outputs.git_info() or {}).get("commit"),
         model=str(path.relative_to(path.parents[1]).as_posix()) if len(path.parents) > 1 else str(path),
         model_sha256=sha256(path),
@@ -371,7 +372,8 @@ def bundle(collection, title, out_root, members, price_usd=19.99, commercial_pri
               files=[dict(role=r, path=p.name, bytes=p.stat().st_size, sha256=sha256(p))
                      for p, r in ((zpath, "zip"), (cover_path, "png"), (contents, "txt"))],
               shop=dict(price_usd=price_usd, commercial_price_usd=commercial_price_usd, collection_id="bundles",
-                        price_note="suggested; confirm before publishing"),
+                        price_note="suggested; confirm before publishing",
+                        draft=any(m.get("shop", {}).get("draft") for m in ms)),
               license=ms[0]["license"], sellable=not reasons, reasons=reasons, generated_at=outputs.now_iso())
     (out / "manifest.json").write_text(json.dumps(bm, indent=1), encoding="utf-8")
     return bm
