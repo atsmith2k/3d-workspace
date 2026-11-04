@@ -75,6 +75,16 @@ def ribbon(y=-25.0, half=50.0, h=11.0, sag=3.0, tail=8.0):
     return band, tails
 
 
+def plug(shape, *neighbours, r=1.6):
+    """`shape` grown into the narrow fabric slots between it and its neighbours (a
+    morphological closing of the group, kept within 2r of the shape). A slot narrower
+    than ~2.4 mm reads as a gap, not as background, and the fabric's pull opens it."""
+    group = unary_union([shape, *neighbours])
+    closed = group.buffer(r, join_style="round").buffer(-r, join_style="round")
+    slots = closed.difference(group).intersection(shape.buffer(2 * r))
+    return shape.union(slots) if not slots.is_empty else shape
+
+
 def art(p):
     d = Design()
     R = 44.0
@@ -118,7 +128,9 @@ def art(p):
         path += [stem[-1], stem[-1] + (stem[-1] - stem[-6]) * 0.9]   # awn off the top
         d.run(np.array(path), C_["wheat"], length=1.0, name="wheat ear", trim_after=True)
     for i, lf in enumerate(leaves):
-        d.fill(knockout(lf, flower, banner_all, overlap=0.0), C_["olive"], angle=40 + 80 * i, name="sunflower leaf")
+        # the leaves fill the slivers of fabric between them and the petals / ribbon
+        lf = plug(lf, flower, banner_all)
+        d.fill(knockout(lf, flower, banner_all, overlap=0.3), C_["olive"], angle=40 + 80 * i, name="sunflower leaf")
     d.fill(knockout(unary_union(back), disc, *front, banner_all), C_["mustard"], angle=0, name="back petals")
     for k, pt in enumerate(front):
         ang = 90 + 360 * k / 16
@@ -138,7 +150,10 @@ def art(p):
                 d.run(np.asarray(part.coords), C_["caramel"], length=1.1, name="seed hatch")
     for t in tails:
         d.fill(knockout(t, band, overlap=0.0), C_["rust"], angle=-30, name="ribbon tail")
-    d.fill(knockout(band, word, overlap=0.0), C_["rust"], angle=0, name="ribbon")
+    # the band fills the slivers between it and the border ring where it breaks out
+    ring = border.buffer(1.2).difference(border.buffer(-1.2))
+    band = plug(band, ring, *tails)
+    d.fill(knockout(band, word, overlap=0.3), C_["rust"], angle=0, name="ribbon")
     d.fill(word, C_["cream"], angle=90, spacing=0.36, name="lettering")
     return d
 

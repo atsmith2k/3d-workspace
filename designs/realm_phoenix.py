@@ -131,13 +131,20 @@ def art():
         cover = above(k)
         seen = cover
         # later feathers of a tier lap over earlier ones; each fills along its length
-        # neighbours alternate +-18 deg off their length so they read apart
+        # neighbours alternate +-18 deg off their length so they read apart (the first
+        # one +18: with -18 first, a red wedge in the right wing ended in short rows that
+        # stitchsim read as a second lock on the tie-off at 160 mm, "stacked locks")
         for i, (g, a) in enumerate(reversed(tiers_[k])):
-            fill(knockout(g, seen), color, angle=a + (18 if i % 2 else -18), name=f"{color} feather")
+            fill(knockout(g, seen), color, angle=a + (-18 if i % 2 else 18), name=f"{color} feather")
             seen = union(seen, g)
         if color == "red":
-            for g, a in crest:
-                fill(knockout(g, head), "red", angle=a, name="crest")
+            # the three plumes share one base just above the head: stacked, three red
+            # fills plus the head and the border edge came to 3.6-3.7 layers there. Each
+            # plume now stops under the ones sewn after it (the middle plume last, on top)
+            plumes = [crest[0], crest[2], crest[1]]
+            for j, (g, a) in enumerate(plumes):
+                fill(knockout(g, head, *[h for h, _ in plumes[j + 1:]]), "red", angle=a,
+                     name="crest")
         if color == "flame":
             fill(beak, "flame", angle=0, name="beak")
     fill(knockout(bird, beak, eye), "gold", angle=80, name="body")

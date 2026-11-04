@@ -62,7 +62,7 @@ def art():
     d.fill(knockout(cuff, pom), C_["cream"], angle=90, name="hat cuff")
     d.fill(pom, C_["cream"], angle=45, name="pompom")
     d.fill(scarf, C_["red"], angle=10, name="scarf")
-    d.fill(knockout(hat, cuff, pom), C_["green"], angle=90, name="hat")
+    d.fill(knockout(hat, cuff, pom, overlap=0.3), C_["green"], angle=90, name="hat")
     d.fill(nose, C_["black"], angle=0, name="nose")
     for g in eyes:
         d.fill(g, C_["black"], angle=45, underlay=False, name="eye")

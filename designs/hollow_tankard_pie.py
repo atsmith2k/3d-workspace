@@ -123,7 +123,7 @@ def art():
     for h in hoops:
         d.fill(knockout(h, foam), C_["brass"], angle=90, name="hoop")
     # pie
-    d.fill(knockout(dish, crimp), C_["rust"], angle=0, name="pie dish")
+    d.fill(knockout(dish, crimp, filling), C_["rust"], angle=0, name="pie dish")
     d.fill(knockout(lattice, crimp), C_["khaki"], angle=0, name="lattice")
     d.fill(knockout(cheese, *holes), C_["yellow"], angle=20, name="cheese")
     d.fill(crimp, C_["gold"], angle=90, name="crimped rim")

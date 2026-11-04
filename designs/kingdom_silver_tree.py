@@ -75,8 +75,10 @@ def trunk():
 
 # branches: (path from inside a fork end outward, tip), mirrored left/right + centre
 _B = [   # each starts at its own spot on the fork limb, 0.6 mm inside its edge
-    [(-9.0, 9.4), (-13.5, 11.6), (-18.5, 12.2), (-23.0, 15.0)],
-    [(-9.6, 11.0), (-12.0, 15.5), (-16.0, 19.0), (-18.5, 24.0)],
+    # the first two leave the fork end 2 mm apart and diverge at once: started 1.7 mm
+    # apart they overlapped each other over the trunk fill (3.9 layers at 4x4)
+    [(-8.6, 9.0), (-13.5, 10.5), (-18.5, 12.2), (-23.0, 15.0)],
+    [(-9.4, 11.4), (-12.0, 15.5), (-16.0, 19.0), (-18.5, 24.0)],
     [(-6.2, 8.6), (-7.4, 14.0), (-9.0, 20.0), (-8.5, 26.5)],
     [(-4.2, 4.6), (-9.0, 4.8), (-14.0, 3.2), (-18.5, 5.0)],
 ]
@@ -103,7 +105,7 @@ def art():
     tips = [b[-1] for b in br] + [t[-1] for t in tw]
     flowers = [blossom(*t) for t in tips]
     # a few more blossoms along the larger branches
-    extra = [(-13.0, 15.8), (13.0, 15.8), (-12.0, 8.6), (12.0, 8.6), (-3.6, 19.0), (3.6, 19.0)]
+    extra = [(-13.0, 15.8), (13.0, 15.8), (-13.2, 8.4), (13.2, 8.4), (-3.6, 19.0), (3.6, 19.0)]
     flowers += [blossom(x, y, 1.1) for x, y in extra]
     moon = (circle(0, 31.6, 5.2) - circle(0, 34.4, 4.6)).buffer(-0.6).buffer(0.6)
     flower_all = union(*flowers)

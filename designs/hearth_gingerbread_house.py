@@ -73,8 +73,8 @@ def art():
     for k, t in enumerate(np.r_[np.linspace(0.08, 0.40, 4), np.linspace(0.60, 0.92, 4)]):
         x, y = _roof_line(t)
         drops.append((circle(x, y, 2.3), "red" if k % 2 == 0 else "green"))
-    d.fill(knockout(walls, roof, icing_geom, *[grow(w, 0.6) for w in windows], door, pep), C_["ginger"], angle=80, name="walls")
-    d.fill(knockout(roof, *[g for g, _ in drops]), C_["cocoa"], angle=0, name="chocolate roof")
+    d.fill(knockout(walls, roof, icing_geom.buffer(0.2), *[grow(w, 1.0) for w in windows], door, pep), C_["ginger"], angle=80, name="walls")
+    d.fill(knockout(roof, icing_geom, *[g for g, _ in drops]), C_["cocoa"], angle=0, name="chocolate roof")
     for g in windows:
         d.fill(tuck(g, 1.2), C_["gold"], angle=45, name="window")
     d.fill(door, C_["pink"], angle=90, name="door")

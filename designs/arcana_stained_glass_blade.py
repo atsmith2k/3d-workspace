@@ -203,7 +203,9 @@ def art():
     for q in leads:
         d.satin(q, LW, C_["black"], name="lead", underlay="center")
     for g in rings:
-        d.outline(g, C_["black"], width=LW, name="lead ring")
+        # the small four-point stars pile satin at their points: open their leads a little
+        sp = dict(spacing=0.46) if any(g is s for s in stars) else {}
+        d.outline(g, C_["black"], width=LW, name="lead ring", **sp)
     d.outline(win, C_["black"], width=FW, name="frame")
     return d
 

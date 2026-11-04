@@ -120,7 +120,8 @@ def art(p):
                     d.run(pts, C_["bark"], length=1.3, name="side veins")
     for nut, cap, stem in acorns:
         d.fill(cap, C_["bark"], angle=10, spacing=0.38, name="acorn cap")
-        d.run(stem, C_["bark"], bean=1, length=1.0, name="acorn stem")
+        d.run(stem, C_["bark"], bean=1, length=1.3, name="acorn stem",
+              running_stitch_tolerance_mm=0.5)   # bean stitches over 0.83 mm: shorter ones read as stacked locks
     d.fill(lettering(p), C_["bark"], angle=70, spacing=0.36, name="lettering")
     for nut, cap, stem in acorns:                # nuts touch their caps edge to edge
         d.fill(knockout(nut, cap, overlap=0.0), C_["wheat"], angle=80, name="acorn")

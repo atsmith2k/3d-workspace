@@ -78,7 +78,12 @@ def sew_face(d, F, color):
     and the corner diamonds, knocked out under the gold rules."""
     face = knockout(tuck(F["card"], RIM * 2), F["bands"], grow(F["picture"], RULE / 2),
                     F["plaque_top"], F["plaque_bot"], *F["diamonds"])
-    d.fill(face, color, angle=90, spacing=0.4, name="card face")
+    # Sewn as a left and a right half (overlapping 0.4 mm on the centre line, parallel
+    # to the rows so the join does not show): as one piece the travel kept running
+    # through the bone neck under the numeral plaque, 7 needle visits to one hole at 5x7.
+    for s in (-1, 1):
+        half = face & rect(W / 2 + 0.2, H + 2, s * (W / 4 - 0.1), 0)
+        d.fill(half, color, angle=90, spacing=0.4, name="card face")
 
 
 def sew_plaques(d, F, color):

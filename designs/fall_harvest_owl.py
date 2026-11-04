@@ -136,7 +136,8 @@ def art():
                   name="chevron", trim_after=True)
     for nut, cap, stem in acorns:
         d.fill(cap, C_["bark"], angle=10, spacing=0.38, name="acorn cap")
-        d.run(stem, C_["bark"], bean=1, length=1.0, name="acorn stem")
+        d.run(stem, C_["bark"], bean=1, length=1.3, name="acorn stem",
+              running_stitch_tolerance_mm=0.5)   # bean stitches over 0.83 mm: shorter ones read as stacked locks
     for tn, lf, a in leaves:
         t = math.radians(a + 90)
         c = lf.centroid

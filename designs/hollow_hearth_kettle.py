@@ -99,7 +99,7 @@ def flames():
 def kettle():
     body = union(ellipse(0, -11, 11, 8.5), rect(18, 4, 0, -17.6))
     lid = ellipse(0, -3.0, 6.5, 2.6)
-    knob = circle(0, 0.2, 1.8)
+    knob = circle(0, -0.2, 2.3)          # wide enough for the 1.2 mm outline to wrap without piling up
     sp = np.asarray(spline([(8, -10), (13, -7), (16.5, -2.5)], samples=8))
     spout = strip(sp, np.linspace(4.2, 2.4, len(sp)))
     glint = smooth([(-8, -7.5), (-6, -5.5), (-3.5, -5.5), (-6.5, -9.5), (-8.5, -11)], samples=6)
@@ -119,7 +119,9 @@ def art():
     bail = arc(0, -4.3, 9.4, 10, 170)
     crane = union(rect(2.6, 46, -21.6, -16.5), rect(25.0, 2.6, -10.4, 7.0),
                   LineString([(-21, -4), (-11, 6.5)]).buffer(1.1, cap_style="flat"))
-    hook = rect(1.6, 3.4, 0, 4.6)
+    # the hook joins the arm to the top of the bail only: reaching down onto the knob it
+    # stacked crane fill, bail satin and kettle outline in one spot (3.6 layers)
+    hook = rect(1.6, 1.4, 0, 5.4)
     iron = union(crane, hook)
     steam = [spline([(tip[0] + 0.5, tip[1] + 2.2), (tip[0] + 3.5, tip[1] + 5.5), (tip[0] + 1.0, tip[1] + 9.0),
                      (tip[0] + 3.0, tip[1] + 12.5)], samples=8),

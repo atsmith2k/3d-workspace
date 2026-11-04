@@ -62,7 +62,7 @@ def _bow(d, bow, main, knot_color):
     d.fill(knockout(rt, lo, ro, knot), main, angle=105, name="tail")
     d.fill(knockout(lo, knot), main, angle=150, name="loop")
     d.fill(knockout(ro, knot), main, angle=30, name="loop")
-    d.fill(knot, knot_color, angle=90, name="knot")
+    d.fill(knot, knot_color, angle=100, name="knot")
 
 
 def art():
@@ -78,13 +78,26 @@ def art():
     # borders would pile up into a knot of satin)
     back_vis = knockout(back, grow(front, BORDER * 1.1), under_bow, min_width=3.0)  # borders side by side
     front_vis = knockout(front, under_bow, min_width=3.0)
-    d.fill(knockout(tuck(back_vis, BORDER), back_st), C_["white"], angle=60, name="back cane")
-    d.fill(knockout(tuck(front_vis, BORDER), front_st), C_["white"], angle=120, name="front cane")
-    d.fill(back_st.intersection(back_vis), C_["red"], angle=-20 + 40, name="back stripes")
-    d.outline(back_vis, C_["red"], width=BORDER, name="back border")
-    d.fill(front_st.intersection(front_vis), C_["red"], angle=20 + 140, name="front stripes")
-    d.outline(front_vis, C_["red"], width=BORDER, name="front border")
-    _bow(d, bow, C_["green"], C_["pine"])
+    d.fill(knockout(tuck(back_vis, BORDER), back_st), C_["white"], angle=120, name="back cane")
+    d.fill(knockout(tuck(front_vis, BORDER), front_st), C_["white"], angle=60, name="front cane")
+    # stripes stop under the border like the white does (a stripe running under the whole
+    # satin stacks three layers where the border fans round a corner)
+    for st, vis, ang, nm in ((back_st, back_vis, 120, "back"), (front_st, front_vis, 60, "front")):
+        d.fill(st.intersection(tuck(vis, BORDER)).buffer(-0.5).buffer(0.5), C_["red"], angle=ang,
+               name=f"{nm} stripes")
+        d.outline(vis, C_["red"], width=BORDER, name=f"{nm} border")
+    # the notches left between the two borders and the bow (where min_width dropped the
+    # slivers) would open once the fabric pulls: the loops reach over them
+    sewn = union(grow(back_vis, BORDER / 2), grow(front_vis, BORDER / 2), bow_all)
+    notches = [g for g in polygons_of(sewn.buffer(1.5).buffer(-1.5).difference(sewn))
+               if g.area < 30 and g.distance(bow_all) < 0.3]
+    lo, ro, *rest = bow
+    for g in notches:
+        if g.distance(lo) <= g.distance(ro):
+            lo = union(lo, grow(g, 0.5))
+        else:
+            ro = union(ro, grow(g, 0.5))
+    _bow(d, [lo, ro, *rest], C_["green"], C_["pine"])
     return d
 
 

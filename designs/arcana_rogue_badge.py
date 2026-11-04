@@ -135,7 +135,9 @@ def art():
     # 4 purple: the cloak
     d.fill(knockout(hood_c, face, dag_all, banner), C_["purple"], angle=-55, name="cloak")
     # 5 silver: banner, moon, blade shade halves
-    d.fill(knockout(F.banner_main(), txt, dag_all, overlap=0.3), C_["silver"], angle=2, name="banner")
+    # rows at 0 deg like the shared sew_banner: at 2 deg one row end met the underlay's
+    # turn points in the strip above the letters, 7 penetrations in one hole (stitchsim)
+    d.fill(knockout(F.banner_main(), txt, dag_all, overlap=0.3), C_["silver"], angle=0, name="banner")
     d.fill(moon, C_["silver"], angle=30, name="moon")
     for i, s in enumerate((blades[1], blades[3])):
         d.fill(knockout(s, A[2], B[2] if i == 0 else A[2]), C_["silver"], angle=0, name="blade shade")

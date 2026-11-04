@@ -11,15 +11,15 @@ Spec:
                 leaves and three berries behind the bow, and a third leaf hanging down
                 between the bells
   density:      the bow knocks out the bells and holly; details knock out the bells
-  coverage:     the small open wedges between the bow's loops and tails (up to 5 mm2
-                at 5x7) are part of the bow, so the slot allowance is 5 mm2
+  coverage:     the tails run on into the slim wedges between them and the loops (bare,
+                they opened up once the fabric pulled in); the slot allowance stays 5 mm2
 """
 from shapely.affinity import rotate as _rot, translate as _tr
 
 from cadkit.stitch import *
 from cadkit.stitch import motifs as M
 
-from _hearth import C_, SIZES, fit, holly_sprig, hoop_for, product, sew_bow, standard_checks
+from _hearth import C_, SIZES, fit, holly_sprig, hoop_for, product, standard_checks
 
 DESCRIPTION = "Two gold jingle bells hanging from a red bow with holly"
 HOOP = "4x4"
@@ -59,6 +59,19 @@ def art():
     for deg, x in ((-22, -7), (22, 7)):
         bells.append([_hang(g, deg, x, 15) for g in _bell()])
     bow = [move(g, 0, 15) for g in M.bow(32)]
+    # each tail runs on into the slim wedge between it and its loop (under 1 mm across;
+    # left bare it was 2-3 mm2 at 5x7 and grew past 4 once the fabric pulled in), and
+    # its knockout keeps its tip (min_width 0.5, not 1.0: rounded off, the tail left a
+    # notch at the knot)
+    lo, ro, knot, lt, rt = bow
+    wedges = union(*bow).buffer(0.5).buffer(-0.5).difference(union(*bow))
+    for w in getattr(wedges, "geoms", [wedges]):
+        if w.area > 0.5:                         # the two loop/tail wedges, not the specks
+            if w.distance(lt) <= w.distance(rt):
+                lt = lt.union(w.buffer(0.05))
+            else:
+                rt = rt.union(w.buffer(0.05))
+    bow = [lo, ro, knot, lt, rt]
     bow_all = union(*bow)
     leaves, veins, berries = holly_sprig(0, 18, deg=0, length=16)
     leaves.append(move(rotate(M.holly_leaf(21, 8.5, spikes=3), -90, origin=(0, 0)), 0, 14))   # fills the V
@@ -75,7 +88,12 @@ def art():
         g = knockout(g, bow_all)
         if not g.is_empty and g.area > 2:
             d.fill(g, C_["berry"], angle=45, underlay=False, name="berry")
-    sew_bow(d, bow, C_["red"], C_["red"])
+    # sew_bow's order and angles, with the tails' tips kept (above)
+    d.fill(knockout(lt, lo, ro, knot, min_width=0.5), C_["red"], angle=75, name="bow tail")
+    d.fill(knockout(rt, lo, ro, knot, min_width=0.5), C_["red"], angle=105, name="bow tail")
+    d.fill(knockout(lo, knot), C_["red"], angle=150, name="bow loop")
+    d.fill(knockout(ro, knot), C_["red"], angle=30, name="bow loop")
+    d.fill(knot, C_["red"], angle=90, name="bow knot")
     return d
 
 

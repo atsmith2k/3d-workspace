@@ -80,7 +80,7 @@ def art():
     flecks = [_v(x, y) for x, y in FLECKS]
     talons = [ellipse(x, -33, 1.6, 2.4) for x in (-9, -5.5, 5.5, 9)]
     branch = np.array([(-46, -34), (-20, -33.5), (0, -33), (22, -32.5), (46, -31.5)])
-    keep = body.buffer(1.2)
+    keep = body.buffer(1.4)
     pieces = LineString(branch).difference(keep)
     pieces = [np.array(g.coords) for g in getattr(pieces, "geoms", [pieces]) if g.length > 3]
     for b in pieces:
@@ -98,7 +98,7 @@ def art():
         d.fill(g, C_["black"], angle=45, underlay=False, name="pupil / fleck")
     d.fill(beak, C_["charcoal"], angle=90, underlay=False, name="beak")
     for g in talons:
-        d.fill(g, C_["charcoal"], angle=90, underlay=False, name="talon")
+        d.fill(g, C_["charcoal"], angle=90, spacing=0.46, underlay=False, name="talon")
     return d
 
 

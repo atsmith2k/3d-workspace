@@ -80,7 +80,7 @@ ORDER = ["dagaz", "raido", "uruz", "ehwaz", "isa", "ingwaz", "isa", "laguz", "th
 RUNE_H = 5.0
 
 
-def _dense(pts, step=1.2):
+def _dense(pts, step=1.8):
     out = [pts[0]]
     for a, b in zip(pts, pts[1:]):
         n = max(1, int(np.ceil(np.linalg.norm(b - a) / step)))
@@ -222,7 +222,7 @@ def art():
     for sp in sparks:
         d.fill(sp, C_["gold"], angle=45, name="spark")
     for r_ in rn:
-        d.run(r_, C_["gold"], bean=1, length=1.2, name="rune", trim_after=True)
+        d.run(r_, C_["gold"], bean=1, length=1.8, name="rune", trim_after=True)
     return d
 
 

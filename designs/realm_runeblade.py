@@ -167,9 +167,15 @@ def art(size=95.0):
     # fuller knocked out under the runes; slivers between strokes are kept down to
     # ~1.15 mm as sewn (narrower ones drop: the rune satins cover them)
     sliver = 1.15 / (size / 100.0)
-    d.fill(knockout(fuller, rune_bands, overlap=0.15, min_width=max(0.7, min(1.25, sliver))),
-           C_["charcoal"],
-           angle=90, name="fuller")
+    groove = knockout(fuller, rune_bands, overlap=0.15, min_width=max(0.7, min(1.25, sliver)))
+    # one fill per rune, cut in the gaps between runes (0.2 mm overlap): as one piece the
+    # travel kept running through the narrow strip beside the ansuz branches (7 needle
+    # visits to one hole at 5x7)
+    cuts = [8.6 - 4.8 * RKY - i * 7.3 - (7.3 - 4.8 * RKY) / 2 for i in range(4)]
+    edges = [20.0] + cuts + [-40.0]
+    for hi, lo in zip(edges, edges[1:]):
+        part = groove & rect(10, hi - lo + 0.4, 0, (hi + lo) / 2)
+        d.fill(part, C_["charcoal"], angle=90, name="fuller")
     zig = [((-1.8 if i % 2 == 0 else 1.8), 17.0 + i * 1.7) for i in range(10)]
     d.run(line(*zig), C_["charcoal"], bean=1, name="grip lacing")
 

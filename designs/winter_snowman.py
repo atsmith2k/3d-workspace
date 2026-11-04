@@ -53,7 +53,9 @@ def art():
     smile = [circle(10 * np.sin(t), 12 - 6 * np.cos(t) + 1.5, 1.2) for t in np.linspace(-0.85, 0.85, 5)]
     buttons = [circle(0, y, 2.0) for y in (-12, -20, -28)]
     over = union(hat, scarf, nose, *eyes, *smile, *buttons)
-    d.fill(knockout(tuck(snow, BORDER), over), C_["white"], angle=60, name="snow")
+    # the white stops under the blue band round the scarf and hat too (no white under the
+    # satin where it zigzags round the fringe notches)
+    d.fill(knockout(tuck(snow, BORDER), over, hat.buffer(BORDER), scarf.buffer(BORDER)), C_["white"], angle=60, name="snow")
     d.outline(knockout(snow, hat.buffer(BORDER / 2), scarf.buffer(BORDER / 2)), C_["sky"], width=BORDER, name="outline")
     for sign in (-1, 1):
         root = (sign * 27.5, -12)

@@ -170,7 +170,9 @@ def art():
            name="soundboard")
     d.fill(knockout(walls, windows, door, roof, *front), C_["khaki"], angle=0, name="tavern walls")
     # 7 gold: ribbon, rosette, notes, windows, pegs, sparkles
-    d.fill(knockout(F.banner_main(), txt, lute_all, overlap=0.3), C_["gold"], angle=2, name="banner")
+    # rows at 0 deg like the shared sew_banner: at 2 deg one row end met the underlay's
+    # turn points in the strip above the letters, 7 penetrations in one hole (stitchsim)
+    d.fill(knockout(F.banner_main(), txt, lute_all, overlap=0.3), C_["gold"], angle=0, name="banner")
     d.fill(knockout(L["rosette"], L["hole"]), C_["gold"], angle=TILT, name="rosette")
     d.fill(L["pegs"], C_["gold"], angle=0, name="pegs")
     d.fill(windows | door, C_["gold"], angle=0, name="windows")

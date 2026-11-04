@@ -50,7 +50,11 @@ def _pine(x, base, h, w):
 
 def art():
     d = Design()
-    wall = union(rect(40, 22, 0, -9), poly([(-20, 1.9), (0, 17), (20, 1.9)]))
+    # the wall runs down under the drift (which knocks it out), so no sliver of fabric
+    # is left between the bottom log and the dip in the drift's crest
+    # and fills the sharp wedge under each eave (a 1.2 mm sliver there opens once sewn)
+    eaves = [poly([(s * 20, 1.5), (s * 20, -2.5), (s * 22.8, -1.0)]) for s in (-1, 1)]
+    wall = union(rect(40, 26, 0, -11), poly([(-20, 1.9), (0, 17), (20, 1.9)]), *eaves)
     roof = LineString([(-26.5, -0.5), (0, 20), (26.5, -0.5)]).buffer(2.8, cap_style="round", join_style="round")
     chimney = rect(5.5, 10, 12, 16)
     panes = [rect(3.8, 3.4, -9 + dx, -5 + dy) for dx in (-2.3, 2.3) for dy in (-2.1, 2.1)]
@@ -71,7 +75,7 @@ def art():
     front = union(wall, roof, drift)
     for g in pines:
         d.fill(knockout(g, front), C_["green"], angle=75, name="pine")
-    d.fill(knockout(wall, roof, door, *panes, drift), C_["ginger"], angle=0, name="log wall")
+    d.fill(knockout(wall, grow(roof, BORDER / 2), door, *panes, drift), C_["ginger"], angle=0, name="log wall")
     for l in logs:
         d.run(l, C_["cocoa"], bean=1, name="log line", trim_after=True)
     d.fill(knockout(chimney, grow(roof, BORDER / 2)), C_["cocoa"], angle=90, name="chimney")

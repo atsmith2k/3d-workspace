@@ -103,7 +103,7 @@ def art():
     d.fill(knockout(shade, rim_band), C_["bark"], angle=100, name="bowl shadow")
     d.fill(band, C_["bark"], angle=105, name="stem band")
     d.fill(mouth, C_["bark"], angle=-10, name="mouthpiece")
-    d.outline(rim, C_["bark"], width=2.0, name="bowl rim")
+    d.outline(rim, C_["bark"], width=2.0, spacing=0.46, name="bowl rim")
 
     # smoke: a tapered curl, then three rings drifting up-left
     top = cy + 11 * K + 4.4

@@ -59,12 +59,14 @@ def hull():
                   (20.5, -0.6), (23.5, 3.5)], samples=8)
     keel = spline([(22.0, 1.0), (17.0, -5.6), (8.0, -9.2), (-8.0, -9.4), (-18.0, -8.0),
                    (-24.0, -3.6), (-26.5, 1.0)], samples=8)
-    return poly(np.vstack([top, keel])).buffer(0.3).buffer(-0.3)
+    # the bow ends where the swan neck takes over: past x 20 it was a hairline spike whose
+    # fill rows piled 88 penetrations into one spot under the neck
+    return (poly(np.vstack([top, keel])) & rect(80, 40, 20.0 - 40, 0)).buffer(0.3).buffer(-0.3)
 
 
 def prow():
     """Swan neck from the bow, and the head with its beak."""
-    neck = spline([(21.4, 0.2), (25.3, 6.6), (26.5, 13.0), (24.6, 18.4), (21.6, 20.0)], samples=10)
+    neck = spline([(19.6, -2.4), (21.4, 0.2), (25.3, 6.6), (26.5, 13.0), (24.6, 18.4), (21.6, 20.0)], samples=10)
     head = smooth([(19.6, 18.4), (20.6, 21.4), (22.8, 21.8), (24.0, 20.0), (22.6, 18.2)], samples=6)
     beak = poly([(20.2, 20.6), (16.6, 19.4), (20.2, 19.0)])
     return neck, union(head, beak)
@@ -141,7 +143,7 @@ def art():
     for x, y, s_ in ((-30.0, 22.0, 1.0), (-22.0, 26.5, 0.8)):
         g = np.array([(x - 3.0 * s_, y + 1.2 * s_), (x - 1.4 * s_, y + 1.0 * s_), (x, y),
                       (x + 1.4 * s_, y + 1.0 * s_), (x + 3.0 * s_, y + 1.2 * s_)])
-        d.run(g, C_["silver"], bean=1, length=1.0, name="gull", trim_after=True)
+        d.run(g, C_["silver"], bean=1, length=1.6, name="gull", trim_after=True)
     d.outline(frame, C_["silver"], width=BW, name="border")
     return d
 

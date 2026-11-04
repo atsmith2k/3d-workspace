@@ -98,7 +98,9 @@ def art():
     leaves = [move(rotate(M.leaf(5.5, 2.7, 0.3), a, origin=(0, 0)), x, y) for x, y, a in ((-18, 30, 40), (-6, 37, -30), (22, 26, 110))]
 
     fg = unary_union([cabin, path] + [p for pr in pines for p in pr] + [t for tr in trees for t in tr])
-    d.fill(knockout(inner, sun, far, near, fg, *leaves, chimney, overlap=0.0), C_["cream"], angle=0, spacing=0.50, name="sky")
+    # the sky runs 0.3 mm under everything sewn over it: edge to edge, the sliver corners
+    # knockout rounds off (pine tips, the pine/border wedges) open once the fabric pulls
+    d.fill(knockout(inner, sun, far, near, fg, *leaves, chimney, overlap=0.3), C_["cream"], angle=0, spacing=0.50, name="sky")
     # mustard: sun, far tree crown, lit window
     d.fill(knockout(sun, far, near, fg, overlap=0.0), C_["mustard"], angle=0, name="sun")
     far_crown, far_trunk = trees[1]

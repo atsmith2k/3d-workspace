@@ -95,6 +95,10 @@ def broken():
         dy = (-1.4, -3.4)[i]
         moved.append(rotate(move(q, dx, dy), (-9, 7)[i], (c.x + dx, c.y + dy)).buffer(-0.7).buffer(0.2))
     lower = rotate(move(lower, 0.8, -5.0), 5.0, (0, -8.0))
+    # the lower shard's tilted corner reached into the lower blade (two shadow fills and
+    # two edge runs stacked there): keep the pieces 1 mm apart
+    moved = [max(polygons_of((q - lower.buffer(1.0)).buffer(-0.1).buffer(0.1)), key=lambda g: g.area)
+             for q in moved]
     stub = stub.buffer(-0.2)
     return stub, moved, lower
 
@@ -141,11 +145,11 @@ def art():
         a = 15 + 30 * i
         g = knockout(g, cover, sr, core)
         if not g.is_empty:
-            d.fill(g, C_["ember"], angle=a + 90, name="ember ray")
+            d.fill(g, C_["ember"], angle=a, name="ember ray")
     for i, g in enumerate(short_rays):
         g = knockout(g, cover, core)
         if not g.is_empty:
-            d.fill(g, C_["flame"], angle=30 * i + 90, name="flame ray")
+            d.fill(g, C_["flame"], angle=30 * i, name="flame ray")
     d.fill(knockout(core, cover), C_["yellow"], angle=75, name="glow core")
     for s in sparks:
         d.fill(s, C_["yellow"], angle=45, name="spark")

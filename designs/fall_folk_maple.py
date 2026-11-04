@@ -49,7 +49,17 @@ def art():
     tones = [C_["rust"], C_["pumpkin"], C_["mustard"], C_["moss"], C_["olive"]]
     leaf = M.maple_leaf(h)
     # sew from the green side round to rust, so the colours change in order
+    # the five wedges all meet at the leaf centre, so every lobe's rows ended (and one
+    # colour's tie-off and the next one's tie-in landed) in the same spot: a needle
+    # pile-up, and five overlapping fill edges there were too dense at 160 mm. The middle
+    # (mustard) lobe takes a small hub disc round the centre and the others stop at its
+    # edge (0.4 mm overlap). r 2.0 keeps that overlap band inside the vein starts (2.6),
+    # so no satin vein sits on two fill layers.
+    from shapely.geometry import Point
+    hub = Point(0, 0).buffer(2.0)
+    mid = sorted(a for a, _ in sectors)[len(sectors) // 2]
     for (a, sec), tone in sorted(zip(sectors, tones), key=lambda st: -st[0][0]):
+        sec = sec | hub if a == mid else sec.difference(hub.buffer(-0.4))
         body = tuck(sec.buffer(0.35).intersection(leaf), 1.25)
         d.fill(move(body, 0, leaf_cy), tone, angle=90 - a, spacing=0.40, name=f"lobe {a:.0f}")
     # veins start a little out from the centre so five columns don't pile into one hole;

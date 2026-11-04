@@ -108,6 +108,7 @@ def art():
         swirls.append(sw)
 
     body = tuck(leaf_shape, RIM)
+    body = body.buffer(-1.3).buffer(1.3)     # no fill sliver into the tip, where the rim satin fans
     d.fill(knockout(body.intersection(left.buffer(0.3)), rib_band, stem_band), C_["leaf"], angle=60, name="lit half")
     d.fill(knockout(body.intersection(right.buffer(0.3)), rib_band, stem_band, left.buffer(-0.1)), C_["green"],
            angle=120, name="shadow half")
