@@ -52,6 +52,8 @@ pub struct Sim {
     pub thread_m: f32,
     pub longest: f32,
     pub start: [f32; 2],
+    /// stitches onto the point the needle is already at: (where, stitch index)
+    pub doubled: Vec<([f32; 2], usize)>,
 }
 
 impl Sim {
@@ -67,6 +69,7 @@ impl Sim {
         let mut pens = 0usize;
         let mut bounds = [f32::MAX, f32::MAX, f32::MIN, f32::MIN];
         let mut start = None;
+        let mut doubled = Vec::new();
         for c in &p.cmds {
             let pt = [c.x, c.y];
             match c.kind {
@@ -79,6 +82,8 @@ impl Sim {
                         if sewing {
                             if moved {
                                 segs.push(Seg { a, b: pt, block });
+                            } else {
+                                doubled.push((pt, segs.len()));
                             }
                         } else if moved || trimmed || color_change {
                             jumps.push(Jump { a, b: pt, trimmed, color_change, after: segs.len() });
@@ -153,6 +158,7 @@ impl Sim {
             trims,
             longest,
             start: start.unwrap_or([0.0, 0.0]),
+            doubled,
         }
     }
 

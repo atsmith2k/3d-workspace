@@ -1,4 +1,5 @@
-//! Readers for the machine formats: PES (+ its PEC block), PEC, DST, EXP and JEF.
+//! Readers for the machine formats: PES (+ its PEC block), PEC, DST, EXP, JEF, VP3,
+//! XXX and U01.
 //! Byte layouts follow pyembroidery's readers (MIT), which cadkit writes with, so a
 //! file decodes here exactly as `cad stitch inspect` sees it.
 
@@ -43,6 +44,17 @@ impl<'a> R<'a> {
         let s = self.bytes(3)?;
         Some((s[0] as u32) << 16 | (s[1] as u32) << 8 | s[2] as u32)
     }
+    fn u16be(&mut self) -> Option<u16> {
+        let s = self.bytes(2)?;
+        Some(u16::from_be_bytes([s[0], s[1]]))
+    }
+    fn u32be(&mut self) -> Option<u32> {
+        let s = self.bytes(4)?;
+        Some(u32::from_be_bytes([s[0], s[1], s[2], s[3]]))
+    }
+    fn i32be(&mut self) -> Option<i32> {
+        self.u32be().map(|v| v as i32)
+    }
     fn u32le(&mut self) -> Option<u32> {
         let s = self.bytes(4)?;
         Some(u32::from_le_bytes([s[0], s[1], s[2], s[3]]))
@@ -71,7 +83,10 @@ pub fn read(path: &Path) -> Result<Pattern, String> {
         "dst" => read_dst(&data),
         "exp" => read_exp(&data),
         "jef" => read_jef(&data),
-        _ => Err(format!("unsupported format '.{ext}' (PES, PEC, DST, EXP, JEF)")),
+        "vp3" => read_vp3(&data),
+        "xxx" => read_xxx(&data),
+        "u01" => read_u01(&data),
+        _ => Err(format!("unsupported format '.{ext}' (PES, PEC, DST, EXP, JEF, VP3, XXX, U01)")),
     }?;
     if pat.cmds.iter().all(|c| c.kind != Kind::Stitch) {
         return Err("no stitches in file".into());
@@ -356,6 +371,173 @@ fn read_jef(b: &[u8]) -> Result<Pattern, String> {
         }
     }
     pat.push_cmd(Kind::End);
-    pat.trims_from_jumps(usize::MAX, 3.0);
+    pat.trims_from_jumps(3, 3.0); // cadkit writes trims as three zero jumps
+    Ok(pat)
+}
+
+// ---------- VP3 (Husqvarna Viking / Pfaff) ----------
+
+/// VP3 strings: a 16-bit big-endian length, then the bytes.
+fn vp3_str(r: &mut R) -> Option<String> {
+    let n = r.u16be()? as usize;
+    Some(String::from_utf8_lossy(r.bytes(n)?).into_owned())
+}
+
+fn read_vp3(b: &[u8]) -> Result<Pattern, String> {
+    let bad = || "VP3 header truncated".to_string();
+    let mut r = R::new(b);
+    if r.bytes(6) != Some(b"%vsm%\0".as_slice()) {
+        return Err("not a VP3 file".into());
+    }
+    let mut pat = Pattern { format: "VP3".into(), ..Default::default() };
+    vp3_str(&mut r).ok_or_else(bad)?; // producer
+    r.skip(7);
+    vp3_str(&mut r).ok_or_else(bad)?; // comments
+    r.skip(32);
+    // design centre and block starts are in 0.001 mm, Y up; stitches are 0.1 mm, Y down
+    let cx = r.i32be().ok_or_else(bad)? as f32 / 1000.0;
+    let cy = r.i32be().ok_or_else(bad)? as f32 / 1000.0;
+    r.skip(27);
+    vp3_str(&mut r).ok_or_else(bad)?;
+    r.skip(24);
+    vp3_str(&mut r).ok_or_else(bad)?;
+    let blocks = r.u16be().ok_or_else(bad)?;
+    let short = || "VP3 colour block truncated".to_string();
+    for i in 0..blocks {
+        r.skip(3); // 00 05 00
+        let dist = r.u32be().ok_or_else(short)? as usize;
+        let end = r.p + dist;
+        let sx = r.i32be().ok_or_else(short)? as f32 / 1000.0;
+        let sy = r.i32be().ok_or_else(short)? as f32 / 1000.0;
+        // each block starts at an absolute position: a move there
+        let (x, y) = pat.cmds.last().map(|c| (c.x, c.y)).unwrap_or((0.0, 0.0));
+        let (ax, ay) = (sx + cx, sy + cy);
+        if (ax - x).abs() > 1e-4 || (ay - y).abs() > 1e-4 {
+            pat.cmds.push(crate::pattern::Cmd { x: ax, y: ay, kind: Kind::Jump });
+        }
+        let n = r.u8().ok_or_else(short)?;
+        r.skip(1); // transition
+        let mut c = [0u8; 3];
+        for _ in 0..n {
+            c = rgb(r.u24be().ok_or_else(short)?);
+            r.skip(3); // parts, length
+        }
+        r.skip(2); // type, weight
+        let catalog = vp3_str(&mut r).ok_or_else(short)?;
+        let desc = vp3_str(&mut r).ok_or_else(short)?;
+        let brand = vp3_str(&mut r).ok_or_else(short)?;
+        let name: Vec<String> = [brand, desc, catalog].into_iter().filter(|s| !s.is_empty() && s != "None").collect();
+        pat.threads.push(Thread { rgb: c, name: name.join(" ") });
+        r.skip(15 + 3); // ..., 0A F6 00
+        let st = b.get(r.p..end.min(b.len())).ok_or_else(short)?;
+        let mut k = 0;
+        while k + 1 < st.len() {
+            let (x, y) = (st[k], st[k + 1]);
+            k += 2;
+            if x != 0x80 {
+                pat.push_rel(signed8(x), -signed8(y), Kind::Stitch);
+                continue;
+            }
+            match y {
+                // long stitch: 16-bit deltas, then an 80 02 with no known effect
+                0x01 if k + 4 <= st.len() => {
+                    let dx = i16::from_be_bytes([st[k], st[k + 1]]) as i32;
+                    let dy = i16::from_be_bytes([st[k + 2], st[k + 3]]) as i32;
+                    k += 6;
+                    pat.push_rel(dx, -dy, Kind::Stitch);
+                }
+                0x03 => pat.push_cmd(Kind::Trim),
+                _ => {}
+            }
+        }
+        r.p = end;
+        if i + 1 < blocks {
+            pat.push_cmd(Kind::Color);
+        }
+    }
+    pat.push_cmd(Kind::End);
+    Ok(pat)
+}
+
+// ---------- XXX (Singer) ----------
+
+fn read_xxx(b: &[u8]) -> Result<Pattern, String> {
+    let mut pat = Pattern { format: "XXX".into(), ..Default::default() };
+    let n_colors = R::at(b, 0x27).u16le().ok_or("XXX header truncated")?;
+    let mut r = R::at(b, 0x100);
+    loop {
+        let Some(b1) = r.u8() else { break };
+        if b1 == 0x7D || b1 == 0x7E {
+            // long move: 16-bit little-endian deltas
+            let (Some(x), Some(y)) = (r.u16le(), r.u16le()) else { break };
+            pat.push_rel(x as i16 as i32, y as i16 as i32, Kind::Jump);
+            continue;
+        }
+        let Some(b2) = r.u8() else { break };
+        if b1 != 0x7F {
+            pat.push_rel(signed8(b1), signed8(b2), Kind::Stitch);
+            continue;
+        }
+        let (Some(b3), Some(b4)) = (r.u8(), r.u8()) else { break };
+        let (x, y) = (signed8(b3), signed8(b4));
+        match b2 {
+            0x01 => pat.push_rel(x, y, Kind::Jump),
+            0x03 => {
+                pat.push_cmd(Kind::Trim);
+                if x != 0 || y != 0 {
+                    pat.push_rel(x, y, Kind::Jump);
+                }
+            }
+            0x08 | 0x0A..=0x17 => pat.push_cmd(Kind::Color),
+            _ => break, // 7F 7F / 7F 18: end
+        }
+    }
+    pat.push_cmd(Kind::End);
+    let mut t = R::at(b, r.p + 2);
+    for _ in 0..n_colors {
+        let Some(c) = t.u32be() else { break };
+        pat.threads.push(Thread { rgb: rgb(c), name: String::new() });
+    }
+    Ok(pat)
+}
+
+// ---------- U01 (Barudan) ----------
+
+fn read_u01(b: &[u8]) -> Result<Pattern, String> {
+    let mut pat = Pattern { format: "U01".into(), ..Default::default() };
+    pat.notes.push("U01 carries no thread colours: default colours shown".into());
+    for rec in b.get(0x100..).ok_or("U01 file too short")?.chunks_exact(3) {
+        let ctrl = rec[0];
+        let mut dx = rec[2] as i32;
+        let mut dy = rec[1] as i32;
+        if ctrl & 0x20 != 0 {
+            dx = -dx;
+        }
+        if ctrl & 0x40 != 0 {
+            dy = -dy;
+        }
+        let moved = dx != 0 || dy != 0;
+        match ctrl & 0x1F {
+            0x00 | 0x02 | 0x04 => pat.push_rel(dx, dy, Kind::Stitch), // (fast / slow)
+            0x01 | 0x03 | 0x05 => pat.push_rel(dx, dy, Kind::Jump),
+            0x06..=0x08 => {
+                pat.push_cmd(Kind::Trim); // top / bobbin trim, stop
+                if moved {
+                    pat.push_rel(dx, dy, Kind::Jump);
+                }
+            }
+            0x09..=0x17 => {
+                // needle change; the first one only picks the starting needle
+                if pat.cmds.iter().any(|c| c.kind == Kind::Stitch) {
+                    pat.push_cmd(Kind::Color);
+                }
+                if moved {
+                    pat.push_rel(dx, dy, Kind::Jump);
+                }
+            }
+            _ => break, // 0x18: end
+        }
+    }
+    pat.push_cmd(Kind::End);
     Ok(pat)
 }

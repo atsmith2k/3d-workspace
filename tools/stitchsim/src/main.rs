@@ -1,13 +1,17 @@
 //! stitchsim: open a machine embroidery file and watch it sew.
 //!
 //!   stitchsim [file.pes]          GUI (drag a file onto the window, or File > Open)
-//!   stitchsim --info file.pes     print the stats and exit (no window)
+//!   stitchsim --info file.pes [--machine brother-home|janome|tajima|bernina]
+//!                                 print the stats and problems and exit (no window)
 //!   stitchsim file.pes --screenshot out.png [--at 0.5|5000] [--zoom 30] [--size 1280x820]
 //!                                 render one frame (half sewn, or 5000 stitches in)
 //!                                 to a PNG and exit
 //!
 //!     [--realistic] [--article tshirt|pants|cap|tote|plain] [--color 2=#ffd100 ...]
-//!     [--density] [--hoop 4x4] [--clean] [--fabric #rrggbb]
+//!     [--density] [--hoop 4x4] [--hoop-turn auto|portrait|landscape] [--machine janome]
+//!     [--clean] [--fabric #rrggbb]
+//!   --hoop turns a non-square hoop to the design's long side unless --hoop-turn pins it
+//!   (a reversed name, 7x5, means landscape)
 //!   --clean renders only the design (no panels, markers, needle or scale bar): product shots
 //!
 //! Keys: Space play/pause, Left/Right step (Shift x100), Home/End, PgUp/PgDn colour
@@ -16,8 +20,10 @@
 //! X problem markers, D density map, N / Shift+N next / previous problem.
 
 mod analysis;
+mod drape;
 mod formats;
 mod garment;
+mod machines;
 mod palettes;
 mod pattern;
 mod sim;
@@ -32,6 +38,44 @@ const HOOPS: [(&str, f32, f32); 7] = [
     ("1.5x2", 40.0, 50.0), ("4x4", 100.0, 100.0), ("2x6", 50.0, 150.0), ("5x7", 130.0, 180.0),
     ("6x10", 160.0, 260.0), ("8x8", 200.0, 200.0), ("8x12", 200.0, 300.0),
 ];
+
+/// How a non-square hoop is turned: machines (and hoops) take the field either way round.
+#[derive(Clone, Copy, PartialEq)]
+enum HoopTurn {
+    Auto,
+    Portrait,
+    Landscape,
+}
+
+impl HoopTurn {
+    const ALL: [HoopTurn; 3] = [HoopTurn::Auto, HoopTurn::Portrait, HoopTurn::Landscape];
+    fn label(self) -> &'static str {
+        match self {
+            HoopTurn::Auto => "auto",
+            HoopTurn::Portrait => "portrait",
+            HoopTurn::Landscape => "landscape",
+        }
+    }
+}
+
+/// Hoop `i`'s field turned for a design of size (dw, dh): (label, width, height).
+fn hoop_field(i: usize, turn: HoopTurn, dw: f32, dh: f32) -> (String, f32, f32) {
+    let (name, a, b) = HOOPS[i];
+    let (short, long) = (a.min(b), a.max(b));
+    if short == long {
+        return (name.to_string(), a, b);
+    }
+    let landscape = match turn {
+        HoopTurn::Landscape => true,
+        HoopTurn::Portrait => false,
+        HoopTurn::Auto => dw > dh,
+    };
+    if landscape {
+        (format!("{name} landscape"), long, short)
+    } else {
+        (format!("{name} portrait"), short, long)
+    }
+}
 
 fn sev_color(s: Severity) -> Color32 {
     match s {
@@ -48,16 +92,38 @@ const CHUNK: usize = 4096;
 
 fn main() -> eframe::Result<()> {
     let args: Vec<String> = std::env::args().skip(1).collect();
+    let flag = |name: &str| args.iter().position(|a| a == name).and_then(|i| args.get(i + 1)).cloned();
+    let machine = match flag("--machine") {
+        Some(m) => machines::find(&m).unwrap_or_else(|| {
+            let names: Vec<&str> = machines::PROFILES.iter().map(|p| p.name).collect();
+            eprintln!("unknown machine {m:?}; one of {}", names.join(", "));
+            std::process::exit(2)
+        }),
+        None => 0,
+    };
     if args.first().map(|a| a == "--info").unwrap_or(false) {
         let Some(path) = args.get(1) else {
-            eprintln!("usage: stitchsim --info FILE");
+            eprintln!("usage: stitchsim --info FILE [--machine NAME]");
             std::process::exit(2);
         };
         match load(Path::new(path)) {
-            Ok((p, s)) => print_info(&p, &s),
+            Ok((p, s)) => print_info(&p, &s, &machines::PROFILES[machine]),
             Err(e) => {
                 eprintln!("{e}");
                 std::process::exit(1);
+            }
+        }
+        return Ok(());
+    }
+    if args.first().map(|a| a == "--metrics").unwrap_or(false) {
+        // calibration: --metrics FILE... prints the analyser's raw measures, one line per file
+        for path in &args[1..] {
+            match load(Path::new(path)) {
+                Ok((_, s)) => {
+                    let m: Vec<String> = analysis::metrics(&s).iter().map(|(k, v)| format!("{k}={v}")).collect();
+                    println!("{path}	{}", m.join(" "));
+                }
+                Err(e) => eprintln!("{path}: {e}"),
             }
         }
         return Ok(());
@@ -75,7 +141,6 @@ fn main() -> eframe::Result<()> {
         }
         return Ok(());
     }
-    let flag = |name: &str| args.iter().position(|a| a == name).and_then(|i| args.get(i + 1)).cloned();
     let shot = flag("--screenshot").map(|out| Shot {
         out: PathBuf::from(out),
         at: flag("--at").and_then(|v| v.parse().ok()),
@@ -109,8 +174,23 @@ fn main() -> eframe::Result<()> {
     let clean = args.iter().any(|a| a == "--clean");
     let fabric = flag("--fabric").and_then(|h| u32::from_str_radix(h.trim_start_matches('#'), 16).ok())
         .map(|c| Color32::from_rgb((c >> 16) as u8, (c >> 8) as u8, c as u8));
-    let hoop = flag("--hoop").and_then(|h| HOOPS.iter().position(|x| x.0 == h));
-    let skip: Vec<&String> = ["--screenshot", "--at", "--size", "--zoom", "--article", "--hoop", "--fabric"].iter().filter_map(|f| flag(f).map(|_| *f)).flat_map(|f| {
+    // --hoop 5x7 turns to fit the design unless --hoop-turn pins it; a reversed name (7x5) is landscape
+    let hoop_arg = flag("--hoop");
+    let mut hoop_turn = match flag("--hoop-turn").as_deref() {
+        Some("landscape") => HoopTurn::Landscape,
+        Some("portrait") => HoopTurn::Portrait,
+        _ => HoopTurn::Auto,
+    };
+    let hoop = hoop_arg.and_then(|h| {
+        HOOPS.iter().position(|x| x.0 == h).or_else(|| {
+            // reversed name ("7x5"): the landscape way round
+            let (a, b) = h.split_once('x')?;
+            let i = HOOPS.iter().position(|x| x.0 == format!("{b}x{a}"))?;
+            hoop_turn = HoopTurn::Landscape;
+            Some(i)
+        })
+    });
+    let skip: Vec<&String> = ["--screenshot", "--at", "--size", "--zoom", "--article", "--hoop", "--hoop-turn", "--machine", "--fabric"].iter().filter_map(|f| flag(f).map(|_| *f)).flat_map(|f| {
         let i = args.iter().position(|a| a == f).unwrap();
         [&args[i], &args[i + 1]]
     }).collect();
@@ -133,8 +213,10 @@ fn main() -> eframe::Result<()> {
             app.jumps = false;
             app.ghost = false;
         }
-        if hoop.is_some() {
+        if hoop.is_some() || machine != 0 {
             app.hoop = hoop;
+            app.hoop_turn = hoop_turn;
+            app.machine = machine;
             app.reanalyze();
         }
         if let Some(d) = &mut app.doc {
@@ -160,7 +242,7 @@ fn load(path: &Path) -> Result<(Pattern, Sim), String> {
     Ok((p, s))
 }
 
-fn print_info(p: &Pattern, s: &Sim) {
+fn print_info(p: &Pattern, s: &Sim, machine: &machines::Profile) {
     let (w, h) = s.size();
     println!("format      {}", p.format);
     println!("label       {}", p.label);
@@ -180,7 +262,13 @@ fn print_info(p: &Pattern, s: &Sim) {
     for n in &p.notes {
         println!("note        {n}");
     }
-    let r = analysis::analyze(s, None);
+    let r = analysis::analyze(s, None, machine);
+    let st = &r.stats;
+    println!("machine     {}", machine.name);
+    println!("centre      ({:.1}, {:.1}) mm", st.centre[0], st.centre[1]);
+    println!("trims/1k    {:.2}", st.trims_per_1k);
+    println!("doubled     {}", st.doubled);
+    println!("short<0.5   {} ({:.2} % of stitches, away from ties)", st.short, st.short_share * 100.0);
     let errors = r.issues.iter().filter(|i| i.sev == Severity::Error).count();
     println!("density     max {:.2} thread layers", r.density.max());
     println!("problems    {} ({} errors, {} warnings)", r.issues.len(), errors, r.issues.len() - errors);
@@ -234,6 +322,7 @@ struct CacheKey {
     shade: bool,
     realistic: bool,
     stage: Stage,
+    article: Article,
     hidden: Vec<bool>,
     colors: Vec<Color32>,
 }
@@ -244,6 +333,14 @@ struct GarmentTex {
     tex: TextureHandle,
     rect: [f32; 4],
     tris: Vec<[[f32; 2]; 3]>,
+}
+
+/// The fabric shading round the embroidery, built once per design and fabric.
+struct PuckerTex {
+    path: PathBuf,
+    fabric: Fabric,
+    tex: TextureHandle,
+    rect: [f32; 4], // design mm
 }
 
 struct Loaded {
@@ -274,6 +371,8 @@ struct App {
     problems: bool,
     density_map: bool,
     hoop: Option<usize>,
+    hoop_turn: HoopTurn,
+    machine: usize,
     selected: Option<usize>,
     article: Article,
     garment_colors: Vec<Color32>,
@@ -283,6 +382,7 @@ struct App {
     thread_tex: Option<TextureHandle>,
     tiles: Vec<(Fabric, TextureHandle, f32)>,
     garment: Option<GarmentTex>,
+    pucker: Option<PuckerTex>,
     key: Option<CacheKey>,
     sewn_chunks: Vec<Arc<Mesh>>,
     ghost_chunks: Vec<Arc<Mesh>>,
@@ -312,6 +412,8 @@ impl App {
             problems: true,
             density_map: false,
             hoop: None,
+            hoop_turn: HoopTurn::Auto,
+            machine: 0,
             selected: None,
             article: Article::Plain,
             garment_colors: Article::ALL.iter().map(|a| a.default_color()).collect(),
@@ -321,6 +423,7 @@ impl App {
             thread_tex: None,
             tiles: Vec::new(),
             garment: None,
+            pucker: None,
             key: None,
             sewn_chunks: Vec::new(),
             ghost_chunks: Vec::new(),
@@ -344,7 +447,8 @@ impl App {
                 });
                 self.pos = sim.len() as f64; // show the finished design first
                 self.sim_t = sim.total_time();
-                let report = analysis::analyze(&sim, self.hoop_spec());
+                let hoop = self.hoop_spec(&sim);
+                let report = analysis::analyze(&sim, hoop.as_ref().map(|(n, w, h)| (n.as_str(), *w, *h)), &machines::PROFILES[self.machine]);
                 self.doc = Some(Loaded { path: path.to_path_buf(), colors: colors.collect(), hidden: vec![false; n], pat, sim, report });
                 self.selected = None;
                 self.error = None;
@@ -370,14 +474,17 @@ impl App {
         }
     }
 
-    fn hoop_spec(&self) -> Option<(&'static str, f32, f32)> {
-        self.hoop.map(|i| HOOPS[i])
+    /// The chosen hoop's field, turned the way the design needs (or as pinned).
+    fn hoop_spec(&self, sim: &Sim) -> Option<(String, f32, f32)> {
+        let (dw, dh) = sim.size();
+        self.hoop.map(|i| hoop_field(i, self.hoop_turn, dw, dh))
     }
 
     fn reanalyze(&mut self) {
-        let hoop = self.hoop_spec();
+        let machine = machines::PROFILES[self.machine];
+        let hoop = self.doc.as_ref().and_then(|d| self.hoop_spec(&d.sim));
         if let Some(d) = &mut self.doc {
-            d.report = analysis::analyze(&d.sim, hoop);
+            d.report = analysis::analyze(&d.sim, hoop.as_ref().map(|(n, w, h)| (n.as_str(), *w, *h)), &machine);
             self.selected = None;
         }
     }
@@ -390,7 +497,7 @@ impl App {
         self.selected = Some(i);
         self.playing = false;
         self.seek(k as f64);
-        self.cam.center = self.place_fn()(at);
+        self.cam.center = drape::warp(self.article, self.place_fn()(at));
         self.cam.zoom = self.cam.zoom.max(8.0);
     }
 
@@ -410,7 +517,9 @@ impl App {
             Stage { x: (b[0] + b[2]) / 2.0, y: (b[1] + b[3]) / 2.0, scale: 1.0, rot: 0.0 }
         } else {
             // the usual width, but keep tall designs to a sensible height too
-            let s = (width / w.max(1.0)).min(width * 1.2 / h.max(1.0));
+            // a cap's front takes about 60 mm of height before the brim and eyelets
+            let tall = if self.article == Article::Cap { 58.0 } else { width * 1.2 };
+            let s = (width / w.max(1.0)).min(tall / h.max(1.0));
             Stage { x, y, scale: s, rot: 0.0 }
         };
     }
@@ -463,6 +572,15 @@ impl App {
             };
             self.tiles.push((fabric, ctx.load_texture(format!("tile{fabric:?}"), img, opts), mm));
         }
+        if let Some(d) = &self.doc {
+            let fresh = self.pucker.as_ref().is_some_and(|p| p.path == d.path && p.fabric == fabric);
+            if self.realistic && !fresh {
+                let segs: Vec<([f32; 2], [f32; 2])> = d.sim.segs.iter().map(|s| (s.a, s.b)).collect();
+                let (img, rect) = drape::pucker(&segs, d.sim.bounds, fabric);
+                let tex = ctx.load_texture("pucker", img, TextureOptions::LINEAR);
+                self.pucker = Some(PuckerTex { path: d.path.clone(), fabric, tex, rect });
+            }
+        }
         if self.article == Article::Plain {
             return;
         }
@@ -502,7 +620,8 @@ impl App {
 /// Garments whose topstitching is a contrast colour are baked in their colour; the
 /// rest are drawn white and tinted, so recolouring them is free.
 fn spec_has_thread(a: Article) -> bool {
-    a == Article::Pants
+    // the cap's metal eyelets must not take the fabric's tint
+    a == Article::Pants || a == Article::Cap
 }
 
 fn shades(c: Color32) -> (Color32, Color32) {
@@ -881,8 +1000,34 @@ impl App {
                     }
                 });
         });
-        if hoop != self.hoop {
+        let mut turn = self.hoop_turn;
+        if let Some(i) = hoop.filter(|&i| HOOPS[i].1 != HOOPS[i].2) {
+            let size = self.doc.as_ref().map(|d| d.sim.size()).unwrap_or((0.0, 0.0));
+            let (_, fw, fh) = hoop_field(i, turn, size.0, size.1);
+            ui.horizontal(|ui| {
+                ui.label("Turn");
+                for t in HoopTurn::ALL {
+                    ui.selectable_value(&mut turn, t, t.label());
+                }
+                ui.weak(format!("{fw:.0} x {fh:.0}"));
+            }).response.on_hover_text("auto turns the hoop to the design's long side; machines take the field either way round");
+        }
+        let mut machine = self.machine;
+        ui.horizontal(|ui| {
+            ui.label("Machine");
+            egui::ComboBox::from_id_salt("machine")
+                .selected_text(machines::PROFILES[machine].label)
+                .show_ui(ui, |ui| {
+                    for (i, m) in machines::PROFILES.iter().enumerate() {
+                        ui.selectable_value(&mut machine, i, m.label).on_hover_text(format!(
+                            "max stitch {:.1} mm, {} stitches, {} colour changes", m.max_stitch, m.max_stitches, m.max_changes));
+                    }
+                });
+        });
+        if hoop != self.hoop || machine != self.machine || turn != self.hoop_turn {
             self.hoop = hoop;
+            self.hoop_turn = turn;
+            self.machine = machine;
             self.reanalyze();
         }
         let Some(d) = &self.doc else { return };
@@ -1144,7 +1289,7 @@ impl App {
         let d = self.doc.as_ref().unwrap();
         let key = CacheKey {
             cam: self.cam, rect, width: self.width, shade: self.shade, realistic: self.realistic,
-            stage: self.stage, hidden: d.hidden.clone(), colors: d.colors.clone(),
+            stage: self.stage, article: self.article, hidden: d.hidden.clone(), colors: d.colors.clone(),
         };
         if self.key.as_ref() != Some(&key) {
             self.key = Some(key);
@@ -1159,8 +1304,18 @@ impl App {
         let c = rect.center();
         let world = move |p: [f32; 2]| Pos2::new(c.x + (p[0] - cam.center[0]) * cam.zoom, c.y - (p[1] - cam.center[1]) * cam.zoom);
         let place = self.place_fn();
-        let tf = move |p: [f32; 2]| world(place(p));
+        let article = self.article;
+        let tf = move |p: [f32; 2]| world(drape::warp(article, place(p)));
+        // stitches take the garment's light where they sit (its folds, the cap's curve)
+        let lit = move |c: Color32, p: [f32; 2]| -> Color32 {
+            let k = drape::light(article, place(p));
+            let f = |v: u8| (v as f32 * k).min(255.0) as u8;
+            Color32::from_rgba_premultiplied(f(c.r()), f(c.g()), f(c.b()), c.a())
+        };
         self.draw_garment(&painter, world);
+        if self.realistic {
+            self.draw_pucker(&painter, tf);
+        }
         let d = self.doc.as_ref().unwrap();
         let mm_px = cam.zoom * self.stage.scale;
         // +0.5 px: flat meshes are not anti-aliased, so thin threads alias into pinholes
@@ -1180,7 +1335,7 @@ impl App {
                 if d.hidden[s.block as usize] {
                     continue;
                 }
-                let col = d.colors[s.block as usize];
+                let col = lit(d.colors[s.block as usize], [(s.a[0] + s.b[0]) * 0.5, (s.a[1] + s.b[1]) * 0.5]);
                 if ghost {
                     push_stitch(&mut m, tf(s.a), tf(s.b), (wpx * 0.6).max(1.0), col.gamma_multiply(0.18), false);
                 } else if let Some(r) = &real {
@@ -1264,7 +1419,7 @@ impl App {
             }
             painter.add(Shape::mesh(m));
         }
-        if let Some((name, hw, hh)) = self.hoop_spec() {
+        if let Some((name, hw, hh)) = self.hoop_spec(&d.sim) {
             let b = d.sim.bounds;
             let (cx, cy) = ((b[0] + b[2]) / 2.0, (b[1] + b[3]) / 2.0);
             let q = [[cx - hw / 2.0, cy - hh / 2.0], [cx + hw / 2.0, cy - hh / 2.0], [cx + hw / 2.0, cy + hh / 2.0], [cx - hw / 2.0, cy + hh / 2.0]];
@@ -1381,6 +1536,36 @@ impl App {
                 painter.add(Shape::mesh(m));
             }
         }
+    }
+
+    /// The puckering overlay as a grid laid through the same warp as the stitches.
+    fn draw_pucker(&self, painter: &egui::Painter, tf: impl Fn([f32; 2]) -> Pos2) {
+        let Some(p) = &self.pucker else { return };
+        if self.doc.as_ref().is_none_or(|d| d.path != p.path) {
+            return;
+        }
+        const N: usize = 40;
+        let [x0, y0, x1, y1] = p.rect;
+        let mut m = Mesh::with_texture(p.tex.id());
+        for j in 0..=N {
+            for i in 0..=N {
+                let (u, v) = (i as f32 / N as f32, j as f32 / N as f32);
+                m.vertices.push(egui::epaint::Vertex {
+                    pos: tf([x0 + (x1 - x0) * u, y1 - (y1 - y0) * v]),
+                    uv: Pos2::new(u, v),
+                    color: Color32::WHITE,
+                });
+            }
+        }
+        for j in 0..N as u32 {
+            for i in 0..N as u32 {
+                let a = j * (N as u32 + 1) + i;
+                let b = a + N as u32 + 1;
+                m.add_triangle(a, a + 1, b + 1);
+                m.add_triangle(a, b + 1, b);
+            }
+        }
+        painter.add(Shape::mesh(m));
     }
 
     fn to_world(&self, rect: Rect, p: Pos2) -> [f32; 2] {

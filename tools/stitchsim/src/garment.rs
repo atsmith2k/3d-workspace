@@ -2,12 +2,15 @@
 //! tote bag, at real size in mm (Y up, origin near the garment centre).
 //!
 //! Each garment is drawn once into an image on the CPU (parts filled in order, soft
-//! pillow shading toward the edges, gentle folds, seam grooves, topstitching, rivets
-//! and eyelets, a drop shadow) and shown as one textured quad. A small repeating
+//! pillow shading toward the edges, folds and grain from `drape`, seam grooves,
+//! topstitching, rivets, a drop shadow) and shown as one textured quad; the cap is ray
+//! cast three-quarter on by `drape::raster_cap`. A small repeating
 //! fabric tile (jersey knit, denim twill, cap twill, canvas) is laid over the garment
 //! outline as a mesh, so the weave stays crisp when zoomed in on the embroidery.
 
 use eframe::egui::{Color32, ColorImage};
+
+use crate::drape;
 
 type P = [f32; 2];
 
@@ -68,7 +71,7 @@ impl Article {
             Article::Plain => (0.0, 0.0, 0.0, "as designed"),
             Article::TShirt => (118.0, 190.0, 90.0, "left chest"),
             Article::Pants => (-112.0, 40.0, 80.0, "right thigh"),
-            Article::Cap => (0.0, 58.0, 90.0, "front centre"),
+            Article::Cap => (0.0, 50.0, 100.0, "front centre"),
             Article::Tote => (0.0, -10.0, 180.0, "front centre"),
         }
     }
@@ -81,6 +84,7 @@ pub struct Part {
 }
 
 pub struct Spec {
+    pub article: Article,
     pub parts: Vec<Part>,
     grooves: Vec<Vec<P>>,
     topstitch: Vec<Vec<P>>,
@@ -161,9 +165,6 @@ fn offset(c: &[P], d: f32) -> Vec<P> {
         .collect()
 }
 
-fn lerp_path(a: &[P], b: &[P], t: f32) -> Vec<P> {
-    a.iter().zip(b).map(|(p, q)| [p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t]).collect()
-}
 
 fn rect(x0: f32, y0: f32, x1: f32, y1: f32) -> Vec<P> {
     vec![[x0, y0], [x1, y0], [x1, y1], [x0, y1]]
@@ -176,7 +177,7 @@ fn part(poly: Vec<P>, shade: f32) -> Part {
 // ---------- the garments ----------
 
 pub fn spec(a: Article) -> Spec {
-    let mut s = Spec { parts: vec![], grooves: vec![], topstitch: vec![], thread: None, discs: vec![], bounds: [0.0; 4] };
+    let mut s = Spec { article: a, parts: vec![], grooves: vec![], topstitch: vec![], thread: None, discs: vec![], bounds: [0.0; 4] };
     match a {
         Article::Plain => {}
         Article::TShirt => {
@@ -255,39 +256,9 @@ pub fn spec(a: Article) -> Spec {
             s.discs.push(([0.0, 477.0], 7.0, [150, 150, 150])); // button
         }
         Article::Cap => {
-            let crown: Vec<P> = (0..=48)
-                .map(|i| {
-                    let th = std::f32::consts::PI * i as f32 / 48.0;
-                    let (c, sn) = (th.cos(), th.sin().max(0.0));
-                    [106.0 * c, 118.0 * sn.powf(0.9)]
-                })
-                .collect();
-            s.parts.push(part(crown, 1.0));
-            let brim_bottom = smooth(&[[-107.0, 2.0], [-102.0, -16.0], [-64.0, -36.0], [0.0, -44.0], [64.0, -36.0], [102.0, -16.0], [107.0, 2.0]], 6);
-            let brim_top = smooth(&[[107.0, 2.0], [60.0, -1.0], [0.0, -2.0], [-60.0, -1.0], [-107.0, 2.0]], 6);
-            let mut brim = brim_bottom.clone();
-            brim.extend(brim_top.iter().copied().skip(1));
-            s.parts.push(part(brim, 0.86));
-            let mut top_rev = brim_top.clone();
-            top_rev.reverse();
-            let n = brim_bottom.len().min(top_rev.len());
-            let (bb, tt): (Vec<P>, Vec<P>) = (resample(&brim_bottom, n), resample(&top_rev, n));
-            for f in [0.18, 0.34, 0.5, 0.66, 0.82] {
-                let row = lerp_path(&tt, &bb, f);
-                s.topstitch.push(row[2..row.len() - 2].to_vec()); // stop short of the brim edge
-            }
-            s.grooves.push(vec![[0.0, 0.0], [0.0, 117.0]]);
-            s.topstitch.push(vec![[-4.0, 2.0], [-4.0, 118.0]]);
-            s.topstitch.push(vec![[4.0, 2.0], [4.0, 118.0]]);
-            for sgn in [1.0f32, -1.0] {
-                let f = |p: P| [p[0] * sgn, p[1]];
-                let seam = smooth(&[f([70.0, 0.0]), f([60.0, 62.0]), f([24.0, 112.0])], 6);
-                s.topstitch.push(offset(&seam, 4.0 * sgn));
-                s.grooves.push(seam);
-                s.discs.push((f([56.0, 86.0]), 3.4, [20, 20, 20]));
-            }
-            s.discs.push(([0.0, 118.0], 8.0, [0, 0, 0])); // button: drawn in the cap colour
-            s.grooves.push(vec![[-106.0, 1.0], [106.0, 1.0]]);
+            // drawn in 3D by raster_cap; only its on-screen bounds are needed here
+            s.bounds = drape::cap_bounds();
+            return s;
         }
         Article::Tote => {
             s.parts.push(part(rect(-190.0, -220.0, 190.0, 200.0), 1.0));
@@ -314,22 +285,6 @@ pub fn spec(a: Article) -> Spec {
     s
 }
 
-fn resample(p: &[P], n: usize) -> Vec<P> {
-    let mut l = vec![0.0f32];
-    for w in p.windows(2) {
-        let d = ((w[1][0] - w[0][0]).powi(2) + (w[1][1] - w[0][1]).powi(2)).sqrt();
-        l.push(l.last().unwrap() + d);
-    }
-    let total = *l.last().unwrap();
-    (0..n)
-        .map(|i| {
-            let t = total * i as f32 / (n - 1).max(1) as f32;
-            let j = l.partition_point(|&v| v < t).clamp(1, p.len() - 1);
-            let f = ((t - l[j - 1]) / (l[j] - l[j - 1]).max(1e-6)).clamp(0.0, 1.0);
-            [p[j - 1][0] + (p[j][0] - p[j - 1][0]) * f, p[j - 1][1] + (p[j][1] - p[j - 1][1]) * f]
-        })
-        .collect()
-}
 
 // ---------- raster ----------
 
@@ -338,9 +293,12 @@ pub struct Image {
     pub rect: [f32; 4], // world mm covered by the image (x0, y0, x1, y1)
 }
 
-const SHADOW_MM: f32 = 40.0;
+pub const SHADOW_MM: f32 = 40.0;
 
 pub fn raster(s: &Spec, color: Color32) -> Image {
+    if s.article == Article::Cap {
+        return drape::raster_cap(color);
+    }
     let b = s.bounds;
     let (w_mm, h_mm) = (b[2] - b[0] + 2.0 * SHADOW_MM, b[3] - b[1] + 2.0 * SHADOW_MM);
     let ppm = (2048.0 / w_mm.max(h_mm)).min(8.0);
@@ -388,10 +346,7 @@ pub fn raster(s: &Spec, color: Color32) -> Image {
             let (mxm, mym) = (x as f32 / ppm + x0, y1 - y as f32 / ppm);
             let d = dist[i] / ppm;
             let edge = 1.0 - 0.30 * (-d / 7.0).exp();
-            let light = 1.0 + 0.05 * ((mym - b[1]) / (b[3] - b[1]).max(1.0) - 0.5) - 0.03 * ((mxm - b[0]) / (b[2] - b[0]).max(1.0) - 0.5);
-            // soft vertical drape, not blotches
-            let fold = 1.0 + 0.022 * (mxm * 0.019 + 0.8 * (mym * 0.008).sin()).sin();
-            let k = edge * light * fold;
+            let k = edge * drape::light(s.article, [mxm, mym]) * drape::grain(s.article.fabric(), mxm, mym);
             for ch in 0..3 {
                 rgb[i][ch] *= k;
             }
@@ -502,7 +457,7 @@ fn coverage(poly: &[P], w: usize, h: usize) -> Vec<f32> {
 }
 
 /// Distance (px) from each covered pixel to the uncovered region (3-4 chamfer).
-fn chamfer(cov: &[f32], w: usize, h: usize) -> Vec<f32> {
+pub fn chamfer(cov: &[f32], w: usize, h: usize) -> Vec<f32> {
     let big = 1e9f32;
     let mut d: Vec<f32> = cov.iter().map(|&c| if c > 0.5 { big } else { 0.0 }).collect();
     for y in 0..h {
@@ -540,7 +495,7 @@ fn chamfer(cov: &[f32], w: usize, h: usize) -> Vec<f32> {
     d
 }
 
-fn box_blur(m: &mut [f32], w: usize, h: usize, r: usize) {
+pub fn box_blur(m: &mut [f32], w: usize, h: usize, r: usize) {
     let mut tmp = vec![0.0f32; m.len()];
     let k = 1.0 / (2 * r + 1) as f32;
     for y in 0..h {
