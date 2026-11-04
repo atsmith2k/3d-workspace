@@ -11,8 +11,9 @@ Writes into output/embroidery/<name>/:
 
 The shop already knows `kind: "embroidery"` and shows hoop size, stitch count and
 thread colours from a product's attributes; the manifest carries those plus every file
-with its sha256. `sellable` wants every size to pass its checks with no warnings and
-no stitchsim problems, and the images, chart and notes present.
+with its sha256. `sellable` wants every size to pass its checks with no warnings
+(the build reads every format back and warns where one differs from the design), no
+stitchsim problems in any of the eight formats, and the images, chart and notes present.
 
 A design steers it with:
     SIZES = [("4x4", "4x4", 95.0), ("5x7", "5x7", 160.0)]   # label, hoop, longest side
@@ -20,6 +21,7 @@ A design steers it with:
                    mockups=["tshirt", "tote"], collection="...", sellable=None)
 """
 import hashlib
+import io
 import json
 import re
 import subprocess
@@ -179,16 +181,25 @@ def notes_text(m):
     L += ["", "Formats (every size)"]
     for f in m["formats"]:
         L.append(f"  .{f:<4} {MACHINES[f]}")
+    fab = m.get("fabric") or {}
+    if fab:
+        L += ["", f"Digitised for {fab['label']}: stitches are sewn longer to make up for the "
+                  f"fabric pulling in under the thread ({fab['name']} profile). "
+                  f"Recommended stabiliser: {fab['stabiliser']}."]
     L += ["", STABILISER, "",
-          "Each size was stitched out in simulation and checked: density under 3.5 thread layers, "
-          "no stitch over 7 mm, every jump trimmed, lock stitches at every cut.", "",
+          "Each size and every file format was checked before release: read back stitch by "
+          "stitch, its structure checked against what machines expect, sewn in simulation "
+          "(density under 3.5 thread layers, no stitch over 7 mm, every jump trimmed, lock "
+          "stitches at every cut, no doubled needle holes) and checked for gaps once the fabric "
+          "pulls in under the thread.", "",
           "Licence", "  " + m["license"], ""]
     return "\n".join(L)
 
 
 # ---------------------------------------------------------------- publish one design
 
-def publish(model_path, build_fn, load_model, parse_overrides, out_root, sim_exe, refresh=True):
+def publish(model_path, build_fn, load_model, parse_overrides, out_root, sim_exe, refresh=True,
+            require_calibration=False):
     """Build every size of a design, render, chart, zip and write the manifest."""
     path = Path(model_path)
     mod = load_model(path)
@@ -199,7 +210,7 @@ def publish(model_path, build_fn, load_model, parse_overrides, out_root, sim_exe
     out.mkdir(parents=True, exist_ok=True)
     reasons = []
     size_info, size_dirs, block_stitches = [], {}, {}
-    colors = None
+    colors, fabric, readiness_by_size = None, None, {}
     for label, hoop, mm in sizes:
         bname = f"{name}_{label}"
         args = SimpleNamespace(model=str(path), set=[f"size={mm}"], name=bname, out=str(out / "sizes"),
@@ -213,14 +224,34 @@ def publish(model_path, build_fn, load_model, parse_overrides, out_root, sim_exe
             data = json.loads((bdir / "build.json").read_text())
             rc = 0 if data.get("ok") else 1
         part = data["parts"][bname]
+        fabric = fabric or data.get("fabric")
         if rc != 0 or not data.get("ok"):
             reasons.append(f"{label}: build failed its checks")
         warn = [l for l in part["lines"] if l.startswith("WARNING")]
         if warn:
             reasons.append(f"{label}: {len(warn)} warning(s)")
-        nprob, probs = stitchsim_info(sim_exe, bdir / f"{bname}.pes") if sim_exe else (-1, [])
-        if nprob != 0:
-            reasons.append(f"{label}: stitchsim found {nprob} problem(s)" if nprob > 0 else f"{label}: stitchsim not run")
+        # the build's machine-readiness verdict (cadkit.stitch.verify): every format the
+        # buyer gets read back, checked structurally and by stitchsim, plus the design
+        rpath = bdir / "readiness.json"
+        ready = json.loads(rpath.read_text(encoding="utf-8")) if rpath.exists() else None
+        if ready is None:
+            reasons.append(f"{label}: no readiness verdict (rebuild)")
+            nprob = -1
+        else:
+            fmt_probs = {f: v["problems"] for f, v in ready["formats"].items()}
+            missing = [f for f in FORMATS if f not in fmt_probs]
+            if missing:
+                reasons.append(f"{label}: not built in {', '.join(missing)}")
+            nprob = sum(len(v) for v in fmt_probs.values())
+            if not ready["ready"]:
+                reasons.append(f"{label}: not machine-ready: " + "; ".join(ready["blockers"][:3])
+                               + (f" (+{len(ready['blockers']) - 3} more)" if len(ready["blockers"]) > 3 else ""))
+            if require_calibration and not ready["fabric"]["calibrated"]:
+                reasons.append(f"{label}: fabric profile {ready['fabric']['name']} not calibrated")
+            readiness_by_size[label] = dict(ready=ready["ready"], fabric=ready["fabric"],
+                                            formats_checked=sorted(fmt_probs),
+                                            checked_by=next(iter(ready["formats"].values()))["checked"]
+                                            if ready["formats"] else [])
         plan_lines = {l.split()[0]: l for l in part["lines"]}
         sew = re.search(r"sew time ~(\d+) min", " ".join(part["lines"]))
         w, h = part["size"]
@@ -267,7 +298,9 @@ def publish(model_path, build_fn, load_model, parse_overrides, out_root, sim_exe
             hoop_size=" / ".join(f"{s['label']} ({s['size_mm'][0]:.0f} x {s['size_mm'][1]:.0f} mm)" for s in size_info),
             stitch_count=" / ".join(f"{s['stitches']:,}" for s in size_info),
             thread_colors=len(rows), formats=[f.upper() for f in FORMATS] + ["SVG"],
-            sizes=[s["label"] for s in size_info]),
+            sizes=[s["label"] for s in size_info],
+            fabric=(fabric or {}).get("label")),
+        fabric=fabric, readiness=readiness_by_size,
         license=license_text,
         shop=dict(price_usd=product.get("price_usd", 3.99), commercial_price_usd=product.get("commercial_price_usd", 12.99),
                   collection_id="embroidery", price_note="suggested; confirm before publishing",
@@ -356,9 +389,16 @@ def bundle(collection, title, out_root, members, price_usd=19.99, commercial_pri
     with zipfile.ZipFile(zpath, "w", zipfile.ZIP_STORED) as z:
         z.write(contents, f"{collection}/README.txt")
         z.write(cover_path, f"{collection}/{cover_path.name}")
+        # each member's own zip minus its 1600 px product shot (~1.8 MB each; the cover shows
+        # them): 104 Game Day designs came to 229 MB, over the shop's 200 MB upload limit
         for m in ms:
             mz = Path(out_root) / m["name"] / f"{m['slug']}.zip"
-            z.write(mz, f"{collection}/{mz.name}")
+            buf = io.BytesIO()
+            with zipfile.ZipFile(mz) as src, zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as dst:
+                for info in src.infolist():
+                    if not info.filename.endswith("_product.png"):
+                        dst.writestr(info, src.read(info), zipfile.ZIP_DEFLATED)
+            z.writestr(f"{collection}/{mz.name}", buf.getvalue())
     reasons = [f"{m['name']}: not sellable ({'; '.join(m['reasons'])})" for m in ms if not m["sellable"]]
     bm = dict(schema=SCHEMA, kind="embroidery", bundle=True, name=collection, slug=collection + "-bundle",
               title=f"{title}: {len(ms)} Embroidery Designs Bundle", summary=blurb.split("\n")[0] if blurb else "",

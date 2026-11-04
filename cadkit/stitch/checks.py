@@ -15,7 +15,8 @@ from . import shapes as S
 from .design import HOOPS
 
 __all__ = ["size", "hoop", "stitches", "colors", "max_density", "long_stitches",
-           "short_stitches", "min_feature", "trims", "jump_threads", "coverage", "custom",
+           "short_stitches", "min_feature", "trims", "jump_threads", "coverage", "lettering",
+           "stray_stitches", "custom",
            "check_results", "format_check", "run_checks", "density_grid", "thin_features",
            "coverage_gaps"]
 
@@ -198,11 +199,14 @@ def _thread(draw, pts, width):
         draw.line([tuple(a), tuple(b)], fill=255, width=max(1, int(np.ceil(width * k))))
 
 
-def coverage_gaps(plan, design, inset=0.35, spread=SPREAD):
+def coverage_gaps(plan, design, inset=0.35, spread=SPREAD, joins=False):
     """[(element name, gap mm2, (x, y))]: the largest patch of each fill or satin that no
     stitch of its colour covers (a sewn row covers `spread` mm; the outer `inset` mm is
     ignored, pull and the border take that). Bare fabric inside a shape is a break in
-    a border, a hole between fill sections or rows pulled apart."""
+    a border, a hole between fill sections or rows pulled apart. `joins` also checks
+    the whole design's area against any thread ("design (joins)"): where neighbouring
+    elements meet, each may stop inside its own inset, and only the union shows
+    whether the fabric between them is covered."""
     from PIL import Image, ImageDraw
     from scipy import ndimage
     from shapely import contains_xy
@@ -280,6 +284,8 @@ def coverage_gaps(plan, design, inset=0.35, spread=SPREAD):
         slots = u.buffer(CLOSE_GAP).buffer(-CLOSE_GAP).difference(u).intersection(holes).difference(own)
         if not slots.is_empty:
             whole = [("design (between elements)", None, slots.buffer(inset))]
+        if joins:
+            whole.append(("design (joins)", None, u))
     out = []
     for name, color, area in areas + whole:
         if color is not None and color not in sewn:
@@ -331,3 +337,102 @@ def coverage(max_mm2=1.0, between_mm2=None):
         bad.sort(key=lambda g: -g[1])
         return False, "; ".join(f"{n} {a:.1f} mm2 at ({x:.0f},{y:.0f})" for n, a, (x, y) in bad[:4])
     return Check("coverage", fn)
+
+
+FILL_CAP_MIN = 6.0      # mm; filled lettering below this loses its counters (bold sans)
+
+
+def small_lettering(design, min_cap=FILL_CAP_MIN):
+    """[(element name, cap height mm)] of filled lettering (d.text) under `min_cap`:
+    pull closes the counters and the strokes fall under 1 mm. Satin lettering reads
+    down to ~4 mm caps (Ink/Stitch's lettering tool, not d.text)."""
+    return [(el.name, el.params["cap_mm"]) for el in design.elements
+            if el.kind == "fill" and el.params.get("cap_mm", 99) < min_cap]
+
+
+def lettering(min_cap=FILL_CAP_MIN):
+    """Filled lettering (d.text) at least `min_cap` mm tall."""
+    def fn(c):
+        bad = small_lettering(c.design, min_cap)
+        return not bad, ("; ".join(f"{n} {h:.1f} mm" for n, h in bad[:4]) if bad
+                         else f"no filled lettering under {min_cap} mm")
+    return Check("lettering", fn)
+
+
+def stray_stitches(plan, design, margin=0.8, min_mm=2.0):
+    """[(colour block, exposed mm, (x, y))]: thread sewn outside every shape of its own
+    colour and not covered by anything sewn later (travel dragged across a finished
+    area, an engine routing a move over the top). Moves buried under later stitching
+    (design.hide_jumps_mm) and short connectors inside `margin` mm of the colour's own
+    shapes are fine. One entry per block whose longest exposed stretch is over
+    `min_mm`."""
+    from PIL import Image, ImageDraw
+    from scipy import ndimage
+    from shapely import contains_xy
+    from shapely.ops import unary_union
+    bx0, by0, bx1, by1 = design.bounds()
+    px0, py0, px1, py1 = plan.bounds
+    off = np.array([(px0 + px1 - bx0 - bx1) / 2, (py0 + py1 - by0 - by1) / 2])
+    W, H = int((bx1 - bx0 + 6) * PX), int((by1 - by0 + 6) * PX)
+    ox, oy = bx0 - 3, by0 - 3
+
+    def pix(p):
+        p = np.asarray(p) - off
+        return list(zip((p[:, 0] - ox) * PX, (H - (p[:, 1] - oy) * PX)))
+    # each colour's own ground: its fills and satins, its runs as a band
+    own = {}
+    for el in design.elements:
+        a = _area_of(el)
+        if a is None:
+            from shapely.geometry import LineString
+            a = LineString(el.geom).buffer(0.5)
+        own.setdefault(el.color, []).append(a.buffer(margin + (el.params.get("pull") or 0.0)))
+    xs = ox + (np.arange(W) + 0.5) / PX
+    ys = oy + (H - np.arange(H) - 0.5) / PX
+    gx, gy = np.meshgrid(xs, ys)
+    own_mask = {c: contains_xy(unary_union(g), gx, gy) for c, g in own.items()}
+    # what everything sewn after each block covers
+    by_block = {}
+    for block, run in plan.runs:
+        im = by_block.setdefault(block, Image.new("L", (W, H), 0))
+        if len(run) > 1:
+            _thread(ImageDraw.Draw(im), pix(run), SPREAD * PX)
+    nb = len(plan.colors)
+    later, acc = {}, np.zeros((H, W), bool)
+    for blk in range(nb - 1, -1, -1):
+        later[blk] = acc.copy()
+        if blk in by_block:
+            acc |= np.asarray(by_block[blk]) > 0
+    out = []
+    for blk in range(nb):
+        color = plan.colors[blk]
+        if color not in own_mask:
+            continue                      # a block the design doesn't describe: skip
+        stray = Image.new("L", (W, H), 0)
+        dr = ImageDraw.Draw(stray)
+        for b, run in plan.runs:
+            if b == blk and len(run) > 1:
+                _thread(dr, pix(run), 2)
+        m = (np.asarray(stray) > 0) & ~own_mask[color] & ~later[blk]
+        lab, n = ndimage.label(m, structure=np.ones((3, 3)))
+        if not n:
+            continue
+        # longest exposed stretch, by the diagonal of each piece's extent
+        best, at = 0.0, (0.0, 0.0)
+        for sl in ndimage.find_objects(lab):
+            h, w = (sl[0].stop - sl[0].start) / PX, (sl[1].stop - sl[1].start) / PX
+            d = float(np.hypot(h, w))
+            if d > best:
+                best = d
+                at = (float(gx[sl][0, 0]), float(gy[sl][0, 0]))
+        if best > min_mm:
+            out.append((blk, best, at))
+    return out
+
+
+def stray_check(min_mm=2.0):
+    def fn(c):
+        bad = stray_stitches(c.plan, c.design, min_mm=min_mm)
+        return not bad, ("; ".join(f"block {b + 1} {mm:.1f} mm at ({x:.0f},{y:.0f})" for b, mm, (x, y) in bad[:4])
+                         if bad else f"no exposed thread outside its shapes over {min_mm} mm")
+    return Check("stray_stitches", fn)

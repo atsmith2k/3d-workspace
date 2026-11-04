@@ -48,6 +48,10 @@ embroidery), creates a personal and a commercial product per design, and uploads
 - **Every deploy of the shop empties its files** (stopgap storage inside the release folder
   on the VM). After any deploy of `main`, re-run the publish with `--apply`; it is idempotent
   and keeps the same URLs. Don't add new storage without the user (it needs SSH to the VM).
+- The shop's file upload takes **200 MB at most** (`413 payload_too_large`; a 502 with an empty
+  body can be the same thing at the proxy). Bundle zips leave out each member's product shot
+  for this reason (Game Day States, 104 designs, came to 229 MB with them). Rebuild bundles
+  (`cad stitch bundle`) after re-publishing their designs, or they ship the old member zips.
 - Never press the panel's "Create database": it replaces `DATABASE_URL` with an empty one
   at once.
 - The Etsy shop carries molds and clay cutters only; don't claim embroidery there.

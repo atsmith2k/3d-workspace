@@ -9,8 +9,11 @@ is the judgement that goes with them.
 
 - Every `check` line PASS, no WARNING lines, at **every** size you ship (4x4 and 5x7 are the
   usual pair; each size is re-stitched, never scaled).
-- `cad stitch sim <pes> --info` reports `problems 0` (no long or tiny stitch runs, density
-  over 3.5, needle pile-ups, untrimmed jumps, missing tie-ins/offs, hoop overflow).
+- `cad stitch sim <file> --info` reports `problems 0` on **every format shipped**, not just
+  the PES (no long or tiny stitch runs, doubled stitches, density over 3.5, needle
+  pile-ups, untrimmed jumps, missing tie-ins/offs, hoop overflow). Until 2026-11-03 only
+  the PES was checked, and DST/EXP/XXX/U01/JEF went out with uncut jumps and VP3 with
+  moves sewn as 60 mm stitches: the PES writer had been cutting jumps the pattern left bare.
 - You looked at the preview sheet **and** a stitchsim realistic render, and it reads at
   actual size. At 100 mm a 0.5 mm detail is invisible; a dark line is the strongest detail
   you have.
@@ -76,11 +79,12 @@ climbs past 3.5 where three layers meet.
 
 ## Machine efficiency
 
-- Trims are the expensive part of sew time (about 8 s each here). The PES/DST writers trim
-  **every** jump, so: the SVG asks Ink/Stitch for lock stitches only where the thread is
+- Trims are the expensive part of sew time (about 8 s each here). Every jump that stays a
+  jump is cut (`pattern.prepare` adds the TRIM for formats whose writers don't), so: the SVG asks Ink/Stitch for lock stitches only where the thread is
   cut; `pattern.sew_short_jumps` sews jumps up to 3 mm as travel (raise it with
-  `design.sew_jumps_mm`, 8 for many touching fur patches) and locks both ends of every jump
-  that stays; `design.hide_jumps_mm` buries longer same-colour travel under later stitching.
+  `design.sew_jumps_mm`, 8 for many touching fur patches); `pattern.tie_cuts` adds a tie
+  wherever a run end between cuts does not read as tied to stitchsim;
+  `design.hide_jumps_mm` buries longer same-colour travel under later stitching.
 - Design for few trims: chain same-colour pieces nearest-first, and lay a piece sewn later
   over the gaps (one plate under all the letters instead of an outline per letter took Game
   Day from 30-47 trims to 8-15).
@@ -100,7 +104,14 @@ climbs past 3.5 where three layers meet.
   Ink/Stitch's own parameter names (`fill_underlay_row_spacing_mm`, not `underlay_spacing`).
   `expand_mm` made coverage worse on fur pieces; don't reach for it.
 - Its default half-stitch locks are ~0.2 mm and get merged away by the 0.4 mm minimum stitch
-  length; the SVG uses triangle locks at 1 mm.
+  length; the SVG uses triangle locks at 1 mm. Even those sometimes start two stitches in or
+  close 0.2 mm off (stitchsim: no tie-in). `tie_cuts` fills those in, judging "tied" by
+  stitchsim's lenient `locked` rule and refusing tie forms that stack. Sewing the machine
+  files from an untied copy and tying every cut ourselves was tried: it piled 8
+  penetrations where several runs end together (wreath veins, badge borders), so don't.
+- A fill stretched for pull compensation as one shape grew its knockout-separated pieces back
+  together through thin necks under the rules, and auto-fill sewed almost none of it (tarot
+  card faces, 620 mm2 bare): stretch each piece on its own.
 
 ## Artifacts that looked like defects
 

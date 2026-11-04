@@ -240,7 +240,9 @@ is how they validate and digitise by hand).
    `--screenshot out.png --at 0.5` for a frame you can read without a window, or
    `--info` for its stats (they match pyembroidery's; `tests/test_stitch.py` checks).
    `--realistic --article tshirt|pants|cap|tote` stages a realistic render on a garment
-   (the viewer also has these as a "Realistic" toggle and a "Stage on" panel).
+   (folds, fabric grain, puckering; the cap three-quarter on with the design wrapped
+   round its crown; the viewer also has these as a "Realistic" toggle and a "Stage on"
+   panel).
    The viewer also flags problem areas (long / tiny stitches, density over 3.5, needle
    pile-ups, untrimmed jumps, missing tie-ins/offs, hoop overflow); `--info` lists
    them, so run `cad stitch sim <file> --info` on files the user brings in. `cad stitch inspect file.pes`
@@ -251,8 +253,8 @@ is how they validate and digitise by hand).
 
 Selling a design: `cad stitch publish designs/<name>.py` builds every size in
 `SIZES` (label, hoop, longest side: re-stitched per size, never a scaled file) in eight
-formats (PES PEC DST JEF EXP VP3 XXX U01), checks each with stitchsim (`problems 0`
-required), renders `<name>_product.png` (realistic, plain fabric) and garment mockups
+formats (PES PEC DST JEF EXP VP3 XXX U01), checks every one of them with stitchsim
+(`problems 0` required in each, not just the PES), renders `<name>_product.png` (realistic, plain fabric) and garment mockups
 (`PRODUCT["mockups"]`), a thread chart, buyer notes, `<slug>.zip` (one folder per size)
 and `manifest.json` (schema `cadkit-embroidery/1`, `kind: "embroidery"`, attributes
 `hoop_size`, `stitch_count`, `thread_colors`, `formats` for the shop's spec band, suggested
@@ -262,6 +264,30 @@ zip of member zips, `bundle_of`) from every design whose `PRODUCT["collection"]`
 The shop's `publish-models.mts` only ingests 3D models today; embroidery needs its own
 ingest step (and `--archive-pdfs` there would archive non-model products).
 
+Machine readiness (no test sew-out per design; `docs/agents/stitch-reliability-roadmap.md`):
+- **Fabric profile**: `FABRIC = "apparel"` (default; also woven, twill, knit, fleece,
+  towel; `cadkit/stitch/fabrics.py`, `--fabric` on build) sets every element's pull
+  compensation unless it passes `pull=` itself. Satins get it per side by width; fills
+  get it in the shape (`fabrics.stretch` along the rows: Ink/Stitch 3.0 ignores fill
+  pull compensation). The values are Wilcom's guidelines until calibrated.
+- **Registration**: the build moves every stitch where the fabric's pull puts it
+  (`fabrics.predict`) and re-runs coverage, joins between elements included; a gap that
+  only opens once sewn is a `WARNING registration` line (overlap more: tuck/knockout).
+- **Stray thread** (`checks.stray_stitches`): thread over 3 mm sewn outside every shape of
+  its colour and not covered later is a `WARNING stray` line. **Lettering**: `d.text`
+  under 6 mm is a `WARNING lettering` line.
+- **Readiness** (`cadkit/stitch/verify.py`): every build writes `readiness.json` and a
+  `ready YES/NO` line: each format read back against the design, checked by
+  `cadkit/stitch/validate.py` (decoders and header checks written from the format specs,
+  sharing no code with pyembroidery) and by stitchsim, plus the design's checks and
+  warnings. `publish` sells only ready sizes (`--require-calibration` also wants a
+  calibrated profile). `cad stitch verify designs/<name>.py` re-checks built folders.
+- **Calibration**: build `designs/calibration_card.py`, sew that PES once per machine +
+  fabric + stabiliser, photograph it flat from above, then
+  `cad stitch calibrate photo.jpg --fabric knit --machine "Brother PE800" --stabiliser cut-away`
+  (`--dry-run` first) writes `cadkit/stitch/profiles/knit.json`; every later build of that
+  profile uses the measured pull and says so.
+
 Collections: `designs/_fall.py` is the pattern (Harvest Hollow): one palette of exact
 Brother threads shared by every design, `fit(d, size, hoop)` to draw once in a 100 mm
 nominal space and rebuild per size (wide designs may use a hoop's long side: machines
@@ -269,6 +295,16 @@ rotate 90 deg, the hoop check accepts it and the buyer notes say so), and
 `standard_checks()`. Reusable shapes are in `cadkit/stitch/motifs.py`: `maple_leaf`
 (+ `maple_sectors`, `maple_veins`), `oak_leaf`, `leaf`, `acorn`, `pumpkin`, `wheat`,
 `petal_ring`, `tendril`, `spiral`, `scallop`, `dots`, `blade`.
+
+Lettering we own: `cadkit/stitch/lettering.py` `block_text("TEXAS", cap, stroke, tracking)`
+is a squared athletic block alphabet (A-Z . ' -) drawn for embroidery, so a design needs
+no third-party font licence and copies no school's typeface. `designs/_gameday.py` (Game
+Day States) is the worked example: state or city name arched over a public-domain state
+outline (`designs/_states.py`, Census boundaries), letters on one connected satin-edged
+plate with a drop shadow, colourways named by colour only. Collegiate-style designs use
+only state and city names: no school names, initials, nicknames, mascots, marks or school
+wordmark styles, and no school or conference names in titles or tags (colour + school
+references can infringe without any logo).
 
 Digitising rules the checks enforce or the preview shows:
 - Sewing order = the order elements are added: background fills first, details on top,
@@ -309,11 +345,27 @@ Digitising rules the checks enforce or the preview shows:
   texture (a change of stitch direction reads as a change of shade in thread): 4 fur
   tones in ~10 mm patches looked like the 8-tone version at 30 % fewer stitches.
   `designs/grizzly_salmon.py` is the worked example.
-- Machine efficiency: the SVG writer asks Ink/Stitch for lock stitches only where the
-  thread is cut; the PES/DST writers trim every jump, so `pattern.sew_short_jumps` sews
+- Machine efficiency: every jump that stays is cut, so `pattern.sew_short_jumps` sews
   jumps up to 3 mm (or `design.sew_jumps_mm`, e.g. 8 for many touching fur patches) as
-  travel and locks both ends of the jumps that stay. Run `cad stitch sim <file> --info`
-  after a build: it flags missing tie-ins/offs and needle pile-ups.
+  travel. Ties: the SVG asks Ink/Stitch for locks only where the thread is cut, and
+  `pattern.tie_cuts` then checks every run end by stitchsim's own rules and adds a tie
+  (0.4-0.8 mm inside the first/last stitch) only where none reads as tied, choosing a
+  form that does not stack onto what is there (Ink/Stitch's triangle tie sometimes
+  starts late or doesn't close). Run `cad stitch sim <file> --info` after a build:
+  it flags missing tie-ins/offs, stacked locks and needle pile-ups.
+- Every format must sew the same thing: `pattern.prepare` (run by `write_all`) puts an
+  explicit TRIM before every jump that leaves sewn thread (only the PES/PEC writers cut
+  jumps by themselves; VP3 has no jump and would sew the move as one long stitch), drops
+  doubled penetrations, snaps to 0.1 mm (the VP3 writer drifts on fractional points) and
+  sets the machine label. The build then reads every written file back
+  (`pattern.verify_files`) and warns, failing the build, where a format differs from the
+  design: colours, size, sewn length, stitches over 12.1 mm, untrimmed jumps, doubles.
+- Buried travel: `design.hide_jumps_mm = 40` sews same-colour jumps as travel when a path
+  between the two pieces lies under stitching sewn later in the same or a darker colour
+  (a dark thread under a light fill shows through); `pattern.sew_hidden_jumps` finds that
+  path (straight, else routed through covered ground) and keeps the trim otherwise.
+  Design for it: lay pieces sewn later over the gaps (one plate under all the letters
+  instead of an outline per letter took Game Day from 30-47 trims to 8-15).
 - `d.satin(..., taper=True)` for columns that come to a point on purpose (claws, thorns,
   leaf tips): min_feature then only needs the body to be 1 mm wide.
 - PES is written as version 6 so exact RGB travels; DST carries no colours, JEF snaps to

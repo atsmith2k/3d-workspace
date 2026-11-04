@@ -57,6 +57,60 @@ def test_colour_changes_and_trims_round_trip(tmp_path):
     assert back.colors[0] == "#c8102e"               # PES v6 keeps the exact RGB
 
 
+def bare_jump_pattern():
+    """Two colours; the first in two pieces joined by a bare 30 mm jump, as Ink/Stitch
+    leaves them (the PES writer cuts it, the other writers would not)."""
+    pat = native.build_pattern(square_design())
+    st, out, done = pat.stitches, [], False
+    for x, y, c in st:
+        if not done and (c & pe.COMMAND_MASK) == pe.TRIM:
+            done = True                         # the cut between the pieces: make it bare
+            continue
+        out.append((x, y, c))
+    pat.stitches = out
+    pat2 = native.build_pattern(square_design())
+    first = [s for s in pat2.stitches if (s[2] & pe.COMMAND_MASK) == pe.STITCH][:40]
+    i = next(k for k, s in enumerate(out) if (s[2] & pe.COMMAND_MASK) == pe.COLOR_CHANGE)
+    pat.stitches = (out[:i] + [(first[0][0] + 300, first[0][1], pe.JUMP)]
+                    + [(x + 300, y, pe.STITCH) for x, y, _ in first] + out[i:])
+    return pat
+
+
+def test_prepare_cuts_jumps_and_drops_doubles():
+    pat = pe.EmbPattern()
+    pat.add_thread(pe.EmbThread("#ff0000"))
+    for x, y in [(0, 0), (20.4, 0), (20.4, 0), (40, 0)]:             # a doubled point, floats
+        pat.add_stitch_absolute(pe.STITCH, x, y)
+    pat.add_stitch_absolute(pe.JUMP, 400, 0)                          # leaves sewn thread: cut
+    for x in (400, 420):
+        pat.add_stitch_absolute(pe.STITCH, x, 0)
+    pat.add_command(pe.END)
+    trims, dups = P.prepare(pat, "Mountain badge #2!")
+    assert (trims, dups) == (1, 1)
+    cmds = [c & pe.COMMAND_MASK for *_, c in pat.stitches]
+    assert cmds.index(pe.TRIM) == cmds.index(pe.JUMP) - 1
+    assert all(float(x).is_integer() and float(y).is_integer() for x, y, _ in pat.stitches)
+    assert pat.extras["name"] == "Mountainbadge2"
+
+
+def test_every_format_sews_what_the_design_says(tmp_path):
+    """All eight shipped formats read back with the design's colours, size and path,
+    every jump cut, no move written as a long stitch and no doubled penetration."""
+    pat = bare_jump_pattern()
+    assert any(not t for *_, t in P.plan_of(pat).jumps)
+    formats = ("pes", "pec", "dst", "jef", "exp", "vp3", "xxx", "u01")
+    written = P.write_all(pat, tmp_path / "two", formats)
+    ref = P.plan_of(pat)
+    assert P.verify_files(written, ref) == {f: [] for f in formats}
+
+
+def test_verify_files_catches_a_bare_jump(tmp_path):
+    pat = bare_jump_pattern()
+    pe.write(pat, str(tmp_path / "raw.exp"))                         # no prepare: jump stays bare
+    probs = P.verify_files({"exp": tmp_path / "raw.exp"}, P.plan_of(pat))["exp"]
+    assert any("untrimmed" in p for p in probs), probs
+
+
 def test_plan_reader_counts_jumps_and_trims():
     pat = pe.EmbPattern()
     pat.add_thread(pe.EmbThread("#ff0000"))
@@ -195,7 +249,7 @@ def test_inkstitch_sews_ring_border_cleanly(tmp_path):
 
 
 @pytest.mark.skipif(cli.sim_binary(build=False) is None, reason="stitchsim not built")
-@pytest.mark.parametrize("fmt", ["pes", "dst", "exp", "jef"])
+@pytest.mark.parametrize("fmt", ["pes", "dst", "exp", "jef", "vp3", "xxx", "u01", "pec"])
 def test_stitchsim_reads_what_we_write(tmp_path, fmt):
     """The Rust simulator decodes every format we write the same way pyembroidery does."""
     import subprocess
@@ -250,7 +304,9 @@ def bad_pattern():
 def test_stitchsim_flags_problems(tmp_path):
     import subprocess
     exe = str(cli.sim_binary(build=False))
-    bad = P.write_all(bad_pattern(), tmp_path / "bad", ("pes",))["pes"]
+    # written raw: write_all would tie the cuts this pattern leaves bare on purpose
+    bad = tmp_path / "bad.pes"
+    pe.write(bad_pattern(), str(bad), P.WRITE_SETTINGS["pes"])
     info = subprocess.run([exe, "--info", str(bad)], capture_output=True, text=True, check=True).stdout
     for kind in ("stitch too long", "far too dense", "tiny stitches", "needle pile-up", "no tie-off", "no tie-in"):
         assert kind in info, (kind, info)
@@ -292,3 +348,121 @@ def test_motifs_are_valid_shapes():
     for s in shapes:
         assert s.is_valid and not s.is_empty and s.area > 1
     assert abs(sum(s.area for _, s in M.maple_sectors(60)) - M.maple_leaf(60).area) < 1.0
+
+
+def test_block_lettering_has_every_capital():
+    from cadkit.stitch.lettering import block_text
+    for ch in "ABCDEFGHIJKLMNOPQRSTUVWXYZ.'-":
+        g = block_text(ch, 10)
+        assert g.is_valid and not g.is_empty and g.area > 3, ch
+    word = block_text("TEXAS", 10, tracking=2.2)
+    assert len(list(getattr(word, "geoms", [word]))) == 5       # letters never touch
+    x0, y0, x1, y1 = block_text("OHIO", 12).bounds
+    assert abs(y1 - y0 - 12) < 0.01
+
+
+def test_hidden_jumps_are_buried_only_under_later_stitching():
+    def pattern(cover):
+        p = pe.EmbPattern()
+        p.add_thread(pe.EmbThread("#c8102e"))
+        for x in range(0, 31):                         # a run, then a 20 mm jump
+            p.add_stitch_absolute(pe.STITCH, x * 10, 0)
+        p.add_stitch_absolute(pe.JUMP, 500, 0)
+        for x in range(50, 81):
+            p.add_stitch_absolute(pe.STITCH, x * 10, 0)
+        if cover:                                      # rows over the jump, sewn after it
+            for r in range(-10, 11, 4):
+                p.add_stitch_absolute(pe.STITCH, 0, r)
+                p.add_stitch_absolute(pe.STITCH, 800, r)
+        p.add_stitch_absolute(pe.END, 0, 0)
+        return p
+    covered, bare = pattern(True), pattern(False)
+    assert P.sew_hidden_jumps(covered, 30) == 1
+    assert not any((c & pe.COMMAND_MASK) == pe.JUMP for _, _, c in covered.stitches)
+    assert P.sew_hidden_jumps(bare, 30) == 0
+
+
+def abutting_fills(pull=None):
+    """Two fills that just touch along x = 0, rows running across the join."""
+    d = Design()
+    d.fill(rect(20, 20, -10, 0), "#c8102e", angle=0, underlay=False, pull=pull)
+    d.fill(rect(20, 20, 10, 0), "#1f5fbf", angle=0, underlay=False, pull=pull)
+    return d
+
+
+def test_fabric_profile_sets_compensation():
+    from cadkit.stitch import fabrics as F
+    d = Design()
+    d.fill(rect(20, 20), "#c8102e")
+    d.satin(np.array([[0, 0], [30, 0]]), 4.0, "navy")
+    d.satin(np.array([[0, 5], [30, 5]]), 4.0, "navy", pull=0.05)          # its own: kept
+    F.apply(d, F.profile("knit"))
+    assert d.elements[0].params["pull"] == 0.35
+    assert d.elements[1].params["pull"] == 0.35
+    assert d.elements[2].params["pull"] == 0.05
+    # fill compensation is in the geometry: rows sewn 0.35 mm longer at both ends
+    pat = native.build_pattern(abutting_fills(pull=0.35))
+    w = P.plan_of(pat).size[0]
+    assert 40.5 < w < 41.0, w
+
+
+def test_pull_model_moves_satin_edges_and_row_ends():
+    from cadkit.stitch import fabrics as F
+    prof = F.profile("knit")
+    zig = np.array([[x * 0.4, 4.0 * (x % 2)] for x in range(40)])         # a 4 mm satin
+    out = F.displace(zig, prof)
+    assert abs(np.ptp(out[5:-5, 1]) - (4.0 - 2 * 0.35)) < 0.02
+    rows = np.array([[0, 0], [3, 0], [6, 0], [9, 0], [9, 0.4], [6, 0.4], [3, 0.4], [0, 0.4]])
+    out = F.displace(rows, prof)
+    assert abs(out[3, 0] - (9 - 0.35)) < 1e-6 and abs(out[4, 0] - (9 - 0.35)) < 1e-6
+    assert np.allclose(out[1:3], rows[1:3])                               # mid-row stays
+
+
+def test_registration_flags_fills_that_part_once_sewn():
+    from cadkit.stitch import fabrics as F
+    prof = F.profile("fleece")              # 0.4 mm a side: a 0.35 mm line of fabric opens
+    raw = abutting_fills(pull=0.0)
+    gaps = cli.registration_gaps(P.plan_of(native.build_pattern(raw)), raw, prof)
+    assert gaps and gaps[0][1] > 5, gaps
+    comp = F.apply(abutting_fills(), prof)
+    assert cli.registration_gaps(P.plan_of(native.build_pattern(comp)), comp, prof) == []
+
+
+def test_stray_thread_across_another_colour_is_flagged():
+    d = Design()
+    d.fill(rect(10, 10, 0, 0), "#1f5fbf", angle=0)        # sewn first, in the middle
+    d.fill(rect(10, 10, -15, 0), "#c8102e", angle=0)
+    d.fill(rect(10, 10, 15, 0), "#c8102e", angle=0)
+    plan = P.plan_of(native.build_pattern(d))
+    assert C.stray_stitches(plan, d) == []
+    # the red pieces joined by travel straight over the finished blue square
+    red = [i for i, (b, _) in enumerate(plan.runs) if b == 1]
+    a, b = plan.runs[red[0]][1], plan.runs[red[-1]][1]
+    travel = np.linspace(a[-1], b[0], 12)[1:-1]
+    plan.runs[red[0]] = (1, np.vstack([a, travel, b]))
+    del plan.runs[red[-1]]
+    bad = C.stray_stitches(plan, d)
+    assert bad and bad[0][0] == 1 and bad[0][1] > 8, bad
+
+
+def test_small_filled_lettering_is_flagged():
+    d = Design()
+    d.text("ABC", 4.0, "navy")
+    assert C.small_lettering(d) == [("text ABC", 4.0)]
+    assert C.small_lettering(d.scaled(2.0)) == []                         # 8 mm once scaled
+
+
+@pytest.mark.skipif(engines.find_inkstitch() is None or cli.sim_binary(build=False) is None,
+                    reason="needs Ink/Stitch and stitchsim")
+@pytest.mark.parametrize("model", ["monogram_patch", "indiana_state", "gameday_banner_colorado_gold_black"])
+def test_release_gate_passes_reference_designs(model, tmp_path):
+    """The whole release gate on designs that span the techniques (lettering, a map
+    border over a tucked fill, block letters on a plate with buried travel): every one
+    of the eight formats ready, the design's checks and warnings clean."""
+    args = SimpleNamespace(model=str(ROOT / "designs" / f"{model}.py"), set=[], name=None,
+                           out=str(tmp_path), engine="inkstitch", hoop=None,
+                           formats="pes,pec,dst,jef,exp,vp3,xxx,u01", no_render=True, compare=False)
+    assert cli.cmd_build(args) == 0, args.build_data["parts"][model]["lines"]
+    ready = __import__("json").loads((tmp_path / model / "readiness.json").read_text())
+    assert ready["ready"], ready["blockers"]
+    assert sorted(ready["formats"]) == sorted(args.formats.split(","))

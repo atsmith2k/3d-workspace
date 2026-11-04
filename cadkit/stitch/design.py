@@ -28,6 +28,8 @@ HOOPS = {
 DEFAULT_HOOP = "4x4"
 
 # Defaults tuned for 40 wt polyester on a medium woven with tear-away/cut-away stabiliser.
+# Pull compensation comes from the design's fabric profile (fabrics.apply) unless an
+# element sets `pull=` itself.
 FILL = dict(angle=45.0, spacing=0.40, stitch=3.0, underlay=True, underlay_spacing=2.0,
             underlay_inset=0.5, staggers=4, method="auto_fill", pull=0.0)
 SATIN = dict(spacing=0.40, pull=0.20, underlay="auto")
@@ -44,6 +46,7 @@ class Element:
     trim_after: bool = False
     ink: dict = field(default_factory=dict)
     area: object = None           # fabric it must cover, when not plain geom (satin rings)
+    fixed: frozenset = frozenset()  # params the script set itself (a fabric profile leaves them)
 
     @property
     def bounds(self):
@@ -61,28 +64,38 @@ class Design:
         # trimmed (the PES writer trims every jump); 3 mm by default when writing, more
         # for designs whose same-colour pieces sit close (fur patches)
         self.sew_jumps_mm = None
+        # same-colour jumps up to this many mm whose whole path is covered by stitching
+        # sewn later are sewn as buried travel instead (no trim, no locks)
+        self.hide_jumps_mm = None
+        # fabric profile name (cadkit.stitch.fabrics); the build applies its pull
+        # compensation. None: the module's FABRIC, else fabrics.DEFAULT
+        self.fabric = None
 
-    def _add(self, kind, geom, color, params, name, trim_after, ink):
+    def _add(self, kind, geom, color, params, name, trim_after, ink, fixed=()):
         el = Element(kind, geom, resolve_color(color), params,
-                     name or f"{kind} {len(self.elements) + 1}", trim_after, ink)
+                     name or f"{kind} {len(self.elements) + 1}", trim_after, ink,
+                     fixed=frozenset(fixed))
         self.elements.append(el)
         return el
 
     def fill(self, shape, color, angle=None, spacing=None, stitch=None, underlay=None,
-             method=None, name="", trim_after=False, **ink):
+             method=None, name="", trim_after=False, pull=None, **ink):
         """Tatami fill of a shapely shape (holes kept). `angle` of the rows in degrees,
         `spacing` row spacing mm (0.4 normal, 0.3 dense, 0.5+ light), `stitch` max
         stitch length mm, `underlay` True/False, `method` an Ink/Stitch fill method
-        (auto_fill, contour_fill, guided_fill, meander_fill, circular_fill)."""
+        (auto_fill, contour_fill, guided_fill, meander_fill, circular_fill), `pull`
+        compensation mm at each row end (default: the fabric profile's)."""
         shape = shape.buffer(0) if not shape.is_valid else shape
         if shape.is_empty:
             raise ValueError(f"fill '{name}' has an empty shape")
         p = dict(FILL)
-        for k, v in dict(angle=angle, spacing=spacing, stitch=stitch, underlay=underlay,
-                         method=method).items():
+        given = dict(angle=angle, spacing=spacing, stitch=stitch, underlay=underlay,
+                     method=method, pull=pull)
+        for k, v in given.items():
             if v is not None:
                 p[k] = v
-        return self._add("fill", shape, color, p, name, trim_after, ink)
+        return self._add("fill", shape, color, p, name, trim_after, ink,
+                         [k for k, v in given.items() if v is not None])
 
     def satin(self, path, width, color, spacing=None, pull=None, underlay=None, name="",
               trim_after=False, taper=False, **ink):
@@ -103,7 +116,8 @@ class Design:
             p.update(closed=True, rungs=[])           # a ring: no start/end seam
         if taper:
             p.update(taper=True, width_body=float(np.median(w)))
-        return self._add("satin", (left, right), color, p, name, trim_after, ink)
+        return self._add("satin", (left, right), color, p, name, trim_after, ink,
+                         ["pull"] if pull is not None else [])
 
     def satin_rails(self, left, right, color, spacing=None, pull=None, underlay=None,
                     name="", trim_after=False, **ink):
@@ -117,7 +131,8 @@ class Design:
         for k, v in dict(spacing=spacing, pull=pull, underlay=underlay).items():
             if v is not None:
                 p[k] = v
-        return self._add("satin", (left, right), color, p, name, trim_after, ink)
+        return self._add("satin", (left, right), color, p, name, trim_after, ink,
+                         ["pull"] if pull is not None else [])
 
     def run(self, path, color, length=None, repeats=None, bean=None, name="",
             trim_after=False, **ink):
@@ -162,8 +177,10 @@ class Design:
         """Filled lettering, cap height `size` mm, centred on (x, y). Keep size >= 6 mm
         for fills; smaller lettering loses its counters."""
         shape = S.move(S.text_shape(string, size, font=font, bold=bold), x, y)
-        return self.fill(shape, color, angle=angle if angle is not None else 90 - 15,
-                         spacing=spacing, name=name or f"text {string}", **kw)
+        el = self.fill(shape, color, angle=angle if angle is not None else 90 - 15,
+                       spacing=spacing, name=name or f"text {string}", **kw)
+        el.params["cap_mm"] = float(size)          # the build checks lettering legibility
+        return el
 
     def scaled(self, k, dx=0.0, dy=0.0):
         """A copy at k times the size then moved by (dx, dy), stitches regenerated (not a resized stitch file):
@@ -179,13 +196,18 @@ class Design:
             else:
                 geom = el.geom * k + (dx, dy)
             params = dict(el.params)
+            if "cap_mm" in params:
+                params["cap_mm"] = params["cap_mm"] * k
             if el.kind == "satin":
                 params["width"] = params["width"] * k
                 params["width_min"] = params["width_min"] * k
-            new = Element(el.kind, geom, el.color, params, el.name, el.trim_after, dict(el.ink))
+            new = Element(el.kind, geom, el.color, params, el.name, el.trim_after, dict(el.ink),
+                          fixed=el.fixed)
             if el.area is not None:
                 new.area = affinity.translate(affinity.scale(el.area, k, k, origin=(0, 0)), dx, dy)
             out.elements.append(new)
+        out.sew_jumps_mm, out.hide_jumps_mm = self.sew_jumps_mm, self.hide_jumps_mm
+        out.fabric = self.fabric
         return out
 
     # ---------- summaries ----------

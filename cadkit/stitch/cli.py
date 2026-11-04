@@ -18,7 +18,7 @@ import numpy as np
 
 from .. import outputs
 from . import checks as C
-from . import engines, pattern as P
+from . import engines, fabrics as F, pattern as P, verify as V
 from .design import DEFAULT_HOOP, HOOPS
 from .render import render_sheet
 from .threads import thread_label
@@ -88,6 +88,10 @@ def cmd_build(args):
     if hoop_name not in HOOPS:
         sys.exit(f"unknown hoop '{hoop_name}'; known: {', '.join(HOOPS)}")
     design.hoop = hoop_name
+    # the fabric profile sets every element's pull compensation (unless it set its own)
+    prof = F.profile(getattr(args, "fabric", None) or getattr(mod, "FABRIC", None)
+                     or design.fabric or F.DEFAULT)
+    F.apply(design, prof)
     svg_path = out / f"{name}.svg"
     svg_path.write_text(to_svg(design, title=name), encoding="utf-8")
     print(f"designed {name}: {len(design.elements)} elements in {time.time() - t0:.1f}s -> {svg_path.name}")
@@ -111,8 +115,17 @@ def cmd_build(args):
               f"{'checked' if plan is back else 're-read'}: {formats[0]} "
               f"({back.penetrations:,} stitches, {rw:.1f} x {rh:.1f} mm, {len(back.colors)} colours)")
 
+    # every file the user gets must sew what the design says, not just the first one
+    ref_plan = P.plan_of(pat)
+    file_probs = P.verify_files(written, ref_plan)
+    reread += "; read back: " + ("all match" if not any(file_probs.values()) else
+                                 ", ".join(f for f, v in file_probs.items() if v) + " differ")
+
     hoop_wh = HOOPS[hoop_name]
     lines, warns, fits = plan_lines(plan, density, hoop_name, hoop_wh, engine)
+    for fmt, probs in file_probs.items():
+        warns += [f"WARNING {fmt}: {pr}" for pr in probs]
+    fits = fits and not any(file_probs.values())
     if abs(rw - engine_plan.size[0]) > 1.0 or abs(rh - engine_plan.size[1]) > 1.0:
         warns.append(f"WARNING {formats[0]} re-read size {rw:.1f} x {rh:.1f} differs from the "
                      f"engine's {engine_plan.size[0]:.1f} x {engine_plan.size[1]:.1f}")
@@ -128,6 +141,23 @@ def cmd_build(args):
     for nm, area, (x, y) in [g for g in gaps if g[1] > 1.0 and not g[0].startswith("design (between")][:5]:
         warns.append(f"WARNING bare: {nm} leaves {area:.1f} mm2 of fabric showing near "
                      f"({x:.0f}, {y:.0f}): a break in a border or between fill sections")
+    # registration: the same coverage test on where the stitches land once the fabric
+    # pulls in; a gap that only opens then is an overlap too small for this fabric
+    sat = sorted(p for _, p in prof["pull_satin"])
+    lines.append(f"fabric   {prof['name']} ({prof['label']}): pull fill {prof['pull_fill']:.2f}, satin "
+                 f"{sat[0]:.2f}-{sat[-1]:.2f} mm per side; {prof['source']}")
+    reg = registration_gaps(plan, design, prof)
+    worst_reg = max((g[1] for g in reg), default=0.0)
+    lines.append(f"registration largest new gap once sewn {worst_reg:.1f} mm2 ({prof['name']} pull)")
+    for nm, area, (x, y) in reg[:5]:
+        warns.append(f"WARNING registration: {nm} opens {area:.1f} mm2 of fabric near ({x:.0f}, {y:.0f}) "
+                     f"once {prof['name']} pulls in: overlap the neighbours more (tuck/knockout)")
+    for nm, cap in C.small_lettering(design):
+        warns.append(f"WARNING lettering: {nm} is {cap:.1f} mm tall; filled lettering needs "
+                     f"{C.FILL_CAP_MIN:.0f} mm or it closes up (use satin lettering, or make it bigger)")
+    for blk, mm, (x, y) in C.stray_stitches(plan, design, min_mm=STRAY_MM):
+        warns.append(f"WARNING stray: colour {blk + 1} leaves {mm:.1f} mm of thread exposed outside its "
+                     f"shapes near ({x:.0f}, {y:.0f}): travel sewn over a finished area; trim it or reroute")
     ctx = SimpleNamespace(plan=plan, design=design, params=ns, hoop=(hoop_name, hoop_wh),
                           density=density, name=name)
     spec = mod.checks(ns) if callable(getattr(mod, "checks", None)) else getattr(mod, "CHECKS", [])
@@ -135,7 +165,14 @@ def cmd_build(args):
     check_lines = [C.format_check(r) for r in results]
 
     lines += [f"thread {i + 1}  {c}  {thread_label(c)}" for i, c in enumerate(plan.colors)]
-    report = lines + [reread] + check_lines + [f"note     {n}" for n in notes] + warns
+    # the release verdict: every file through the read-back, the independent structure
+    # check and stitchsim, plus the design's checks and warnings (cadkit.stitch.verify)
+    file_warn = tuple(f"WARNING {f}:" for f in written)
+    ready = V.readiness(written, ref_plan, results, [w for w in warns if not w.startswith(file_warn)],
+                        prof, sim_binary(build=False))
+    V.save(ready, out)
+    report = (lines + [reread] + check_lines + [f"note     {n}" for n in notes] + warns
+              + V.lines_of(ready))
     ok = fits and all(r["ok"] for r in results)
     print()
     for line in report:
@@ -158,6 +195,9 @@ def cmd_build(args):
         design=str(path.relative_to(ROOT).as_posix() if path.is_relative_to(ROOT) else path),
         design_sha256=outputs.sha256(path), description=getattr(mod, "DESCRIPTION", "").strip(),
         params=p, hoop=hoop_name, engine=engine, ok=bool(ok), header_lines=header,
+        fabric=dict(name=prof["name"], label=prof["label"], stabiliser=prof["stabiliser"],
+                    calibrated=prof["calibrated"], source=prof["source"]),
+        ready=ready["ready"], blockers=ready["blockers"],
         parts={name: dict(lines=report, checks=results,
                           stitches=plan.penetrations, colors=plan.colors,
                           size=[round(v, 2) for v in plan.size], trims=plan.trims,
@@ -170,6 +210,20 @@ def cmd_build(args):
     args.build_data, args.plan = build, plan
     print(f"\n  {'OK' if ok else 'FAILED'}  {out.relative_to(ROOT).as_posix() if out.is_relative_to(ROOT) else out}")
     return 0 if ok else 1
+
+
+STRAY_MM = 3.0      # exposed stray thread longer than this is a visible defect
+
+
+def registration_gaps(plan, design, prof, over=1.0, grows=0.5):
+    """[(element, mm2, (x, y))]: bare patches over `over` mm2 that open (or grow by
+    more than `grows` mm2) once the stitches are displaced by the fabric's pull."""
+    ideal = {}
+    for nm, a, _ in C.coverage_gaps(plan, design, joins=True):
+        ideal[nm] = max(ideal.get(nm, 0.0), a)
+    out = [g for g in C.coverage_gaps(F.predict(plan, prof), design, joins=True)
+           if g[1] > over and g[1] > ideal.get(g[0], 0.0) + grows]
+    return sorted(out, key=lambda g: -g[1])
 
 
 def _compare(design, svg_path, used, plan):
@@ -273,7 +327,8 @@ def cmd_publish(args):
     rc = 0
     for model in args.models:
         m = PUB.publish(model, cmd_build, load_model, parse_overrides, Path(args.out or OUT), exe,
-                        refresh=not args.no_refresh)
+                        refresh=not args.no_refresh,
+                        require_calibration=args.require_calibration)
         state = "SELLABLE" if m["sellable"] else "NOT sellable: " + "; ".join(m["reasons"])
         print(f"\n  {m['title']}  [{state}]")
         for s in m["sizes"]:
@@ -284,7 +339,8 @@ def cmd_publish(args):
 
 
 def cmd_bundle(args):
-    """A bundle product from every published design in a collection."""
+    """A bundle product from every published design in a collection, or listing the
+    bundle's name in PRODUCT["bundles"] (a style or theme within a collection)."""
     from ..__main__ import load_model
     from . import publish as PUB
     members = []
@@ -292,7 +348,7 @@ def cmd_bundle(args):
         if path.name.startswith("_"):
             continue
         prod = getattr(load_model(path), "PRODUCT", {}) or {}
-        if prod.get("collection") == args.collection:
+        if prod.get("collection") == args.collection or args.collection in prod.get("bundles", ()):
             members.append(path.stem)
     if not members:
         sys.exit(f"no designs with PRODUCT collection '{args.collection}'")
@@ -320,6 +376,7 @@ def add_parser(sub):
     b.add_argument("--no-render", action="store_true")
     b.add_argument("--compare", action="store_true", help="also stitch with the other engine and compare")
     b.add_argument("--detail", metavar="X,Y", help="centre of the preview detail tile, mm (default: densest spot)")
+    b.add_argument("--fabric", choices=F.names(), help="fabric profile (default: the design's FABRIC, else apparel)")
     i = ss.add_parser("inspect", help="stats and preview of any stitch file (PES, DST, JEF, EXP, VP3...)")
     i.add_argument("file")
     i.add_argument("--hoop", default=DEFAULT_HOOP, choices=list(HOOPS))
@@ -332,6 +389,8 @@ def add_parser(sub):
     pb.add_argument("models", nargs="+")
     pb.add_argument("--out")
     pb.add_argument("--no-refresh", action="store_true", help="reuse existing size builds")
+    pb.add_argument("--require-calibration", action="store_true",
+                    help="not sellable unless the fabric profile was calibrated from a sewn card")
     bd = ss.add_parser("bundle", help="a bundle product from a collection's published designs")
     bd.add_argument("collection")
     bd.add_argument("--title")
@@ -339,6 +398,13 @@ def add_parser(sub):
     bd.add_argument("--price", type=float, default=19.99)
     bd.add_argument("--commercial-price", type=float, default=59.99)
     bd.add_argument("--out")
+    vf = ss.add_parser("verify", help="machine readiness of built designs: every format read back, "
+                                      "independent structure check, stitchsim, design checks")
+    vf.add_argument("targets", nargs="+", help="designs/<name>.py or output folders")
+    vf.add_argument("--out", help="output root (default output/embroidery/)")
+    from . import calibrate
+    c = ss.add_parser("calibrate", help="fit a fabric profile's pull from a photo of the sewn calibration card")
+    calibrate.add_arguments(c)
     m = ss.add_parser("sim", help="watch a stitch file (or a design's PES) sew in the stitchsim viewer")
     m.add_argument("file", help="PES/PEC/DST/EXP/JEF file, or designs/<name>.py")
     m.add_argument("--info", action="store_true", help="print the simulator's stats instead of opening it")
@@ -347,6 +413,36 @@ def add_parser(sub):
     return st
 
 
+def cmd_verify(args):
+    """Re-check built folders (a design's output, or every size of a published one)."""
+    sim = sim_binary(build=False)
+    bad = 0
+    for target in args.targets:
+        t = Path(target)
+        if t.suffix == ".py":
+            t = Path(args.out or OUT) / t.stem
+        dirs = sorted(d for d in (t / "sizes").glob("*") if (d / "build.json").exists()) if (t / "sizes").exists() else [t]
+        for d in dirs:
+            if not (d / "build.json").exists():
+                print(f"  {d}: not built")
+                bad += 1
+                continue
+            r = V.verify_dir(d, sim)
+            V.save(r, d)
+            print()
+            print(f"  {d.name}")
+            for line in V.lines_of(r):
+                print("    " + line)
+            bad += not r["ready"]
+    return 1 if bad else 0
+
+
 def run(args):
     return dict(build=cmd_build, inspect=cmd_inspect, new=cmd_new, list=cmd_list,
-                sim=cmd_sim, publish=cmd_publish, bundle=cmd_bundle)[args.stitch_cmd](args)
+                sim=cmd_sim, publish=cmd_publish, bundle=cmd_bundle,
+                verify=cmd_verify, calibrate=_calibrate)[args.stitch_cmd](args)
+
+
+def _calibrate(args):
+    from . import calibrate
+    return calibrate.cmd_calibrate(args)

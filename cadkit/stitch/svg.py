@@ -10,9 +10,11 @@ from xml.sax.saxutils import escape
 
 import numpy as np
 from shapely.geometry import LineString, MultiLineString, Polygon
+from shapely import shortest_line
 
 from . import shapes as S
 from .design import HOOPS, DEFAULT_HOOP
+from .fabrics import stretch
 
 NS = ('xmlns="http://www.w3.org/2000/svg" '
       'xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape" '
@@ -49,8 +51,8 @@ def ink_params(el, trim=None):
                  fill_underlay_angle=(p["angle"] + 90) % 180,
                  fill_underlay_row_spacing_mm=p["underlay_spacing"],
                  fill_underlay_inset_mm=p["underlay_inset"])
-        if p.get("pull"):
-            a["pull_compensation_mm"] = p["pull"]
+        # fill pull compensation is in the shape itself (sew_parts stretches it along
+        # the rows): Ink/Stitch 3.0 ignores pull_compensation_mm on fills
     elif el.kind == "satin":
         u = satin_underlay(p["width"], p["underlay"])
         a = dict(satin_column="True", zigzag_spacing_mm=p["spacing"],
@@ -90,10 +92,18 @@ def sew_parts(design):
         if el.kind == "fill":
             # holes under 2 mm2 close up when sewn anyway, and Ink/Stitch's auto-fill can
             # fail on them: fill them in
-            parts += [(el, Polygon(poly.exterior, [r for r in poly.interiors if Polygon(r).area >= 2.0]))
-                      for poly in S.polygons_of(el.geom)]
+            # pull compensation: rows sewn longer at both ends (fabrics.stretch), each
+            # piece on its own: pieces a knockout split apart (a card face cut by the
+            # rules sewn over it) must not grow back together through thin necks, which
+            # Ink/Stitch's auto-fill gives up on
+            pull = el.params.get("pull") or 0.0
+            for piece in S.polygons_of(el.geom):
+                for poly in S.polygons_of(stretch(piece, el.params["angle"], pull)):
+                    parts.append((el, Polygon(poly.exterior, [r for r in poly.interiors if Polygon(r).area >= 2.0])))
         else:
             parts.append((el, el.geom))
+    hide = getattr(design, "hide_jumps_mm", None)
+    later = _later_cover(parts) if hide else None
     out = []
     for i, (el, g) in enumerate(parts):
         last_of_el = i + 1 == len(parts) or parts[i + 1][0] is not el
@@ -101,10 +111,32 @@ def sew_parts(design):
             trim = el.trim_after
         else:
             nel, ng = parts[i + 1]
-            far = _geom_of(el, g).distance(_geom_of(nel, ng)) > TRIM_GAP
+            a, b = _geom_of(el, g), _geom_of(nel, ng)
+            far = a.distance(b) > TRIM_GAP
+            if far and hide and nel.color == el.color and not el.trim_after:
+                # leave the move untrimmed when it might be buried under stitching sewn
+                # later; pattern.sew_hidden_jumps routes it, or trims it after all
+                far = shortest_line(a, b).length > hide or not later[i + 1].buffer(0.6).intersects(b)
             trim = far or nel.color != el.color or (last_of_el and el.trim_after)
         out.append((el, g, bool(trim)))
     return out
+
+
+def _later_cover(parts):
+    """later[i]: what parts i.. (sewn from part i on) cover, shrunk 0.4 mm."""
+    foot = []
+    for el, g in parts:
+        if el.kind == "fill":
+            foot.append(g)
+        elif getattr(el, "area", None) is not None:
+            foot.append(el.area)
+        else:
+            foot.append(_geom_of(el, g).buffer(0.3))
+    later, acc = [None] * len(parts), Polygon()
+    for i in range(len(parts) - 1, -1, -1):
+        acc = acc.union(foot[i])
+        later[i] = acc.buffer(-0.4)
+    return later
 
 
 def _ring_halves(geom, rungs):

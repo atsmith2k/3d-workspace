@@ -15,6 +15,7 @@ from shapely.geometry import LineString, Point
 from shapely.ops import substring
 
 from . import shapes as S
+from .fabrics import stretch
 from .svg import satin_underlay
 from .threads import nearest_brother
 
@@ -205,7 +206,7 @@ def fill(shape, p, start=None):
         if not u.is_empty:
             runs += _fill_pass(u, p["underlay_spacing"], 3.0, 1, p["angle"] + 90, start)
     start = runs[-1][-1] if runs else start
-    top = shape.buffer(p["pull"]) if p.get("pull") else shape
+    top = stretch(shape, p["angle"], p.get("pull") or 0.0)   # pull compensation along the rows
     return _join(runs + _fill_pass(top, p["spacing"], p["stitch"], p["staggers"], p["angle"], start),
                  shape)
 

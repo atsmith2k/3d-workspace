@@ -101,5 +101,14 @@ def stitch(design, svg_path, engine="auto"):
             notes.append(f"{n} jumps of up to {reach:g} mm sewn as travel stitches (design.sew_jumps_mm)")
         if err:
             notes += [f"inkstitch: {line}" for line in err.splitlines()[-5:] if line.strip()]
-        return pat, f"inkstitch {inkstitch_version()}", notes
-    return native.build_pattern(design), "native", notes
+        return _hide(design, pat, notes), f"inkstitch {inkstitch_version()}", notes
+    return _hide(design, native.build_pattern(design), notes), "native", notes
+
+
+def _hide(design, pat, notes):
+    reach = getattr(design, "hide_jumps_mm", None)
+    if reach:
+        from .pattern import sew_hidden_jumps
+        n = sew_hidden_jumps(pat, reach)
+        notes.append(f"{n} jumps of up to {reach:g} mm under later stitching sewn as buried travel (design.hide_jumps_mm)")
+    return pat
