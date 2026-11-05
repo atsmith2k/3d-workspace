@@ -3387,5 +3387,157 @@
         "checks_ok": true
       }
     }
+  },
+  "espresso_cup_slip_cast_master": {
+    "model": "slip_cast_master.py",
+    "set": [
+      "piece=espresso_cup"
+    ],
+    "parts": {
+      "espresso_cup_slip_cast_master-master": {
+        "size": [
+          137.8,
+          137.8,
+          95.2
+        ],
+        "volume_cm3": 394.0,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "espresso_cup_slip_cast_master-cottle": {
+        "size": [
+          131.8,
+          131.8,
+          117.2
+        ],
+        "volume_cm3": 114.0,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      }
+    }
+  },
+  "fluted_tumbler_slip_cast_master": {
+    "model": "slip_cast_master.py",
+    "set": [
+      "piece=fluted_tumbler"
+    ],
+    "parts": {
+      "fluted_tumbler_slip_cast_master-master": {
+        "size": [
+          155.9,
+          155.9,
+          140.6
+        ],
+        "volume_cm3": 807.1,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "fluted_tumbler_slip_cast_master-cottle": {
+        "size": [
+          149.9,
+          149.9,
+          162.6
+        ],
+        "volume_cm3": 180.4,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      }
+    }
+  },
+  "fluted_planter_slip_cast_master": {
+    "model": "slip_cast_master.py",
+    "set": [
+      "piece=fluted_planter"
+    ],
+    "parts": {
+      "fluted_planter_slip_cast_master-master": {
+        "size": [
+          175.2,
+          175.2,
+          123.6
+        ],
+        "volume_cm3": 1050.0,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "fluted_planter_slip_cast_master-cottle": {
+        "size": [
+          169.2,
+          169.2,
+          145.6
+        ],
+        "volume_cm3": 182.6,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      }
+    }
+  },
+  "bubble_candle_mold_kit": {
+    "model": "candle_master_mold.py",
+    "set": [
+      "style=bubble",
+      "candle=cube_candle"
+    ],
+    "parts": {
+      "bubble_candle_mold_kit-master": {
+        "size": [
+          108.2,
+          108.2,
+          76.3
+        ],
+        "volume_cm3": 241.2,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "bubble_candle_mold_kit-housing": {
+        "size": [
+          102.2,
+          102.2,
+          72.8
+        ],
+        "volume_cm3": 54.6,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      }
+    }
+  },
+  "twisted_taper_candle_mold_kit": {
+    "model": "candle_master_mold.py",
+    "set": [
+      "style=twisted_taper",
+      "candle=candle"
+    ],
+    "parts": {
+      "twisted_taper_candle_mold_kit-master": {
+        "size": [
+          53.5,
+          53.5,
+          167.5
+        ],
+        "volume_cm3": 44.0,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "twisted_taper_candle_mold_kit-housing": {
+        "size": [
+          47.5,
+          47.5,
+          164.0
+        ],
+        "volume_cm3": 55.6,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      }
+    }
   }
 }
