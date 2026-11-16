@@ -3330,5 +3330,162 @@
         "checks_ok": true
       }
     }
+  },
+  "star_of_david_mold_master": {
+    "model": "star_of_david_mold_master.py",
+    "set": [],
+    "parts": {
+      "star_of_david_mold_master": {
+        "size": [
+          115.3,
+          128.5,
+          33.4
+        ],
+        "volume_cm3": 174.7,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      }
+    }
+  },
+  "dreidel_candle_mold_master": {
+    "model": "dreidel_candle_mold_master.py",
+    "set": [],
+    "parts": {
+      "dreidel_candle_mold_master-half_a": {
+        "size": [
+          72.6,
+          98.7,
+          36.3
+        ],
+        "volume_cm3": 84.3,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "dreidel_candle_mold_master-half_b": {
+        "size": [
+          72.6,
+          98.7,
+          36.3
+        ],
+        "volume_cm3": 84.9,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      }
+    }
+  },
+  "gift_box_candle_mold_master": {
+    "model": "gift_box_candle_mold_master.py",
+    "set": [],
+    "parts": {
+      "gift_box_candle_mold_master-top": {
+        "size": [
+          116.3,
+          116.3,
+          47.5
+        ],
+        "volume_cm3": 234.1,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "gift_box_candle_mold_master-bottom": {
+        "size": [
+          117.3,
+          117.3,
+          63.2
+        ],
+        "volume_cm3": 464.5,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      }
+    }
+  },
+  "fluted_candle_jar_mold_master": {
+    "model": "fluted_candle_jar_mold_master.py",
+    "set": [],
+    "parts": {
+      "fluted_candle_jar_mold_master-jar": {
+        "size": [
+          125.6,
+          125.6,
+          91.8
+        ],
+        "volume_cm3": 689.8,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "fluted_candle_jar_mold_master-core": {
+        "size": [
+          125.6,
+          125.6,
+          84.9
+        ],
+        "volume_cm3": 432.2,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "fluted_candle_jar_mold_master-lid": {
+        "size": [
+          127.6,
+          127.6,
+          25.9
+        ],
+        "volume_cm3": 111.4,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "fluted_candle_jar_mold_master-collar": {
+        "size": [
+          127.6,
+          127.6,
+          5.0
+        ],
+        "volume_cm3": 37.4,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      }
+    }
+  },
+  "nutcracker_candle_holder_mold_master": {
+    "model": "nutcracker_candle_holder_mold_master.py",
+    "set": [],
+    "parts": {
+      "nutcracker_candle_holder_mold_master": {
+        "size": [
+          51.0,
+          38.1,
+          152.0
+        ],
+        "volume_cm3": 121.2,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      }
+    }
+  },
+  "snowflake_snap_bar_master": {
+    "model": "snowflake_snap_bar_master.py",
+    "set": [],
+    "parts": {
+      "snowflake_snap_bar_master": {
+        "size": [
+          122.8,
+          71.8,
+          20.7
+        ],
+        "volume_cm3": 100.4,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      }
+    }
   }
 }
