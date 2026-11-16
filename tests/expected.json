@@ -3330,5 +3330,62 @@
         "checks_ok": true
       }
     }
+  },
+  "cat_coaster_mold_head": {
+    "model": "cat_coaster_mold.py",
+    "set": [
+      "style=head"
+    ],
+    "parts": {
+      "cat_coaster_mold_head": {
+        "size": [
+          106.7,
+          101.7,
+          14.0
+        ],
+        "volume_cm3": 46.7,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      }
+    }
+  },
+  "cat_coaster_mold_paw": {
+    "model": "cat_coaster_mold.py",
+    "set": [
+      "style=paw"
+    ],
+    "parts": {
+      "cat_coaster_mold_paw": {
+        "size": [
+          106.7,
+          106.7,
+          14.0
+        ],
+        "volume_cm3": 44.2,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      }
+    }
+  },
+  "cat_coaster_mold_moon": {
+    "model": "cat_coaster_mold.py",
+    "set": [
+      "style=moon"
+    ],
+    "parts": {
+      "cat_coaster_mold_moon": {
+        "size": [
+          106.7,
+          106.7,
+          14.0
+        ],
+        "volume_cm3": 42.3,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      }
+    }
   }
 }
