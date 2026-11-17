@@ -291,6 +291,7 @@ def compose_manifest(out, build, slices, info, printers=None, git=None, generate
             print_time_s=s.get("print_time_s"), print_time_text=s.get("print_time_text"),
             layers=s.get("layers"), filament_g=s.get("filament_g"), filament_m=s.get("filament_m"),
             file=s.get("file"),
+            **({"overrides": s["overrides"]} if s.get("overrides") else {}),
         ))
     files = collect_files(out, name, build.get("parts", {}), supported)
     by_kind = {f.get("kind"): f["path"] for f in files if f["role"] == "png"}
@@ -416,6 +417,14 @@ def print_notes_text(m):
               + "; infill " + (", ".join(f"{v:g}%" for v in infill) or "15%")
               + "; supports " + sup,
               "  orientation:  " + (m.get("spec", {}).get("orientation") or "as supplied, flat base on the bed")]
+    process = next((s["overrides"] for s in slices if s.get("overrides")), None)
+    if process:
+        nice = {"seam_position": "seam", "seam_slope_type": "scarf seam",
+                "support_on_build_plate_only": "supports on build plate only"}
+        lines.append("  settings:     " + "; ".join(
+            f"{nice.get(k, k)}: {v}" if k != "support_on_build_plate_only" else nice[k]
+            for k, v in process.items() if not (k == "support_on_build_plate_only" and str(v) in ("0", "False")))
+            + " (already set in the supplied 3MF projects)")
     parts = m.get("parts", [])
     if len(parts) == 1:
         lines.append("  size:         " + _size_text(parts[0].get("size_mm"), parts[0].get("size_in")))

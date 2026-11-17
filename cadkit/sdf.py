@@ -247,7 +247,7 @@ def lattice_fill(f, cell=10.0, wall=1.6, skin=2.0, lattice=gyroid):
 
 # ---------------------------------------------------------------- output
 
-def build_sdf(f, bounds, edge=0.5, level=0.0, flat_bottom=True):
+def build_sdf(f, bounds, edge=0.5, level=0.0, flat_bottom=True, snap=False):
     """Mesh the solid where f > level. `bounds` = (xmin, ymin, zmin, xmax, ymax, zmax)
     or ((xmin, ymin, zmin), (xmax, ymax, zmax)); `edge` is the grid spacing in mm.
     Returns a manifold3d.Manifold, which the model can return directly or combine
@@ -256,7 +256,9 @@ def build_sdf(f, bounds, edge=0.5, level=0.0, flat_bottom=True):
     The level set rounds sharp edges by about edge/2. With `flat_bottom` (and bounds
     that reach below z=0) the result is trimmed flat at z=0 afterwards, so a part that
     sits on the bed keeps a crisp bottom edge instead of a tiny chamfer the overhang
-    check would flag."""
+    check would flag. `snap=True` moves every vertex onto the exact surface of f
+    afterwards (smooth curved skins instead of faint mottled facets; f must be
+    vectorised and roughly distance-like near the surface)."""
     if len(bounds) == 2:
         bounds = (*bounds[0], *bounds[1])
     edge = float(edge)
@@ -283,10 +285,38 @@ def build_sdf(f, bounds, edge=0.5, level=0.0, flat_bottom=True):
                            edge, float(level))
     if m.is_empty():
         raise ValueError("SDF produced no solid inside the bounds; check signs (positive = inside) and bounds")
+    if snap and "G" in dir():
+        fz = (lambda x, y, z: f(x, y, np.maximum(z, 2 * edge))) if trim else f
+        m = _snap(m, fz, float(level), edge)
     if trim:
         span = hi - lo
         m = m ^ Manifold.cube([span[0], span[1], hi[2] + 1]).translate([lo[0], lo[1], 0.0])
     return m
+
+
+def _snap(m, f, level, edge, iters=3):
+    """Move every vertex onto the true level set of f (Newton steps along the numerical
+    gradient). level_set places vertices on a trilinear interpolation of the grid, which
+    leaves them up to ~edge/10 off a curved surface: visible as mottled facets."""
+    from manifold3d import Mesh
+    mesh = m.to_mesh()
+    v = np.array(mesh.vert_properties[:, :3], float)
+    h = edge * 0.05
+    for _ in range(iters):
+        x, y, z = v.T
+        d = f(x, y, z) - level
+        g = np.stack([(f(x + h, y, z) - f(x - h, y, z)),
+                      (f(x, y + h, z) - f(x, y - h, z)),
+                      (f(x, y, z + h) - f(x, y, z - h))], 1) / (2 * h)
+        g2 = np.maximum((g * g).sum(1), 1e-12)
+        step = (d / g2)[:, None] * g
+        n = np.linalg.norm(step, axis=1)
+        step *= np.minimum(1.0, 0.5 * edge / np.maximum(n, 1e-12))[:, None]  # never jump a cell
+        v -= step
+    props = np.array(mesh.vert_properties, np.float32)
+    props[:, :3] = v
+    return Manifold(Mesh(vert_properties=np.ascontiguousarray(props),
+                         tri_verts=np.ascontiguousarray(mesh.tri_verts, np.uint32)))
 
 
 def _trilinear(G, lo, edge):

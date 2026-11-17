@@ -107,6 +107,8 @@ Run from the repo root. Windows: `cad ...`; macOS/Linux/Git Bash: `./cad ...`
 | `cad measure models/<name>.py --probe 10,5,2 --hole 10,5` | Is a point inside? how thick there? hole diameter? |
 | `cad build ... --sweep thickness=2,3,4` | Build every value and write one comparison sheet |
 | `cad trace logo.png --width 60` | Trace an image to an SVG outline (plus a preview) for use in a model |
+| `cad litho new photo.jpg --width 100 --shape arc` | Photo to lithophane model (flat, arc or cylinder lamp shade; oval, heart, hexagon outlines), built with a simulated backlit view |
+| `cad litho calibrate wedge.jpg` | Measure your filament's light transmittance from a photo of `models/lithophane_calibration.py` |
 | `cad lint models/<name>.py` | Static checks for known pitfalls |
 | `cad publish models/<name>.py [--refresh] [--printers a1,a1mini]` | Shop-ready folder: full build, a 3MF per printer, clean product renders, print notes and `manifest.json` (`--refresh` rebuilds and re-slices) |
 | `cad selftest [--update]` | Regression suite over `tests/expected.json` (`--update` re-records) |

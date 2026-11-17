@@ -97,8 +97,9 @@ def _svg_text_to_cs(svg_text, width, height, min_area, px_size, samples_per_mm=1
 
 def heightmap(path, width, height, base=1.0, invert=False, blur=0.0, max_px=400):
     """Relief slab: a flat base `base` mm thick with the image's brightness raised up
-    to `height` mm on top (white = highest; `invert` for a lithophane, where dark
-    areas should be thick). Returns a Manifold sitting on z=0, centred in XY."""
+    to `height` mm on top (white = highest, `invert` for dark = highest). Returns a
+    Manifold sitting on z=0, centred in XY. For lithophanes use cadkit.lithophane
+    (`cad litho new`): light-transmission tone mapping, frame, shapes, simulation."""
     im = ImageOps.grayscale(Image.open(path).convert("RGB"))
     if max(im.size) > max_px:
         im.thumbnail((max_px, max_px), Image.LANCZOS)

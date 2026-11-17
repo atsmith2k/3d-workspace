@@ -1,0 +1,39 @@
+{
+ "id": "dragon_banner",
+ "kind": "image",
+ "file": "dragon_banner.png",
+ "provider": "openai",
+ "model": "gpt-image-2",
+ "prompt": "A medieval heraldic tapestry, portrait format, filling the whole frame edge to edge: a red dragon rampant on a gold field inside a dark blue woven border with a simple repeating knot pattern. Flat woven wool texture, visible weave, muted natural dyes, front-on, evenly lit, no perspective, no wall, no frame, no fringe, no text, no letters, no coat of arms of any real house or nation.",
+ "params": {
+  "size": [
+   1024,
+   1536
+  ],
+  "quality": "medium"
+ },
+ "created_at": "2026-11-17T18:42:06Z",
+ "sha256": "4c31c3f465b2ac830397d3cf3aae08f17e25b7d2462acbb7a55dbdceb91b89ab",
+ "terms": "https://openai.com/policies/terms-of-use",
+ "response": {
+  "created": 1794940926,
+  "usage": {
+   "input_tokens": 91,
+   "input_tokens_details": {
+    "image_tokens": 0,
+    "text_tokens": 91
+   },
+   "output_tokens": 1372,
+   "output_tokens_details": {
+    "image_tokens": 1372,
+    "text_tokens": 0
+   },
+   "total_tokens": 1463
+  },
+  "revised_prompt": null
+ },
+ "cleared": false,
+ "cleared_by": null,
+ "cleared_note": null,
+ "cleared_at": null
+}

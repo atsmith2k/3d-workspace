@@ -3331,6 +3331,53 @@
       }
     }
   },
+  "costume_shoulder_chain": {
+    "model": "costume_shoulder_chain.py",
+    "set": [],
+    "parts": {
+      "costume_shoulder_chain": {
+        "size": [
+          207.8,
+          226.0,
+          16.6
+        ],
+        "volume_cm3": 51.8,
+        "bodies": 16,
+        "watertight": true,
+        "checks_ok": true
+      }
+    }
+  },
+  "costume_waist_strap": {
+    "model": "costume_shoulder_chain.py",
+    "set": [
+      "style=waist"
+    ],
+    "parts": {
+      "costume_waist_strap-strap": {
+        "size": [
+          158.4,
+          226.7,
+          16.6
+        ],
+        "volume_cm3": 41.4,
+        "bodies": 12,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "costume_waist_strap-receiver": {
+        "size": [
+          21.0,
+          60.0,
+          20.0
+        ],
+        "volume_cm3": 8.7,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      }
+    }
+  },
   "cat_coaster_mold_head": {
     "model": "cat_coaster_mold.py",
     "set": [
@@ -3456,8 +3503,8 @@
     "parts": {
       "fluted_planter_slip_cast_master-master": {
         "size": [
-          175.2,
-          175.2,
+          175.3,
+          175.3,
           123.6
         ],
         "volume_cm3": 1050.0,
@@ -3467,8 +3514,8 @@
       },
       "fluted_planter_slip_cast_master-cottle": {
         "size": [
-          169.2,
-          169.2,
+          169.3,
+          169.3,
           145.6
         ],
         "volume_cm3": 182.6,
@@ -3534,6 +3581,134 @@
           164.0
         ],
         "volume_cm3": 55.6,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      }
+    }
+  },
+  "duck_head_bookend": {
+    "model": "duck_head_bookend.py",
+    "set": [],
+    "parts": {
+      "duck_head_bookend": {
+        "size": [
+          168.4,
+          75.9,
+          165.3
+        ],
+        "volume_cm3": 339.1,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      }
+    }
+  },
+  "duck_head_bookend_cast": {
+    "model": "duck_head_bookend.py",
+    "set": [
+      "style=cast"
+    ],
+    "parts": {
+      "duck_head_bookend_cast": {
+        "size": [
+          100.4,
+          75.9,
+          165.3
+        ],
+        "volume_cm3": 197.8,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      }
+    }
+  },
+  "duck_head_bookend_notab": {
+    "model": "duck_head_bookend.py",
+    "set": [
+      "tab=false"
+    ],
+    "parts": {
+      "duck_head_bookend_notab": {
+        "size": [
+          100.4,
+          75.9,
+          165.3
+        ],
+        "volume_cm3": 332.9,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      }
+    }
+  },
+  "lithophane_test_card": {
+    "model": "lithophane_test_card.py",
+    "set": [],
+    "parts": {
+      "lithophane_test_card": {
+        "size": [
+          100.0,
+          4.0,
+          80.6
+        ],
+        "volume_cm3": 12.9,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      }
+    }
+  },
+  "lithophane_test_card_arc": {
+    "model": "lithophane_test_card.py",
+    "set": [
+      "shape=arc"
+    ],
+    "parts": {
+      "lithophane_test_card_arc": {
+        "size": [
+          82.7,
+          25.9,
+          80.6
+        ],
+        "volume_cm3": 12.5,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      }
+    }
+  },
+  "lithophane_test_card_cylinder": {
+    "model": "lithophane_test_card.py",
+    "set": [
+      "shape=cylinder",
+      "width=150"
+    ],
+    "parts": {
+      "lithophane_test_card_cylinder": {
+        "size": [
+          47.7,
+          47.7,
+          122.6
+        ],
+        "volume_cm3": 23.7,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      }
+    }
+  },
+  "lithophane_calibration": {
+    "model": "lithophane_calibration.py",
+    "set": [],
+    "parts": {
+      "lithophane_calibration": {
+        "size": [
+          104.0,
+          4.0,
+          34.0
+        ],
+        "volume_cm3": 10.6,
         "bodies": 1,
         "watertight": true,
         "checks_ok": true

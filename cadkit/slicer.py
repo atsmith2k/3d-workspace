@@ -10,6 +10,7 @@ Both are optional; `cad slice` says so if neither is found. Point CAD_BAMBU or
 CAD_SLICER at the binaries for unusual installs.
 """
 import json
+import math
 import os
 import re
 import shutil
@@ -136,13 +137,15 @@ class SliceResult:
 
 
 def slice_stl(stl, out_dir, printer_key=printers.DEFAULT, layer_height=0.2, infill=15,
-              supports=False, filament=None, profile=None, prefer="auto", timeout=900):
+              supports=False, filament=None, profile=None, prefer="auto", timeout=900,
+              process=None, rotate=0):
     backend, exe = backend_for(printer_key, prefer)
     if backend is None:
         raise FileNotFoundError("no slicer found; install Bambu Studio or PrusaSlicer "
                                 "(or set CAD_BAMBU / CAD_SLICER)")
     if backend == "bambu":
-        return slice_bambu(exe, stl, out_dir, printer_key, layer_height, infill, supports, filament, timeout)
+        return slice_bambu(exe, stl, out_dir, printer_key, layer_height, infill, supports, filament,
+                           timeout, process, rotate)
     return slice_prusa(exe, stl, out_dir, printer_key, layer_height, infill, supports, profile, timeout)
 
 
@@ -229,7 +232,12 @@ def _flatten_preset(profiles, kind, name):
     return merged
 
 
-def slice_bambu(exe, stl, out_dir, printer_key, layer_height, infill, supports, filament, timeout):
+def slice_bambu(exe, stl, out_dir, printer_key, layer_height, infill, supports, filament, timeout,
+                process=None, rotate=0):
+    """`process`: extra Bambu process keys (e.g. support_type, seam_position, wall_loops)
+    laid over the preset after the standard ones. `rotate`: turn the part this many
+    degrees about Z on the plate (the print pose is unchanged; it decides which side
+    faces the plate's back, where `seam_position: back` puts the seam)."""
     pr = printers.get(printer_key)
     if "machine" not in pr:
         raise ValueError(f"printer '{printer_key}' has no Bambu Studio preset")
@@ -240,6 +248,11 @@ def slice_bambu(exe, stl, out_dir, printer_key, layer_height, infill, supports, 
     filament = filament or printers.DEFAULT_FILAMENT
     filament_name = f"{filament} {pr['filament_suffix']}"
     filament_json = profiles / "filament" / f"{filament_name}.json"
+    if not filament_json.exists():
+        # some presets (e.g. PETG Basic on the A1 mini) only exist with the nozzle named
+        alt = profiles / "filament" / f"{filament_name} 0.4 nozzle.json"
+        if alt.exists():
+            filament_name, filament_json = alt.stem, alt
     if not filament_json.exists():
         raise FileNotFoundError(f"no Bambu filament preset '{filament_name}'; see {profiles / 'filament'}")
     base_h = min(printers.BAMBU_PROCESS, key=lambda h: abs(h - layer_height))
@@ -254,7 +267,11 @@ def slice_bambu(exe, stl, out_dir, printer_key, layer_height, infill, supports, 
                          "compatible_printers": [pr["machine"]],
                          "layer_height": f"{layer_height:g}",
                          "sparse_infill_density": f"{infill}%",
-                         "enable_support": "1" if supports else "0"})
+                         "enable_support": "1" if supports else "0",
+                         # the A1s here print on textured PEI; the CLI's default Cool Plate
+                         # rejects PETG/TPU (their cool_plate_temp is 0)
+                         "curr_bed_type": "Textured PEI Plate"})
+        override.update({k: str(v) for k, v in (process or {}).items()})
         process_json = tmp / "process.json"
         process_json.write_text(json.dumps(override), encoding="utf-8")
         # The filament preset needs its inherits chain resolved too: passed as is, the CLI
@@ -269,10 +286,19 @@ def slice_bambu(exe, stl, out_dir, printer_key, layer_height, infill, supports, 
         machine_cfg = _flatten_preset(profiles, "machine", pr["machine"])
         flat_machine = tmp / "machine.json"
         flat_machine.write_text(json.dumps(machine_cfg), encoding="utf-8")
+        if rotate:
+            # turned here, not with the CLI's --rotate (that mis-slices: half the layers)
+            import trimesh
+            tm = trimesh.load(stl, force="mesh")
+            tm.apply_transform(trimesh.transformations.rotation_matrix(math.radians(rotate), [0, 0, 1]))
+            src = tmp / stl.name
+            tm.export(src)
+        else:
+            src = stl
         cmd = [exe, "--load-settings", f"{flat_machine};{process_json}",
                "--load-filaments", str(flat_filament),
                "--orient", "0",            # the model is already in its print pose
-               "--slice", "0", "--export-3mf", "out.3mf", "--outputdir", str(tmp), str(stl)]
+               "--slice", "0", "--export-3mf", "out.3mf", "--outputdir", str(tmp), str(Path(src).resolve())]
         r = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, cwd=tmp)
         result = tmp / "result.json"
         info = json.loads(result.read_text(encoding="utf-8")) if result.exists() else {}

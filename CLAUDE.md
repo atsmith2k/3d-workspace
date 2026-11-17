@@ -105,6 +105,7 @@ PRODUCT = dict(title="...", category="molds", tags=[...], printers=["a1", "a1min
                cast_material="cement", post_processing=None, sellable=None)  # optional
 LICENSE_NOTES = "..."                  # optional; replaces the default licence text
 MIN_WALL = 0.4                         # optional; thin-wall warning floor (blades); dict per part ok
+SLICE = dict(supports=True, rotate=-90, process=dict(seam_position="back"))  # optional
 def checks(p):                         # or a static CHECKS = [...] list
     return [dims(x=p.width), hole(6.4, at=(10, 10)), solid((0, 0, 1)), no_overhang()]
 def build(p):                          # p.width, p.style ...
@@ -113,6 +114,13 @@ def build(p):                          # p.width, p.style ...
 
 `PRODUCT`, `LICENSE_NOTES` and an optional `display(p)` (product-shot poses, like `assembly`;
 otherwise overlapping parts are laid side by side) are read by `cad publish` only.
+`SLICE` is the model's production print setup, used by every `cad slice`, `--slice` and
+`cad publish` (so publish slices with supports when the model needs them): `supports`,
+`rotate` (degrees about Z on the plate, e.g. to turn a flat back to the plate's back where
+`seam_position: back` hides the seam) and `process` (any Bambu process key: `seam_position`,
+`seam_slope_type`, `support_on_build_plate_only`, `wall_loops`...). `--process KEY=VALUE`
+adds or overrides keys for one run; slice.json records them as `overrides` and the print
+notes list them. Check where a seam really lands in the 3MF's G-code before claiming it.
 `MIN_WALL` lowers the thin-wall warning threshold for walls that are thin on purpose
 (cutter blade edges); the report still shows the share under 1.2 mm.
 `PRODUCT["title"]` may use `{param}` placeholders so `--set` variants get their own titles.
@@ -183,9 +191,43 @@ and use `cutter_checks(p)` / `cutter_assembly(p)` / `cutter_display(p)`. Worked 
 **Images and SVGs** (`from cadkit.image import *`): `trace("logo.png", width=60)` turns a
 logo, sketch or photo silhouette into a CrossSection (holes kept); `svg_shape("x.svg",
 width=80)` loads an SVG's paths; `heightmap("photo.jpg", width=100, height=3, base=1)`
-makes a relief slab or lithophane (`invert=True`) as a Manifold. When the user gives an
+makes a relief slab as a Manifold. When the user gives an
 image, run `cad trace image.png --width 60` first and look at the outline preview it
 writes before modeling with it. build123d models can also use `import_svg`.
+
+**Lithophanes** (`cadkit/lithophane.py`): when the user wants a photo as a backlit print,
+`cad litho new photo.jpg --width 100 [--shape flat|arc|cylinder] [--outline
+rect|rounded|oval|heart|hexagon] [--set stand=30 ...] [--slice]` copies the photo to
+`models/images/`, writes `models/lithophane_<stem>.py` from `models/_lithophane_template.py`
+and builds it. Then tune with `cad build ... --set` like any model. Besides the usual
+preview, the build writes `<name>_backlit.png`: the target tones beside a simulated
+light-box view (Beer-Lambert through the wall plus light scatter). **Look at that one**
+to judge tone and contrast; the regular preview is for the shape.
+- Tone mapping is Cura's ImageReader lithophane model re-implemented (sRGB -> linear
+  luminance, Beer-Lambert `transmittance` per mm, `model="transmittance"`). The default
+  `model="perceptual"` spreads CIE lightness evenly over the printable lit range (~5:1
+  at 0.6-3.0 mm), so shadows don't merge; `linear` is Cura's other option.
+- `min_t`/`max_t` (0.6/3.0) set white/black wall; `gamma` lifts mid-tones; `levels`
+  auto-stretches; `sharpen` pre-compensates the light diffusion; `nozzle` (0.4) flattens
+  relief ridges and grooves narrower than an extrusion line; `mirror` when the relief side
+  faces the viewer; `invert` for a negative.
+- Shapes print upright (best detail: the wall traces the relief at nozzle resolution).
+  The smooth face is the viewing side. The top frame band carries a 40 deg chamfer so it
+  never overhangs; arcs and cylinders stand alone, a flat panel holds by its brim or
+  `stand`. A cylinder's `width` is its circumference (diameter = width / pi).
+- `SLICE = LITHO_SLICE`: 0.12 mm layers, 100% zig-zag infill (Bambu's default grid
+  infill rejects 100%), 6 mm brim. A 100 x 80 panel is ~2 h and 18 g on the A1.
+  `SLICE` may now set `layer_height` and `infill` for any model (CLI flags still win).
+- `MIN_WALL = LITHO_MIN_WALL` (0.25): white areas are 0.6 mm on purpose, and the
+  sampler reads crest shoulders thinner still. The `picture wall >= min_t` check holds
+  the real minimum.
+- Calibrate a filament: print `models/lithophane_calibration.py` (8 steps 0.6-3.4 mm),
+  photograph it on a light box with fixed exposure, then run `cad litho calibrate photo.jpg
+  [--crop x0,y0,x1,y1]`. It prints the transmittance to `--set`.
+- Customer photos stay `sellable=False` (the template sets it). Models may define
+  `extras(p, out, name) -> (files, lines)` for extra build outputs like this one.
+  Reference model: `models/lithophane_test_card.py` (generated card,
+  `scripts/make_litho_test_card.py`).
 
 **Multi-part fit.** For a dict return, define `assembly(p)` giving each part's move from
 print pose to assembled pose, `{"lid": (dx, dy, dz, rx, ry, rz)}` (degrees, rotation about
@@ -378,6 +420,345 @@ continuous satin border over a tucked fill, script lettering with a knocked-out 
 Code: `cadkit/stitch/` (`design`, `shapes`, `svg` writer, `engines`, `native`
 engine, `pattern` reader/writers, `checks`, `render`, `cli`); tests in `tests/test_stitch.py`.
 
+## Game assets for Cinder (`cad game`)
+
+Third silo, same loop: the user (or a Hive suggestion) describes an asset, Claude writes
+`assets/<name>.py`, builds it, reads the preview, iterates, and hands back a GLB that is proven
+to load in the Cinder engine (https://cinder.ash10.dev; docs for agents at `/llms.txt`). Plan,
+research and phases: `docs/game-assets-plan.md`; judgement and failures:
+`docs/agents/game-assets-playbook.md`. Phases 0-4 are built: static props, environment
+pieces, a material library, worlds and packs, skinned characters with clips, sound, game UI,
+2D sprites, the optional generative step, fonts, and Blender in the loop for high-resolution
+assets.
+
+1. Clarify only what changes the asset: what it is for and what it stands next to, size in
+   metres, style, whether it is pushed around (dynamic) or scenery (static).
+2. `cad game new <name> "<description>"`, fill in the Spec (size, pivot, budget, materials,
+   features, use, engine body and collider), turn it into `checks(p)`: `size`, `tris`,
+   `materials`, `texture_size`, `pivot`, `tiles`, `custom`.
+3. Write `build(p)` returning `Model((mesh, material), ...)` (`from cadkit.game import *`).
+   Meshes: `box`, `lathe` (revolve a profile), `disc`, `cylinder`, `torus`, `flat` (hard edges),
+   `block` (a box standing on a point), `bevel_box` (chamfered edges, flat faces at full size),
+   `wedge` (a ramp), `prism` (extruded outline; `centre=` for stars and arrows), `box_uv`
+   (world-scale tiling UVs), `ball`, `capsule` (a limb between two points), `merge`, `.moved/.rotated/.scaled/.with_uv`, and `to_game(part)` to bring a
+   build123d / manifold / SDF part over (mm Z-up to metres Y-up). Textures (numpy, tileable,
+   seeded): `noise`, `fbm`, `streaks`, `blur`, `tint`, `normal_from_height`,
+   `occlusion_from_height`, `orm(occlusion, roughness, metallic)`. Library materials (cached,
+   tileable): `stone_blocks`, `flagstones`, `planks`, `iron`. `Material(name, color,
+   metallic, roughness, emissive, emissive_strength, base=, orm=, normal=, emission=, alpha=)`.
+4. `cad game build assets/<name>.py` writes `output/game/<name>/`: `<name>.glb`,
+   `<name>_preview.png`, `build.json` (with a paste-ready `world_snippet`), `readiness.json`,
+   `report.txt`, `cooked/`. `--set`, `--json`, `--no-engine` (quick, never ready).
+5. **Read the preview**: its four frames are rendered by Cinder itself, beside a 1.8 m orange
+   figure for scale, with the UV layout and every texture map. Every check PASS and
+   `ready YES`: static checks, `cinder-cook` accepts it, it draws headless with no GPU errors,
+   and a solid prop dropped 0.5 m rests where its bounds say.
+6. Deliver the GLB and the preview; say the size, triangles, materials, textures, how it is
+   used (body, collider) and paste the world snippet.
+
+**Mesh nodes.** `Model((base, mat), (spikes, mat, "spikes"))`: a third item names a node. Parts
+of one node become one mesh node of the glTF, so a Mojo game gets a separate entity it can
+move, hide or recolour (a flag on its pole, spikes in a trap). The world kit still draws the
+file as one model. Each node is its own primitive: count it in `BUDGET["materials"]`.
+
+**Characters** (`KIND = "character"`, `build(p)` returns a `Character`): `sk = biped(height)` is
+an 18-bone humanoid (root at the feet as bone 0, relaxed A-pose, facing +Z) or build a
+`Skeleton()` with `sk.add(name, parent, head, tail=)`. `ch = Character(sk)`;
+`ch.add(mesh, material, bind="head")` binds rigidly, `bind=["upper_arm.L", "lower_arm.L"],
+blend=0.045` weights one tube across a joint so it bends smoothly. `palette(name, colors)` +
+`swatch_uv(mesh, i, pal)` give a whole character one flat-colour material.
+`ch.clips = [Clip.cycle(name, seconds, pose_fn, keys=16)]` where `pose_fn(phase)` returns
+`{bone: euler(x=, y=, z=)}` and `{"hips:move": (dx, dy, dz)}`; rest rotations are identity, so
+a key is the bone's local rotation. Checks: `clips("idle", "walk", "run")`,
+`phase_matched("walk", "run", "foot.L")`; every character also gets `skin` and `clip data`.
+The cook must give one `.cskel` and one `.cclip` per clip, and the build **parses the engine's
+`.cclip` files back** (name, duration, channels, keys) against what was built. The preview adds
+one engine-rendered strip per clip: five moments of the cycle, skinned on the CPU and baked
+static. Worked example: `assets/adventurer.py`.
+
+**Sounds** (`KIND = "sound"`, `from cadkit.game.audio import *`, `build(p)` returns
+`Sound(samples, loop=False, bus="sfx", spatial=True, streamed=False)`): synthesis at 48 kHz in
+numpy. Sources `osc(freq, seconds, "sine"|"saw"|"square"|"tri")` (freq may be a per-sample
+`glide(f0, f1, seconds)`), `noise(seconds, seed, "white"|"pink"|"brown")`, `modes(freqs, t60s,
+amps, seconds)` (a struck object); envelopes `adsr`, `decay(seconds, t60)`, `fade`; filters
+`lowpass`, `highpass`, `bandpass`, `swept_bandpass`; `reverb(x, seconds, mix, wrap=)`,
+`place(dst, src, at, gain, wrap=)`, `stereo(x, pan)`, `normalize(x, peak_db)`; for loops
+`fit(freq, seconds)` (a pitch that completes whole cycles) and `loop_blend`. Checks
+(`from cadkit.game.sound import duration, band, peak, custom`): `duration(lo, hi)`,
+`band(lo_hz, hi_hz, at_least=, at_most=)` (the share of energy in a band: how a thud is told
+from a chime), `peak(lo_db, hi_db)`. Every sound also gets `format` (the WAV read back by
+scipy), `level` (no clipping, not too quiet, no DC), `edges` (starts and ends at zero, no
+trailing silence; for a loop, the seam), `channels` (spatial means mono) and `budget`.
+The build writes `<name>.wav` (48 kHz 16-bit PCM) and `<name>_preview.png`: waveform and
+spectrogram. **Nobody here can listen: read the spectrogram** and write a `band` check for
+every claim the Spec makes about how it sounds. The engine step uses the sample game as a probe:
+run headless from a scratch folder with the file standing in for its music, Cinder's audio
+engine either opens it or reports `audio: could not load` (a garbage-file control runs once per
+process). Worked examples: `assets/gem_pickup.py` (bell partials), `assets/chest_open.py`
+(layered events), `assets/torch_crackle_loop.py` (a seamless texture loop),
+`assets/dungeon_ambience_loop.py` (32 s stereo music loop).
+
+**Game UI** (`KIND = "ui"`, `from cadkit.game.ui import *`, `build(p)` returns `UiSet(ui)`):
+`ui = Ui(Theme(...))`, then the engine's own constructors with the engine's own defaults:
+`ui.root(anchor, name, offset=)` (anchors `top_left` .. `bottom_right`, `centre`),
+`ui.panel(parent, row=)`, `ui.label(parent, text, name=, size=, color=)`, `ui.button`,
+`ui.toggle(parent, text, checked)`, `ui.slider(parent, text, value, lo, hi)`; any node field can
+be passed or edited (`ui[id]["min_size"] = [260, 44]`). The build writes `<name>.ui.txt` (a
+`cinder-scene 1` document, byte for byte what `Ui.to_text` writes), `<name>.theme.json` and
+`<name>.mojo` (load code: `Ui.from_text`, the theme, `find` for every named node). Checks:
+`has(name, kind)`, `node_at_least(name, w, h)`, `custom`; always: every control named, Latin-1
+text with no quotes, and from the engine: the round trip, every node inside 1280 x 720, root
+panels not overlapping. **cinder-probe** proves it: `tools/cinder_probe/cinder_probe.mojo` is
+our Mojo program, compiled against the engine by `cad game probe build` (needs the Cinder
+checkout at `../cinder` or `CAD_CINDER_SRC`, Docker and the `cinder-toolchain-windows` image);
+it has Cinder read the document, lay it out, draw it headless and write it back, and reports
+every node's rectangle. The preview is the engine's frame beside the same frame with each
+rectangle outlined. Rebuild the probe when its source or the engine changes
+(`cad game probe status`). Worked examples: `assets/dungeon_hud.py`, `assets/pause_menu.py`.
+
+**Sprites** (`KIND = "sprite"`, `from cadkit.game.sprite import *`, `build(p)` returns
+`SpriteSheet(frames, animations=, slices=)`): `Canvas(size)` draws anti-aliased shapes
+(`circle`, `ellipse`, `rect(box, radius=)`, `polygon`, `line`) and `.image()` gives straight-alpha
+RGBA. The build packs a power-of-two atlas and writes `<name>.png`, `<name>.json`
+(`cadkit-sprites/1`: frames, animations with fps, 9-slice borders) and `<name>_quads.glb`, one
+unlit quad per frame, which it cooks and draws in Cinder. Checks: `frames(*names)`,
+`frame_size(w, h)`, `animation(name, count, fps)`, `nine_slice(name)`, `custom`. This is
+**built ahead**: nothing in Cinder 0.1.1 reads a sprite sheet. Worked examples:
+`assets/hud_icons.py`, `assets/ui_frames.py` (9-slice), `assets/coin_spin.py` (animation).
+
+**Fonts** (`KIND = "font"`, `from cadkit.game.font import *`, `build(p)` returns
+`FontFace(glyphs, family=, tracking=)`): glyphs are shapely shapes on a grid where the cap height
+is 10 units and the baseline is y = 0, each with its advance. `block_glyphs(stroke)` is the
+block alphabet this workspace owns (`cadkit.stitch.lettering`, A-Z) extended with digits and
+punctuation in the same construction, so no third-party typeface is copied. The build writes
+`<name>.ttf` (fontTools, 1000 units per em, cap height 700) and `<name>.json`. Lowercase maps
+to the capitals and accented Latin-1 letters to their base letter (`unicase`, `fold_accents`),
+because Cinder bakes code points 32..255 and anything else is a '?'. Checks: `covers(chars)`,
+`stroke_at(px, min_px)` (the thinnest stroke at a size), `distinct("0", "O")` (confusable pairs);
+always: valid outlines inside their advance, FreeType (Pillow) loads it and agrees on advances,
+and from the engine through cinder-probe: Cinder parses it, bakes 224 glyphs, measures a test
+line as expected, and **the engine's pixels match the glyphs** (`ink_match`, at least 70 %
+overlap with FreeType's rendering; a different font scores about 50 %). A UI set in a font is
+`UiSet(ui, font="block_caps")`: the font asset is built first, and a pack needs both.
+Worked examples: `assets/block_caps.py`, `assets/title_screen.py`.
+
+**High-resolution assets: Blender in the loop** (`from cadkit.game import blender as B`). The
+other kernels draw hard-surface and low-poly shapes; this one does the high-to-low workflow that
+detailed assets are made with. Blender runs headless as a subprocess (`blender -b
+--factory-startup --python tools/blender_bridge/bridge.py -- <job>`); meshes cross as arrays
+and come back as an ordinary `Mesh` and images, so the asset is still a script and the same
+checks and Cinder ladder decide `ready`.
+```python
+s = B.Session()
+hi = s.add(rough_mesh, "high")                       # weld=True joins a hard-edged mesh into one surface
+s.modify(hi, B.subsurf(5), B.displace("CLOUDS", scale=0.5, strength=0.16))
+lo = s.copy(hi, "low")                                # the game mesh comes from the high one...
+s.decimate(lo, 3000); s.shade(lo, sharp_angle=50); s.unwrap(lo)
+s.bake([hi], lo, size=2048, maps=("normal", "ao", "curvature", "emit"), cage=0.05, ray=0.2)
+r = s.run()                                           # one Blender run, or the cache
+low, normal, ao = r.mesh(lo), r.image("normal"), r.image("ao")
+```
+- Steps: `add(mesh, name, emit=)`, `modify(name, *modifiers)`, `boolean(a, b, operation, materials=)`,
+  `join`, `copy`, `remesh(a, voxel_size)`, `decimate(a, tris)`, `shade(a, sharp_angle=)`,
+  `unwrap(a)`, `bake(high, low, size, maps, cage, ray, samples)`, `weights(a, skeleton)` (bone-heat
+  skin weights; `r.skin(name)` gives joints and weights), `get(a)`. Modifiers: `B.subsurf(levels)`,
+  `B.displace(texture, scale, strength)` (CLOUDS, VORONOI, MUSGRAVE, STUCCI...), `B.inflate(d)`
+  (move the surface along its normals), `B.bevel`, `B.smooth`, `B.solidify`, or any raw
+  `dict(type="<BLENDER MODIFIER>", ...props)`. `B.bake_lowpoly(high, tris, size, maps)` is the
+  whole workflow in one call.
+- Maps: `normal` (tangent space, glTF's convention; Blender and Cinder both use MikkTSpace, and
+  the mesh is triangulated before the bake so the tangents agree), `ao`, `curvature` (0.5 flat,
+  bright on convex edges, dark in creases: drives edge wear), `emit` (the emission of the high
+  mesh's materials: give a boolean cutter `emit=1.0` and the faces it cuts bake as a mask).
+- Paint the colour in world space, not UV space: `texel_maps(mesh, size)` gives each texel's
+  position and normal on the mesh and a mask of the UV islands; `noise3` / `fbm3` sampled at
+  those positions have no seams; mix by the baked `ao` and `curvature`; `fill_background(img,
+  mask)` carries island colours over the empty texels so mips do not bleed. Add `uv_unique()`
+  to the checks of anything baked.
+- Results are cached in `output/game/.blender/` by a hash of the steps, the input meshes, the
+  bridge script and the Blender version: an unchanged asset does not start Blender again (the
+  monolith is 47 s cold, instant after). `cad game blender` says which Blender is used
+  (`CAD_BLENDER`, else the newest under Program Files, else PATH; installed here with winget).
+- Why a subprocess: the `bpy` wheel is pinned to one Python (3.13 for Blender 5.x; this
+  workspace is 3.12), a Blender crash cannot take the build down, and no GPL code is imported
+  into cadkit. Why not an agent driving a live Blender (the MCP servers): the asset would live
+  in a session nobody can rebuild.
+- **Order matters.** Big shapes (subdivide, lumps, cracks), then carve, then only fine grain.
+  Displacing after carving moves each groove wall along its own normal and smears the cut shut.
+- **Exact cut depth**: trim the cutter against an inset copy of the surface
+  (`s.modify(inner, B.inflate(-depth)); s.remesh(inner, 0.02); s.boolean(cut, inner,
+  materials="INDEX"); s.boolean(hi, cut)`). The remesh matters: an inset rough surface crosses
+  itself and the exact boolean returns nothing.
+- `ray` must exceed the depth of what is carved, or the bake misses the floor of the cut;
+  `cage` must clear the high mesh's bumps. Defaults in `bake_lowpoly` are 8 % and 2 % of the size.
+- Have a check for every map (the monolith's rune mask baked empty three times, for three
+  different reasons, and the check caught each): mask coverage, mean lean of the normals,
+  high-poly triangle count from `r.step("modify", i)["triangles"]`.
+- The cache folder is not source: the asset script is. Blender is needed to rebuild from
+  nothing, so say `needs: Blender` in the Spec.
+- **Sculpted characters.** Lay the body out as `ball`s (scale them for ellipsoids) and
+  `capsule(a, b, r0, r1)`s along the bones of a `Skeleton`, in a wide A-pose (arms out, legs
+  apart: parts that touch fuse, and bone heat then cannot tell them apart). `s.remesh(hi, 0.03)`
+  makes the overlapping parts one closed skin; sculpt, bake, then `s.weights(lo, sk)` on the
+  low mesh and `Character(sk).add_skinned(low, mat, *r.skin(lo))`. Add `deforms_cleanly()` to
+  the checks: it poses every clip and fails when edges stretch (a vertex on the wrong bone).
+  Bone heat spreads a vertex over five or more bones; the bridge takes the fifth-largest
+  weight off the top four rather than just keeping them, or neighbouring vertices drop
+  different bones and the skin tears (the golem's flank, 4.2x, when its arms went up). An arm
+  raised more than about 120 deg at the shoulder stretches past the check: share the lift with
+  the chest and elbow. Clips are not part of the Blender cache key: retiming one is instant.
+Worked examples: `assets/rune_monolith.py` (500,000 triangles sculpted and carved, baked onto
+3,000 with four 2048 px maps), `assets/stone_golem.py` (a 2.4 m character: 588,000 triangles
+baked onto 8,000, automatic skin weights, three clips).
+
+**Generated inputs** (`from cadkit.game import gen`): for a look a script cannot draw.
+`gen.image(prompt, name="dragon_banner", size=(1024, 1536))` (OpenAI images) and
+`gen.sound(prompt, name=, seconds=)` (ElevenLabs sound effects) return arrays;
+`gen.material(img, name)` makes a PBR material from a picture, `gen.tileable(img)` makes it
+repeat. Rules the code enforces:
+- **A build never calls a service on its own.** Inputs are read from `assets/gen/<id>.png|.wav`
+  (commit these, like `models/images/`). A miss stops the build with the command that would
+  create it: `cad game build <asset> --gen`, one paid call. The services have no dependable
+  seed, so the cache is what makes a build repeatable.
+- Every input has a record, `assets/gen/<id>.json` (prompt, provider, model, parameters, when,
+  `cleared: false`). Changing the prompt under the same name is an error, not a silent reuse.
+- **Nothing generated ships until a person clears it.** The asset can be `ready YES`; `cad game
+  pack` still refuses it. `cad game gen clear <id> --by NAME --note "what was checked"` is for
+  the user, after looking at the picture and the provider's terms. **Claude never clears one.**
+- Keys: `OPENAI_API_KEY`, `ELEVENLABS_API_KEY` in the environment or the git-ignored `.env` at
+  the repo root (`cad game gen keys` says which are set). Never ask for a key in chat, never
+  write one to a file that is committed, a log or a manifest.
+- Write prompts that ask for what the mesh needs (front-on, evenly lit, edge to edge, no text)
+  and that name no real person, brand, house or nation.
+`cad game gen list` shows every input and whether it is cleared. Worked example:
+`assets/wall_tapestry.py`.
+
+**Packs.** `cad game pack packs/<name>.py [--refresh]` bundles every asset whose
+`PRODUCT["collection"]` matches the script's `COLLECTION` into `output/game/packs/<name>/`:
+`assets/*.glb`, `previews/`, `worlds/demo.world`, `manifest.json` (schema `cadkit-game/1`: per
+asset bounds, triangles, textures, `engine_use`, `rest_y`, world snippet, cook logical paths,
+licence, engine version verified against), `AGENTS.md` (a paste-ready snippet per asset) and
+`ATTRIBUTION.md`. It rebuilds members that are missing, stale or not ready and refuses a pack
+with a member that is not ready. The script's `demo(w)` builds the demo with
+`cadkit.game.world.World`: `w.place(asset, at=(x, floor_y, z), yaw=, name=, body=, **components)`
+stands a pack asset on a floor point using its `rest_y`, body and collider; `w.add(name,
+light=dict(...), player=dict(...))` adds anything else. The pack is `ready` only when
+`cinder-play --check` passes and the headless run loads every placed model with no GPU errors
+(and is won, with `DEMO = dict(seconds=, autopilot=True, expect_won=True)`). `SHOTS = [dict(name,
+position, target)]` adds beauty frames from placed cameras (the world without its player);
+**read them and `<name>_contents.png`**. `cad game install <name> --to <game dir> [--cook]`
+copies a ready pack into a game. `DEMO["settle"] = dict(max_move=0.25, free=[names])` makes the
+demo a stacking test: every dynamic body must end the run within `max_move` metres of where it
+was placed, and the manifest lists where each one ended. `PRODUCT["gameplay"]` (a dict: bounce
+surface, hazard node, collider wanted) and `PRODUCT["notes"]` travel into the manifest and
+`AGENTS.md`: that is how an asset tells a game what the engine cannot read from a model.
+Worked examples: `packs/dungeon_kit.py` + `assets/_dungeon.py` (shared grid, stone and checks
+for 12 pieces) and `packs/sandbox_kit.py` + `assets/_sandbox.py` (one 16-tile atlas for a whole
+kit, `tile(mesh, T.RED)`; built from ten Hive suggestions).
+
+`cad game list`, `cad game engine` (which Cinder package verifies; `CAD_CINDER`, else
+`../cinder/dist/cinder-windows-x64`), `cad game schema` (contract, checks, conventions and the
+request format as JSON: start there as an agent).
+
+Rules the checks hold, and what the engine taught us:
+- Metres, Y up, -Z forward, counter-clockwise front faces. Texture row 0 is the top (v=0).
+- **Pivot**: a dynamic prop's origin is the centre of its bounds, because the world kit centres
+  box and sphere colliders on the entity (an origin at the base sinks it half its height: the
+  drop test fails). Static pieces sit on Y=0 with the origin at the base centre; floor tiles
+  have it on the top face (`pivot("top")`, walking surface at Y=0); wall-mounted pieces on the
+  back face (`pivot((0.5, None, 1.0))`, hanging toward -Z). `ENGINE["rest_y"]` is the origin's
+  height when the asset is in place (default: standing on its lowest point).
+- Kits: 2 m grid, walls centred on cell edges, one world-projected stone texture
+  (`box_uv(mesh, 1 / GRID)`) so courses run on across neighbouring pieces.
+- The autopilot walks straight lines: lay a demo's route down one axis and keep dressing off it.
+- Emissive strength over about 1.5 tone-maps toward white (a red gem turns pink): keep the
+  colour saturated, the strength low, and add a point light in the world for the cast light.
+- Never name a module after a function the package exports (`materials` the check was
+  shadowed by `materials` the module: the library is `matlib`).
+- Cinder reads POSITION, NORMAL, TANGENT, TEXCOORD_0/1 and skin attributes; metallic-roughness
+  with base, metallic-roughness, normal, occlusion and emissive maps; `KHR_texture_transform`
+  and `KHR_materials_emissive_strength`. No vertex colours, no other extensions. It generates
+  tangents and LODs itself: never author them.
+- With an `orm` texture set `metallic=1.0, roughness=1.0` (factors multiply the texture).
+- One material is one draw call: pack a prop into one atlas where you can (the crate and
+  barrel do). Textures are powers of two; 512 px per metre is the default density.
+- Base names are snake_case and unique: `cinder-cook` derives the cook prefix from them.
+- Source files are the deliverable. `cooked/` is a cache for one engine build (cooked formats
+  have no migrations).
+- `lathe` faces to the right of travel: profile bottom-to-top faces outward, top-to-bottom
+  faces the axis (a rim's inner wall).
+- Cinder 0.1.1 leaves any dropped body about 15 mm inside the floor, its own primitives
+  included; the drop test's tolerance allows for it.
+- **`ok`, `gpu_errors 0` and a counted model do not mean anything was drawn.** Every build
+  renders the stage with and without the asset and compares: a static asset that changes no
+  pixels is a blocker.
+- **Cinder 0.1.1's world kit does not draw skinned models** (it attaches no animator, so there
+  is no joint palette; the Khronos CesiumMan is invisible too). A character's frames are
+  therefore static bakes of its bind pose and clips, the report says so, and its pack notes
+  tell a game to give the spawned mesh an `AnimatorRef` from Mojo. Never place a skinned asset
+  in a world-kit demo.
+- Characters face **+Z** (the kit turns a player model so +Z points where it walks), stand
+  with their feet at the origin and animate in place. Left is +X. Phase 0 of every gait is the
+  left foot's strike, so cycles blend on a shared phase.
+- Rotating a leg about +X by a positive angle swings the foot to -Z (backward); knees bend
+  with a positive X rotation of the lower leg, elbows with a negative one.
+- A loop variable named `path` inside `write_glb` once redirected the output file: do not
+  shadow arguments in long functions.
+- The world kit's colliders are box, sphere and mesh, and a mesh cannot be dynamic. So a
+  cylinder ships with a box collider (it stacks, it does not roll), a ramp ships kinematic with
+  a mesh collider, and a tree ships with no body (any kit collider would make its canopy
+  solid). Say what collider is wanted in `PRODUCT["gameplay"]` for Mojo games.
+- A flat-colour kit fits one small atlas of tiles (512 px, sixteen 128 px tiles, 0.9 MB for 15
+  models). Cinder still uploads it once per model.
+- Sound: one-shots are mono and spatial; music and ambience are stereo, not spatial, streamed.
+  A loop is the whole file (Cinder has no loop points): give every tone a `fit` pitch, place
+  events with `wrap=True`, use `reverb(..., wrap=True)`, and shape noise in the frequency
+  domain so it is periodic. Peaks: effects about -3 dBFS, things heard constantly (footsteps,
+  UI ticks) -6 to -8, beds -8.
+- Never put a steady tone through a stereo reverb: each channel gets an arbitrary phase and
+  left and right cancel on a mono speaker (the music loop's drone measured -0.3 correlation).
+  Send only the events through it and keep the bed dry; check `corrcoef(left, right) > 0.3`.
+- `cinder.audio` `SoundDesc(path, bus, streamed, looping, spatial)`: streamed comes before
+  looping. The world kit has no audio components: sounds are played from a Mojo `Game`.
+- **Cinder 0.1.1 draws alpha-masked and alpha-blended materials opaque**: `forward.wgsl` reads
+  the alpha mode with `u32()` where the material wrote integer bits, so it is always 0. Only the
+  depth pass cuts the mask, which is why a masked quad looks right in front of something drawn
+  later and wrong on its own. Do not rely on alpha in a model until the engine is fixed (it is
+  in Cinder issue "Sprites: ..."); sprite proof quads show a black square behind the art.
+- A UI theme is not in a UI document (the engine does not serialise it): node colours travel
+  in the document, the theme's hover / pressed / accent / focus colours in `<name>.mojo`.
+- Do not name a Mojo argument `out` (reserved); a docstring summary starts with a capital.
+- An asset script's `from cadkit.game import *` brings names, not submodules (`__all__`): a
+  script with no `checks()` once picked up the `checks` module and the build tried to call it.
+- OpenAI image model ids change: `gpt-image-1` was gone by 2026-11 and `gpt-image-2` is the
+  default here. When a call says the model does not exist, list `GET /v1/models` and set
+  `CAD_GEN_OPENAI_MODEL` or the default in `gen.py`. A refused request costs nothing.
+- **Installing a UI font in Cinder 0.1.1**: there is no public setting. The UI renderer uploads
+  a glyph atlas the first time a size is drawn and never again, so a font swapped in after the
+  first frame is laid out with the new metrics and drawn from the old texture: text-shaped
+  garbage that measures correctly. Install it in `Game.start`, before anything is drawn:
+  `app._ensure_ui_renderer()` then `app.ui_renderer.value().fonts = FontCache(font^)`.
+- **Numbers that pass over a wrong picture** happened three times (a skinned model nobody drew,
+  a font drawn from the wrong atlas, a tapestry whose picture was fine and whose mesh was not).
+  Each time the fix was a check that looks at pixels. When adding a kind, add one.
+- Text on a HUD or title needs its own ground: a panel behind it of alpha 120 or more. Pale
+  text over an unknown scene disappeared on the first title screen.
+- Not yet run against a real service: ElevenLabs sound in the generative
+  step. Cinder has no sprites and its UI draws no images; see the plan for what is built ahead.
+
+Worked examples: `assets/wooden_crate.py` (atlas, raised frame, dynamic), `assets/oak_barrel.py`
+(lathe, hoops in geometry and texture, recessed heads), `assets/iron_lantern.py` (two
+factor-only materials, emissive, static), `assets/spike_trap.py` (a named mesh node),
+`assets/robot_character.py` (rigid parts on the shared biped). Code: `cadkit/game/` (`model`, `mesh`, `texture`,
+`matlib`, `rig` (skeletons, skinning, clips, FK), `audio` (synthesis), `sound` (sound build, checks,
+spectrogram), `ui` (UI documents, themes), `sprite` (drawing, atlases, 9-slice), `font` (glyphs, TTF writer),
+`gen` (generated inputs), `blender` (headless Blender sessions; the bridge is
+`tools/blender_bridge/bridge.py`), `gltf` writer + independent reader, `engine`, `checks`, `build` ladder, `world`,
+`pack`, `render`, `cli`);
+tests in `tests/test_game.py`, `tests/test_game_rig.py`, `tests/test_game_sound.py`,
+`tests/test_game_ui.py`, `tests/test_game_font.py`, `tests/test_game_gen.py` and `tests/test_game_blender.py` (engine tests skip without a Cinder package, probe tests without the probe).
+`tools/cinder_probe/` holds the Mojo probe.
+
 ## Printers
 
 The user prints on a **Bambu Lab A1** (default, 256 x 256 x 256 mm bed) and an
@@ -449,6 +830,14 @@ Bambu A1 series design notes (0.4 mm nozzle, 0.42 mm line width, 0.2 mm layers):
   keep `drafted` for spiky art and for domes (one slice per 0.2 mm layer).
 - build123d tapers on large, intricate art (many joined strokes) are slow (minutes) and
   fail often. Do that kind of work in manifold3d instead.
+- SDF: `build_sdf(..., snap=True)` moves every vertex onto the exact surface (level_set
+  meshes a trilinear interpolation of the grid, leaving vertices up to ~0.2 mm off and a
+  mottled skin). Features narrower than ~3 grid cells (grooves) alias into a rope texture
+  along their length: give them a round-bottomed profile >= 1.6 mm wide at edge 0.6, or cut
+  them as mesh sweeps. Dense capsule-swept rings (hundreds of hulls) leave sub-0.01 mm
+  triangles that Bambu Studio welds into non-manifold edges: the build then says
+  `bambu kept cadkit's STL` and the slice can come out ~10% slower. Treat that line as a
+  defect, not a note.
 - SDF: write functions with numpy ufuncs (`np.sqrt`, `np.maximum`...) so the grid is
   evaluated at once; `math` functions force a slow point-by-point path. An open lattice
   band thinner than ~2 cells breaks into pieces; closed-skin `lattice_fill` is robust.
@@ -471,6 +860,9 @@ Bambu A1 series design notes (0.4 mm nozzle, 0.42 mm line width, 0.2 mm layers):
 cadkit/          harness: __main__ (CLI), mesh (convert/clean/check), render (preview + product),
                  outputs (build.json / slice.json / report.txt), publish (manifest, notes, gate)
 models/          one script per object (_template.py is the starting point); commit these
+assets/          one script per game asset (_template.py); `cad game build`
+packs/           one script per asset pack (collection, demo world); `cad game pack`
+cadkit/game/     game-asset harness (meshes, textures, glTF writer, Cinder engine adapter, ladder)
 designs/         one script per embroidery design (_template.py); `cad stitch build`
 cadkit/stitch/   embroidery harness (Design, stitch engines, PES/DST writers, checks, preview)
 tools/stitchsim/ Rust embroidery simulator (PES/DST/EXP/JEF viewer); `cad stitch sim`

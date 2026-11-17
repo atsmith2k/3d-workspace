@@ -7,6 +7,7 @@
   python -m cadkit list
   python -m cadkit selftest
   python -m cadkit stitch build designs/foo.py   (embroidery: see cadkit/stitch/cli.py)
+  python -m cadkit game build assets/foo.py      (game assets for Cinder: see cadkit/game/cli.py)
 
 `build` runs the model's build(p), checks the result is printable, and writes
 output/<model>/<model>.stl (+ .step for B-rep models), preview.png, build.json and
@@ -186,6 +187,17 @@ def cmd_build(args):
         reports[fname] = rep
         meshes[part_name] = rep.tm
         part_data[fname] = dict(part=part_name, **rep.data)
+    extras = None
+    if callable(getattr(mod, "extras", None)) and not getattr(args, "no_render", False):
+        # model-specific extra outputs (e.g. a lithophane's backlit simulation)
+        files, extra_lines = mod.extras(SimpleNamespace(**p), out, name)
+        print("\n== extras")
+        for line in extra_lines or []:
+            print("  " + line)
+        for f in files or []:
+            f = Path(f)
+            print(f"  -> {f.relative_to(ROOT) if f.is_relative_to(ROOT) else f}")
+        extras = dict(files=[Path(f).name for f in files or []], lines=list(extra_lines or []))
     fit = None
     if len(parts) > 1:
         fit_lines, fit_ok, pairs = fit_report(mod, SimpleNamespace(**p), meshes)
@@ -198,7 +210,7 @@ def cmd_build(args):
         name=name, model=str(path.relative_to(ROOT).as_posix() if path.is_relative_to(ROOT) else path),
         model_sha256=outputs.sha256(path), description=getattr(mod, "DESCRIPTION", "").strip(),
         params=p, printer=key, printer_name=pr["name"], bed=list(bed), fast=bool(args.fast),
-        ok=bool(all_ok), header_lines=header, parts=part_data, fit=fit,
+        ok=bool(all_ok), header_lines=header, parts=part_data, fit=fit, extras=extras,
         generated_at=outputs.now_iso(), cadkit_version=__version__,
     )
     outputs.save_json(out / "build.json", build)
@@ -237,9 +249,34 @@ def fit_report(mod, p, meshes, min_clearance=0.1):
     return lines, ok, pairs
 
 
+def slice_settings(args):
+    """The model's SLICE dict (production print settings: supports, rotate, process
+    keys), with --supports / --process from the command line laid over it."""
+    cfg = {}
+    model = getattr(args, "model", None)
+    if model:
+        try:
+            cfg = dict(getattr(load_model(Path(model)), "SLICE", None) or {})
+        except Exception:
+            cfg = {}
+    process = dict(cfg.get("process") or {})
+    for pair in getattr(args, "process", None) or []:
+        k, _, v = pair.partition("=")
+        if k:
+            process[k.strip()] = v.strip()
+    lh = getattr(args, "layer_height", None)
+    fill = getattr(args, "infill", None)
+    return dict(supports=bool(getattr(args, "supports", False) or cfg.get("supports", False)),
+                rotate=float(cfg.get("rotate", 0) or 0), process=process,
+                layer_height=float(lh if lh is not None else cfg.get("layer_height", 0.2)),
+                infill=int(fill if fill is not None else cfg.get("infill", 15)),
+                filament=getattr(args, "filament", None) or cfg.get("filament"))
+
+
 def slice_folder(out, name, args):
     """Slice every STL in an output folder; record each in slice.json (keyed by the
-    3MF stem, so slices for different printers coexist) and recompose report.txt."""
+    3MF stem, so slices for different printers coexist) and recompose report.txt.
+    The model's SLICE dict (see slice_settings) rides along on every slice."""
     stls = sorted(out.glob(f"{name}*.stl"))
     if not stls:
         sys.exit(f"nothing built in {out}; run build first")
@@ -248,21 +285,28 @@ def slice_folder(out, name, args):
         print("  slice    skipped: no Bambu Studio or PrusaSlicer found (set CAD_BAMBU / CAD_SLICER)")
         return None
     slices = outputs.load_json(out / "slice.json")
+    cfg = slice_settings(args)
     results = []
     for stl in stls:
         t0 = time.time()
         try:
             res = slicer.slice_stl(stl, out, printer_key=key,
-                                   layer_height=getattr(args, "layer_height", 0.2),
-                                   infill=getattr(args, "infill", 15),
-                                   supports=getattr(args, "supports", False),
-                                   filament=getattr(args, "filament", None),
+                                   layer_height=cfg["layer_height"],
+                                   infill=cfg["infill"],
+                                   supports=cfg["supports"],
+                                   filament=cfg["filament"],
                                    profile=getattr(args, "profile", None),
-                                   prefer=getattr(args, "slicer", "auto"))
+                                   prefer=getattr(args, "slicer", "auto"),
+                                   process=cfg["process"], rotate=cfg["rotate"])
         except Exception as e:
             print(f"  slice    FAILED for {stl.name}: {e}")
             continue
         lines = res.lines()
+        if cfg["process"] or cfg["rotate"]:
+            extra = ", ".join(f"{k}={v}" for k, v in cfg["process"].items())
+            if cfg["rotate"]:
+                extra = f"turned {cfg['rotate']:g} deg on the plate" + (", " + extra if extra else "")
+            lines.insert(-1, f"settings {extra}")
         print(f"\n== slice {stl.stem} with {res.slicer} ({time.time() - t0:.1f}s)")
         for line in lines:
             print("  " + line)
@@ -270,6 +314,7 @@ def slice_folder(out, name, args):
         print(f"  -> {f.relative_to(ROOT) if f.is_relative_to(ROOT) else f}")
         stem = f.stem if res.project else f"{stl.stem}_{res.printer_key}"
         slices[stem] = dict(res.to_dict(), stl=stl.name, stl_sha256=outputs.sha256(stl),
+                            overrides=cfg["process"], rotate=cfg["rotate"], lines=lines,
                             sliced_at=outputs.now_iso())
         results.append(res)
     outputs.save_json(out / "slice.json", slices)
@@ -397,6 +442,62 @@ def cmd_trace(args):
     print(f"traced {src.name}: {cs.num_contour()} contours, {hi_x - lo_x:.1f} x {hi_y - lo_y:.1f} mm, "
           f"area {cs.area():.0f} mm2\n  -> {svg.relative_to(ROOT)}\n  -> {png.relative_to(ROOT)}\n"
           f"  use it with: from cadkit.image import svg_shape; svg_shape('{svg.relative_to(ROOT).as_posix()}', width={args.width})")
+    return 0
+
+
+def cmd_litho(args):
+    """`cad litho new photo.jpg`: write models/<name>.py from the lithophane template
+    (photo copied to models/images/) and build it. `cad litho calibrate`: transmittance."""
+    from . import lithophane as lp
+    if args.litho_cmd == "calibrate":
+        return litho_calibrate(args)
+    src = Path(args.image).resolve()
+    if not src.exists():
+        sys.exit(f"no such image: {src}")
+    stem = "".join(c if c.isalnum() else "_" for c in src.stem.lower()).strip("_")
+    name = args.name or f"lithophane_{stem}"
+    dest = ROOT / "models" / f"{name}.py"
+    if dest.exists():
+        sys.exit(f"{dest.relative_to(ROOT)} already exists; build it with: "
+                 f"cad build {dest.relative_to(ROOT).as_posix()}")
+    images = ROOT / "models" / "images"
+    images.mkdir(exist_ok=True)
+    img = images / f"{name}{src.suffix.lower()}"
+    if src != img:
+        img.write_bytes(src.read_bytes())
+    rel = img.relative_to(ROOT).as_posix()
+    defaults = lp.litho_params(rel)
+    over = dict(width=args.width, height=args.height, shape=args.shape, outline=args.outline)
+    for k, v in parse_overrides(defaults, args.set).items():
+        if k != "image" and v != defaults[k]:
+            over[k] = v
+    text = (ROOT / "models" / "_lithophane_template.py").read_text(encoding="utf-8")
+    text = (text.replace("DESCRIPTION_HERE", f"{args.shape} lithophane of {src.name}")
+                .replace("IMAGE_HERE", rel).replace("NAME_HERE", name)
+                .replace("PARAMS_HERE", ", ".join(f"{k}={v!r}" for k, v in over.items())))
+    dest.write_text(text, encoding="utf-8")
+    print(f"created {dest.relative_to(ROOT)} (photo copied to {rel})")
+    if args.no_build:
+        return 0
+    bargs = argparse.Namespace(model=str(dest), set=[], name=None, out=None, fast=False, no_render=False,
+                               section=None, slice=args.slice, sweep=None, printer=args.printer, bed=None,
+                               layer_height=None, infill=None, supports=False, filament=None,
+                               slicer="auto", profile=None, process=[])
+    return cmd_build(bargs)
+
+
+def litho_calibrate(args):
+    from . import lithophane as lp
+    wedge = load_model(ROOT / "models" / "lithophane_calibration.py")
+    steps = list(wedge.PARAMS["steps"])
+    crop = tuple(int(v) for v in args.crop.split(",")) if args.crop else None
+    tau, vals, fit, ok = lp.fit_transmittance(args.photo, steps, crop=crop, axis=args.axis)
+    print(f"calibration from {Path(args.photo).name}: {len(steps)} steps")
+    for t, v, f, good in zip(steps, vals, fit, ok):
+        print(f"  {t:4.1f} mm  measured {v:.3f}  fit {f:.3f}" + ("" if good else "  (clipped, ignored)"))
+    print(f"\ntransmittance {tau:.3f} per mm (lit contrast at 0.6-3.0 mm: {tau ** -2.4:.0f}:1)")
+    print(f"use it with:  cad build models/<name>.py --set transmittance={tau:.3f}\n"
+          f"or put transmittance={tau:.3f} in the model's PARAMS")
     return 0
 
 
@@ -628,13 +729,17 @@ def add_model_args(sp):
 
 
 def add_slice_args(sp):
-    sp.add_argument("--layer-height", type=float, default=0.2,
-                    help="0.08/0.12/0.16/0.20/0.24/0.28 pick the matching Bambu preset")
-    sp.add_argument("--infill", type=int, default=15, help="percent")
+    sp.add_argument("--layer-height", type=float, default=None,
+                    help="0.08/0.12/0.16/0.20/0.24/0.28 pick the matching Bambu preset "
+                         "(default: the model's SLICE layer_height, else 0.2)")
+    sp.add_argument("--infill", type=int, default=None,
+                    help="percent (default: the model's SLICE infill, else 15)")
     sp.add_argument("--supports", action="store_true", help="let the slicer add supports")
     sp.add_argument("--filament", help=f"Bambu filament preset, e.g. 'Bambu PETG Basic' (default {printers.DEFAULT_FILAMENT})")
     sp.add_argument("--slicer", default="auto", choices=["auto", "bambu", "prusa"])
     sp.add_argument("--profile", help="PrusaSlicer .ini to load (prusa backend only)")
+    sp.add_argument("--process", action="append", default=[], metavar="KEY=VALUE",
+                    help="extra Bambu process setting, e.g. seam_position=back (over the model's SLICE)")
 
 
 def main():
@@ -673,6 +778,24 @@ def main():
     tr.add_argument("--threshold", type=int, default=128)
     tr.add_argument("--invert", action="store_true", help="light artwork on dark background")
     tr.add_argument("--out")
+    li = sub.add_parser("litho", help="lithophanes: make a model from a photo, or calibrate a filament")
+    lsub = li.add_subparsers(dest="litho_cmd", required=True)
+    ln = lsub.add_parser("new", help="photo -> models/<name>.py (+ build)")
+    ln.add_argument("image")
+    ln.add_argument("--name", help="model name (default: lithophane_<photo stem>)")
+    ln.add_argument("--width", type=float, default=100.0, help="outer width mm (cylinder: circumference)")
+    ln.add_argument("--height", type=float, default=0.0, help="outer height mm (0 = photo aspect)")
+    ln.add_argument("--shape", default="flat", choices=["flat", "arc", "cylinder"])
+    ln.add_argument("--outline", default="rect", choices=["rect", "rounded", "oval", "heart", "hexagon"])
+    ln.add_argument("--set", action="append", default=[], metavar="NAME=VALUE",
+                    help="any other lithophane parameter, written into the model's PARAMS")
+    ln.add_argument("--no-build", action="store_true", help="only write the model script")
+    ln.add_argument("--slice", action="store_true", help="also slice after building")
+    ln.add_argument("--printer", help="a1 (default) or a1mini")
+    lc = lsub.add_parser("calibrate", help="measure filament transmittance from a backlit photo of the wedge")
+    lc.add_argument("photo")
+    lc.add_argument("--crop", help="x0,y0,x1,y1 pixel box around the steps (default: whole photo)")
+    lc.add_argument("--axis", default="x", choices=["x", "y"], help="steps run left-right (x) or bottom-top (y)")
     n = sub.add_parser("new", help="start a model from the template")
     n.add_argument("name")
     n.add_argument("description", nargs="?", default="")
@@ -681,12 +804,15 @@ def main():
     t.add_argument("--update", action="store_true", help="re-record tests/expected.json from this run")
     from .stitch import cli as stitch_cli
     stitch_cli.add_parser(sub)
+    from .game import cli as game_cli
+    game_cli.add_parser(sub)
     args = ap.parse_args()
     if args.cmd == "build" and args.sweep:
         sys.exit(cmd_sweep(args))
     commands = dict(build=cmd_build, slice=cmd_slice, measure=cmd_measure, new=cmd_new,
                     list=cmd_list, selftest=cmd_selftest, lint=cmd_lint, trace=cmd_trace,
-                    publish=cmd_publish, stitch=stitch_cli.run)
+                    publish=cmd_publish, stitch=stitch_cli.run, litho=cmd_litho,
+                    game=game_cli.run)
     sys.exit(commands[args.cmd](args))
 
 

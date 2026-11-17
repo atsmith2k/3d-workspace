@@ -1,13 +1,14 @@
 # AGENTS.md: working in this repo as a coding agent
 
 This repo is a **generative design workspace**: an agent turns a plain-language request into
-a finished, checked digital product, with no hand modelling or digitising. It makes two kinds
-of product, and both can be sold in the shop at https://shop.ash10.dev (repo `ash10-dev-shop`):
+a finished, checked digital product, with no hand modelling or digitising. It makes three kinds
+of product; the first two can be sold in the shop at https://shop.ash10.dev (repo `ash10-dev-shop`):
 
 | Product | Agent writes | Command | Ships |
 |---|---|---|---|
 | 3D print model | `models/<name>.py` | `cad build`, `cad slice`, `cad publish` | STL, STEP, sliced 3MF |
 | Machine-embroidery design | `designs/<name>.py` | `cad stitch build`, `cad stitch publish` | PES PEC DST JEF EXP VP3 XXX U01 + Ink/Stitch SVG |
+| Game asset for the Cinder engine | `assets/<name>.py` | `cad game build` (`cad game schema` for the contract) | GLB proven in-engine, preview rendered by Cinder |
 
 This file is tool-neutral: any coding agent (Claude Code, Codex, Cursor, Aider...) can follow
 it. `CLAUDE.md` is the full reference (every helper, contract and gotcha). The playbooks in
@@ -25,6 +26,15 @@ shop's embroidery line:
   Then `cad selftest` (regression suite) must pass.
 - Run `cad` from the repo root: `cad.cmd` on Windows, `./cad` elsewhere (both wrap `.venv`).
 - `cad list` (3D models), `cad stitch list` (embroidery designs, Ink/Stitch status).
+- Game assets: `cad game list`, `cad game engine` (the Cinder package that verifies builds;
+  set `CAD_CINDER` if it is not at `../cinder/dist/cinder-windows-x64`). A build is done only at
+  `ready YES`. Details: CLAUDE.md, "Game assets for Cinder", and `docs/game-assets-plan.md`.
+- High-resolution game assets use headless Blender (`cad game blender` says which one; install
+  with `winget install BlenderFoundation.Blender` or set `CAD_BLENDER`). Without it those assets
+  cannot be rebuilt from nothing; everything else is unaffected.
+- Photo lithophanes: `cad litho new photo.jpg --width 100 [--shape arc|cylinder]` writes and
+  builds a model. Judge it by `<name>_backlit.png` (simulated light box), not just the
+  preview. `cad litho calibrate` measures a filament. Details: CLAUDE.md, "Lithophanes".
 - Tests: `.venv/Scripts/python -m pytest tests -q`. Run them, and `cad selftest`, after any
   change under `cadkit/`.
 - Ink/Stitch 3 (in the Inkscape extensions folder, or `CAD_INKSTITCH`) is the default stitch
