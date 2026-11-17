@@ -309,3 +309,15 @@ def capsule(a, b, r0, r1=None, sides=12, rings=4):
            [(r1 * np.cos(t), length + r1 * np.sin(t)) for t in quarter]
     prof[0], prof[-1] = (0.0, -r0), (0.0, length + r1)
     return along(lathe(prof, sides), a, b)
+
+
+def wind_to_normals(mesh):
+    """Turn round any triangle that winds against its own vertex normals (a decimated mesh can
+    leave one or two): the engine culls by winding, so such a face would be a hole."""
+    a, b, c = (mesh.v[mesh.f[:, k]] for k in range(3))
+    back = (np.cross(b - a, c - a) * mesh.n[mesh.f].sum(1)).sum(1) < 0
+    if not back.any():
+        return mesh
+    f = mesh.f.copy()
+    f[back] = f[back][:, [0, 2, 1]]
+    return Mesh(mesh.v, f, mesh.n, mesh.uv)

@@ -249,6 +249,7 @@ def _skin(ctx):
     for j, w in ctx.model.skins:
         used |= set(np.unique(j[w > 0]).tolist())
     idle = [b.name for i, b in enumerate(sk.bones) if i not in used and b.name != "root"
+            and not b.name.startswith("socket_")
             and not any(c.parent == i for c in sk.bones)]
     if idle:
         bad.append(f"leaf bones move nothing: {idle}")

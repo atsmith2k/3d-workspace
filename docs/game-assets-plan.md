@@ -181,6 +181,11 @@ directory.
 8. A body dropped onto a static floor comes to rest about 15 mm inside it (seen with the
    engine's own `shape kind="box"`: dropped from 0.5 m it rests at y=0.385 for a 0.8 m box,
    placed at rest it stays at 0.400).
+9. Samplers: the pool holds 256 (`cinder/gfx/resources.mojo`) and the world kit creates one per
+   texture per placed copy of a model, so a world stops loading at about 250 textures counting
+   every copy (83 pieces of one textured material, 41 of two): "Pool is full (256 slots)".
+   Samplers with the same settings should be shared, and textures shared between copies.
+   Found by the fantasy pack's style test; `cad game pack` now counts them (budget 245).
 
 Until 4 lands, clips are proven by the cook plus the CPU pose strip, and sounds by decode checks.
 
@@ -416,3 +421,27 @@ for three different reasons, and the asset's own check caught each one.
 - Close up, the monolith's silhouette shows its 3,000 triangles, and its glowing runes read
   more as bright paint than as grooves. A higher budget and a dimmer glow would fix both.
 - No high-poly sculpting from a reference image or from a generated mesh.
+
+
+## 15. Generated surfaces on baked models (2026-11-17)
+
+Asked for: more depth in the models' textures, by generating them. Built on the two existing
+deep ends, the generative step (section 13) and Blender (section 14), rather than beside them.
+
+- `gen.surface_image(subject, name, metres)` asks for a material the way a texture needs it;
+  `gen.pbr(img, metres, relief, rough)` makes a `Surface` from the one picture: lighting divided
+  out (`delight`), edges cross-faded to repeat, a height field guessed from brightness in two
+  bands, roughness from the height.
+- `Surface.sample(pos, nrm)` projects it triplanar onto the texel positions of a baked mesh
+  (`texel_maps`), so there are no UV seams; `slope_normal` + `combine_normals` lay its grain
+  over the baked normal map at the right physical depth (`texel_metres`).
+- The same rules as every generated input: cached in `assets/gen/`, a build never pays on its
+  own, nothing ships until a person clears it.
+- First asset: `assets/nat_boulder_mossy.py`. Found on the way: the generator's moss was far
+  too green for the pack (colour now comes from the palette, texture from the picture); moss
+  placed by a hard threshold sat like a cap (broken up by two scales of 3D noise and by the
+  granite's own height); decimation left one triangle wound backward (`wind_to_normals`).
+- Not built: a generated height map driving the sculpt itself (Blender displacement from an
+  image), generated maps conditioned on the model's own UV layout (a model-aware texturing
+  service), and upscaling past 1024 px sources. Height from brightness is a guess: it is right
+  for cracks and grain, wrong for a material whose dark parts stand proud.

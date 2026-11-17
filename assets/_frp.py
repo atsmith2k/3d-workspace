@@ -220,3 +220,30 @@ def piece_checks(x, y, z, kind="building", anchor="base", mats=None, tol=0.002):
     b = BUDGET_OF[kind]
     return [size(x=x, y=y, z=z, tol=tol), tris(max=b["tris"]), pivot(anchor), materials(mats or b["materials"]),
             texture_size(b["texture"])]
+
+
+# ---------------------------------------------------------------- armour slots and sound levels
+# One piece, one slot. `bones` are what the piece is bound to (".L"/".R" added for limbs);
+# `hides` is the body region the build drops under it, so no skin shows through.
+SLOTS = dict(
+    head=dict(bones=("head",), hides="scalp"),
+    shoulders=dict(bones=("chest", "upper_arm"), hides=None),
+    chest=dict(bones=("spine", "chest"), hides="torso"),
+    arms=dict(bones=("upper_arm", "lower_arm"), hides="arms"),
+    hands=dict(bones=("hand", "fingers", "thumb"), hides="hands"),
+    belt=dict(bones=("hips",), hides=None),
+    legs=dict(bones=("hips", "upper_leg", "lower_leg"), hides="legs"),
+    feet=dict(bones=("foot", "toe"), hides="feet"),
+    cloak=dict(bones=("chest", "spine"), hides=None),
+    robe=dict(bones=("spine", "chest", "hips", "upper_leg"), hides="torso+legs", takes=("chest", "legs")))
+
+# Peak level in dBFS per sound family: any footstep works with any surface, any weapon with any hit.
+SOUND_PEAK = dict(step=-8.0, ui=-8.0, cloth=-8.0, swing=-6.0, foley=-6.0, door=-6.0,
+                  hit=-3.0, spell=-3.0, voice=-3.0, creature=-3.0, ambience=-8.0, music=-8.0)
+
+
+def sound_name(family, source, variant=None):
+    """`sfx_step_stone_03`, `mus_village_dusk`: the pack's sound names."""
+    assert family in SOUND_PEAK, family
+    head = "mus" if family == "music" else f"sfx_{family}"
+    return f"{head}_{source}" + (f"_{variant:02d}" if variant is not None else "")

@@ -45,7 +45,7 @@ from the title screen to the final boss, without making or buying anything else.
    honour alpha, draw UI images, play audio from a world file, or emit particles. Section 8 says
    what each gap blocks and how the pack is built so it is correct the day the gap closes.
 
-## 3. Style guide (to be fixed in a one-page sheet before production)
+## 3. Style guide (fixed in `fantasy-rpg-style-guide.md` and `assets/_frp.py`; summary here)
 
 **Palette.** One master palette of about 48 colours, weighted dark: cold and soot-stained
 stone, weathered and rotten wood, three metals (iron with rust, tarnished bronze, dull gold),
@@ -119,6 +119,10 @@ worlds**, including roughly 100 dark-fantasy pieces spread through the sub-packs
 | Sandbox Kit | 15 models | Separate product; shares scale and grid. |
 
 ## 6. Shared systems to design before any sub-pack
+
+Status 2026-11-17: 1, 2, 4, 6, 7 are built and proven by `assets/hero_mannequin.py` (35 bones, eight
+sockets, four shapes) and `packs/frp_style_test.py`; 3, 8 and 9 are specified in the style guide
+(`SLOTS`, `SOUND_PEAK`, icon rules) with no fitted armour or sound family built yet; 5 is not started.
 
 These are decisions more than assets; each is a short spec with a test asset.
 
@@ -577,6 +581,7 @@ shown the same way.
 | UI draws no images (filed as cinder#44) | Icons, framed panels, cursors, portraits, minimap | Screens as text-and-panel documents; all art built ahead as atlases |
 | No audio in world files | Hearing a kit world | Sounds proven by the engine opening them; played from Mojo |
 | Textures not shared between models | Memory of large kits | Small shared sheets; manifest names them for the day sharing lands |
+| 256 samplers, one per texture per placed copy | Scenes over about 250 textures (83 one-material pieces) | Flat materials, 8 m ground tiles, atlases; the pack build counts samplers and refuses over 245 |
 | No terrain system | Open landscapes | Modular ground and cliff pieces on the grid (decided) |
 | No cylinder, convex or per-part colliders | Barrels that roll, trees with trunk-only collision | Collider wanted recorded in each manifest entry |
 | No public UI font setting | Using our fonts | Documented recipe; installed in `Game.start` |

@@ -248,3 +248,145 @@ def material(img, name, roughness=0.8, metallic=0.0, relief=2.0, size=None):
     lum = blur(base.mean(2), 1)
     return Material(name, base=base, orm=orm(1.0, roughness, metallic, size=base.shape[0]),
                     normal=normal_from_height(lum, relief), metallic=1.0, roughness=1.0)
+
+
+# ---------------------------------------------------------------- generated surfaces for baked models
+# A generated picture of a material (rock, bark, rust, moss) becomes a full PBR surface, and is
+# then projected onto a baked model in world space, so the detail has no UV seams and sits under
+# the model's own baked occlusion, curvature and normals. The picture supplies what a script
+# draws badly (the look of a real material); the bake supplies what a picture cannot know (the shape).
+
+SURFACE_PROMPT = ("A seamless tileable texture of {subject}. Seen straight on, perfectly flat, filling the whole "
+                  "frame edge to edge at one uniform scale, about {metres:g} metres across. Flat even overcast "
+                  "light: no cast shadows, no highlights, no gradient across the frame, no vignette, no perspective. "
+                  "No objects, no text, no border. A base colour (albedo) texture for a game material.")
+
+
+def surface_image(subject, name, metres=2.0, size=1024, quality="high", **params):
+    """A generated picture of a material, asked for the way a texture needs it. `subject`
+    describes the material only ("weathered grey granite with pale lichen")."""
+    return image(SURFACE_PROMPT.format(subject=subject, metres=metres), name=name, size=(size, size),
+                 quality=quality, **params)
+
+
+def _gauss(a, sigma, wrap=True):
+    from scipy import ndimage
+    a = np.asarray(a, float)
+    sig = (sigma, sigma) + (0,) * (a.ndim - 2)
+    return ndimage.gaussian_filter(a, sig, mode="wrap" if wrap else "nearest")
+
+
+def delight(img, radius=0.12, keep=0.25):
+    """Take the lighting out of a picture: divide by its own heavily blurred brightness, so a
+    generated image that is brighter on one side or in the middle becomes an even albedo. `radius`
+    is the blur as a share of the size; `keep` is how much of the broad variation stays."""
+    a = np.asarray(img, float)
+    lum = a.mean(2)
+    broad = _gauss(lum, radius * a.shape[0])
+    gain = (lum.mean() / np.maximum(broad, 1e-3)) ** (1 - keep)
+    return np.clip(a * gain[..., None], 0, 1)
+
+
+def unevenness(img, radius=0.12):
+    """How uneven a picture's lighting is: the spread of its heavily blurred brightness, as a
+    share of its mean. Under about 0.06 reads as one evenly lit material."""
+    lum = np.asarray(img, float).mean(2)
+    broad = _gauss(lum, radius * lum.shape[0])
+    return float(broad.std() / max(lum.mean(), 1e-6))
+
+
+def height_from_picture(img, fine=1.0, coarse=12.0, mix=0.6):
+    """A height field (0..1) guessed from a picture: dark is low, in two bands, so both the
+    cracks (coarse) and the grain (fine) stand in relief. A guess, but the one every texture
+    tool makes; judge it in the preview's normal map."""
+    lum = np.asarray(img, float).mean(2)
+    wide = _gauss(lum, coarse) - _gauss(lum, coarse * 6)
+    small = _gauss(lum, fine) - _gauss(lum, coarse)
+    h = mix * wide / max(wide.std(), 1e-6) + (1 - mix) * small / max(small.std(), 1e-6)
+    return np.clip(0.5 + h / 6, 0, 1)
+
+
+class Surface:
+    """A tileable PBR surface: base colour, height and roughness, one repeat `metres` across."""
+
+    def __init__(self, base, height, rough, metres, metallic=0.0, relief=0.01):
+        self.base, self.height, self.rough = base, height, rough
+        self.metres, self.metallic, self.relief = metres, metallic, relief      # relief: height range in metres
+
+    @property
+    def size(self):
+        return self.base.shape[0]
+
+    def material(self, name):
+        """The surface as an ordinary tiling Material (for kit pieces with world-scale UVs)."""
+        from .model import Material
+        from .texture import occlusion_from_height, orm
+        slope = self.relief * self.size / self.metres            # height range in texels
+        return Material(name, base=self.base, normal=slope_normal(self.height, slope, wrap=True),
+                        orm=orm(occlusion_from_height(self.height, 6, 0.6), self.rough, self.metallic),
+                        metallic=1.0, roughness=1.0)
+
+    def sample(self, pos, nrm, sharp=6.0):
+        """Triplanar projection: the surface at world positions `pos` (..., 3) on faces with
+        normals `nrm`. Returns (base, height, rough). Each axis projects the picture along
+        itself; faces between axes blend, sharply, so the grain is not smeared."""
+        from scipy import ndimage
+        w = np.abs(np.asarray(nrm, float)) ** sharp
+        w = w / np.maximum(w.sum(-1, keepdims=True), 1e-9)
+        n = self.size
+        stack = np.dstack([self.base, self.height, self.rough])
+        out = 0.0
+        for axis, (a, b) in enumerate(((2, 1), (0, 2), (0, 1))):
+            u = (pos[..., a] / self.metres * n + 37.0 * axis) % n       # each projection offset, so they never line up
+            v = (-pos[..., b] / self.metres * n + 53.0 * axis) % n
+            got = np.stack([ndimage.map_coordinates(stack[..., c], [v, u], order=1, mode="grid-wrap")
+                            for c in range(stack.shape[2])], -1)
+            out = out + got * w[..., axis:axis + 1]
+        return out[..., :3], out[..., 3], out[..., 4]
+
+
+def pbr(img, metres=2.0, relief=0.01, rough=(0.65, 0.95), metallic=0.0, size=None, blend=0.12, flatten=True):
+    """A Surface from one picture: de-lit, made to repeat, resized to a power of two, with a
+    height field guessed from it and roughness from the height (hollows rougher, worn tops
+    smoother, between `rough` lo and hi)."""
+    a = np.asarray(img, float)
+    if flatten:
+        a = delight(a)
+    a = square_pow2(tileable(a, blend) if blend else a, size)
+    h = height_from_picture(a)
+    r = rough[1] - (rough[1] - rough[0]) * np.clip((h - 0.3) / 0.5, 0, 1)
+    return Surface(a, h, r, metres, metallic, relief)
+
+
+def slope_normal(height, scale, wrap=False, mask=None):
+    """A tangent-space normal map (glTF: +Y up, row 0 at the top) from a height field. `scale`
+    is the height range measured in texels: slope = scale * difference between neighbours."""
+    h = np.asarray(height, float)
+    if mask is not None:                                   # do not take a gradient across the edge of a UV island
+        from .texture import fill_background
+        h = fill_background(h, mask)
+    if wrap:
+        dx = (np.roll(h, -1, 1) - np.roll(h, 1, 1)) / 2
+        dy = (np.roll(h, -1, 0) - np.roll(h, 1, 0)) / 2
+    else:
+        dy, dx = np.gradient(h)
+    n = np.dstack([-dx * scale, dy * scale, np.ones_like(h)])
+    n /= np.linalg.norm(n, axis=2, keepdims=True)
+    return n * 0.5 + 0.5
+
+
+def combine_normals(base, detail, amount=1.0):
+    """Lay a detail normal map over a baked one (both encoded 0..1): the baked map keeps the
+    shape, the detail adds grain on top (the "whiteout" blend)."""
+    a, b = np.asarray(base, float) * 2 - 1, np.asarray(detail, float) * 2 - 1
+    n = np.dstack([a[..., 0] + b[..., 0] * amount, a[..., 1] + b[..., 1] * amount, a[..., 2] * np.maximum(b[..., 2], 1e-3)])
+    n /= np.maximum(np.linalg.norm(n, axis=2, keepdims=True), 1e-9)
+    return n * 0.5 + 0.5
+
+
+def texel_metres(mesh, mask):
+    """The size of one texel on a baked mesh, in metres: the square root of its surface area
+    over the texels its UV islands cover."""
+    v = mesh.v[mesh.f]
+    area = 0.5 * np.linalg.norm(np.cross(v[:, 1] - v[:, 0], v[:, 2] - v[:, 0]), axis=1).sum()
+    return float(np.sqrt(area / max(int(np.asarray(mask).sum()), 1)))

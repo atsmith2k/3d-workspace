@@ -340,3 +340,64 @@ def biped_gait(ph, stride, knee, arm, elbow, lean, bob, twist, drop=24.0):
         pose[f"upper_arm.{side}"] = euler(x=arm * cc, z=-sign * drop)
         pose[f"lower_arm.{side}"] = euler(x=-elbow - elbow * 0.25 * cc)
     return pose
+
+
+# The shared humanoid: one skeleton for heroes, townsfolk and humanoid monsters, so armour,
+# weapons and clips made for one fit all. Body shapes change proportions, never bone names.
+SHAPES = dict(standard=dict(height=1.80, width=1.00), stout=dict(height=1.35, width=1.30),
+              slight=dict(height=1.10, width=0.92), tall=dict(height=2.05, width=1.16))
+
+# Attachment points. A socket is a bone that moves nothing by itself: a game parents an item to
+# it, and a build binds an item to it rigidly. `turn` is how an item made to the held-item
+# convention (grip at its origin, blade or shaft along +Y) is turned to sit in the socket at
+# rest: (degrees, axis) pairs applied in order.
+SOCKETS = {
+    "socket_hand.R": dict(parent="hand.R", use="main-hand weapon or tool", turn=((90, "x"),)),
+    "socket_hand.L": dict(parent="hand.L", use="off-hand weapon, torch, focus", turn=((90, "x"),)),
+    "socket_shield": dict(parent="lower_arm.L", use="shield strap, on the outside of the forearm", turn=()),
+    "socket_back": dict(parent="chest", use="two-handed weapon, bow or staff carried on the back", turn=((180, "z"), (20, "z"))),
+    "socket_quiver": dict(parent="chest", use="quiver, behind the right shoulder", turn=((160, "z"),)),
+    "socket_hip.L": dict(parent="hips", use="sheathed sword, left hip", turn=((180, "z"), (-25, "x"))),
+    "socket_hip.R": dict(parent="hips", use="dagger, pouch or potion, right hip", turn=((180, "z"), (-25, "x"))),
+    "socket_head": dict(parent="head", use="helmet, hat, crown: the top of the skull", turn=()),
+}
+
+
+def humanoid(shape="standard", arm_down=62.0):
+    """The pack's humanoid skeleton in one of four body shapes: the 18 bones of `biped`, plus a
+    jaw, eyes, a thumb and a finger group per hand, toes, and eight sockets. 35 bones."""
+    spec = SHAPES[shape]
+    h = spec["height"] / 1.75
+    sk = biped(spec["height"], shoulder=0.19 * spec["width"], hip=0.095 * spec["width"], arm_down=arm_down)
+    head, top = sk.head("head"), sk.tail(sk.index("head"))
+    sk.add("jaw", "head", head + [0, 0.035 * h, 0.03 * h], tail=head + [0, 0.0, 0.10 * h])
+    for s, side in ((1, "L"), (-1, "R")):
+        sk.add(f"eye.{side}", "head", head + [s * 0.035 * h, 0.12 * h, 0.085 * h], tail=head + [s * 0.035 * h, 0.12 * h, 0.11 * h])
+    for s, side in ((1, "L"), (-1, "R")):
+        wrist, tip = sk.head(f"hand.{side}"), sk.tail(sk.index(f"hand.{side}"))
+        d = (tip - wrist) / np.linalg.norm(tip - wrist)
+        sk.add(f"fingers.{side}", f"hand.{side}", wrist + d * 0.07 * h, tail=wrist + d * 0.15 * h)
+        sk.add(f"thumb.{side}", f"hand.{side}", wrist + d * 0.03 * h + [0, 0, 0.03 * h], tail=wrist + d * 0.07 * h + [0, 0, 0.06 * h])
+        sk.add(f"socket_hand.{side}", f"hand.{side}", wrist + d * 0.075 * h + [0, 0, 0.012 * h])
+        ankle = sk.head(f"foot.{side}")
+        sk.add(f"toe.{side}", f"foot.{side}", [ankle[0], 0.02 * h, 0.11 * h], tail=[ankle[0], 0.02 * h, 0.2 * h])
+    elbow, wrist = sk.head("lower_arm.L"), sk.head("hand.L")
+    sk.add("socket_shield", "lower_arm.L", (elbow + wrist) / 2 + [0.05 * h * spec["width"], 0, 0])
+    chest, hips = sk.head("chest"), sk.head("hips")
+    sk.add("socket_back", "chest", chest + [0, 0.10 * h, -0.14 * h * spec["width"]])
+    sk.add("socket_quiver", "chest", chest + [-0.09 * h * spec["width"], 0.14 * h, -0.13 * h * spec["width"]])
+    for s, side in ((1, "L"), (-1, "R")):
+        sk.add(f"socket_hip.{side}", "hips", hips + [s * 0.15 * h * spec["width"], 0.0, 0.0])
+    sk.add("socket_head", "head", top)
+    return sk
+
+
+def attach(character, parts, socket):
+    """Bind an item (a list of (mesh, material) made to the held-item convention) to a socket of
+    a Character built on `humanoid`, turned as the socket says. Returns the character."""
+    at = character.skeleton.head(socket)
+    for mesh, material in parts:
+        for deg, axis in SOCKETS[socket]["turn"]:
+            mesh = mesh.rotated(deg, axis)
+        character.add(mesh.moved(*at), material, bind=socket)
+    return character

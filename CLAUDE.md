@@ -633,6 +633,32 @@ repeat. Rules the code enforces:
 `cad game gen list` shows every input and whether it is cleared. Worked example:
 `assets/wall_tapestry.py`.
 
+**Generated surfaces on baked models** (high-definition textures): the picture supplies the look
+of a real material, the Blender bake supplies the shape.
+```python
+img = gen.surface_image("weathered dark grey granite, hairline cracks, pale lichen", "frp_granite", metres=1.5)
+rock = gen.pbr(img, metres=1.5, relief=0.008, rough=(0.7, 0.95))   # de-lit, tileable, height + roughness guessed
+pos, nrm, mask = texel_maps(low, 2048)                             # low: the baked, unwrapped game mesh
+base, height, rough = rock.sample(pos, nrm)                        # triplanar, in world space: no UV seams
+detail = gen.slope_normal(height * rock.relief, 1 / gen.texel_metres(low, mask), mask=mask)
+normal = gen.combine_normals(baked_normal, detail)                 # grain over the baked shape
+```
+- `surface_image` wraps the subject in the prompt a texture needs (flat, evenly lit, edge to
+  edge, no objects or text): describe the material only. `gen.pbr(img).material(name)` is the
+  same surface as an ordinary tiling Material for kit pieces.
+- Mix by the bake, not by the picture: multiply the colour by the baked `ao`, lighten by
+  `curvature`, place a second surface (moss, rust, snow) by the texel normals and height.
+- **Colour comes from the palette, texture from the picture**: the first moss was lawn green.
+  Take the picture's brightness and tint it with palette colours; keep only part of its hue.
+- Checks every such asset carries: `gen.unevenness(surface.base) < 0.06` (no lighting left in
+  the picture), `seam_error < 1.6`, how much lean the detail adds to the baked normals, cover
+  of each layer and where it lies, mean base colour.
+- A decimated mesh can come back with a triangle wound against its normals:
+  `wind_to_normals(r.mesh(lo))` (`cadkit.game.mesh`).
+- 1024 px over 1.5 m is 680 px per metre, about the density of a 2048 px bake on a 1.7 m rock.
+  Worked example: `assets/nat_boulder_mossy.py` (1,000,000 triangles sculpted, 2,500 shipped,
+  two generated surfaces; 12 MB GLB).
+
 **Packs.** `cad game pack packs/<name>.py [--refresh]` bundles every asset whose
 `PRODUCT["collection"]` matches the script's `COLLECTION` into `output/game/packs/<name>/`:
 `assets/*.glb`, `previews/`, `worlds/demo.world`, `manifest.json` (schema `cadkit-game/1`: per
@@ -655,6 +681,15 @@ surface, hazard node, collider wanted) and `PRODUCT["notes"]` travel into the ma
 Worked examples: `packs/dungeon_kit.py` + `assets/_dungeon.py` (shared grid, stone and checks
 for 12 pieces) and `packs/sandbox_kit.py` + `assets/_sandbox.py` (one 16-tile atlas for a whole
 kit, `tile(mesh, T.RED)`; built from ten Hive suggestions).
+
+**Fantasy RPG pack** (`docs/game-asset-packs/fantasy-rpg-pack-plan.md`, rules in
+`fantasy-rpg-style-guide.md`): assets start `from _frp import *` (`assets/_frp.py`: ruler,
+`PALETTE`, materials, `BUDGET_OF`, `product(subpack)`, `piece_checks`, `SLOTS`, `SOUND_PEAK`).
+`humanoid(shape)` (standard, stout, slight, tall) is the one 35-bone skeleton for every humanoid;
+`SOCKETS` are its eight attachment bones and `attach(character, parts, socket)` binds a held item
+(grip at its origin, blade along +Y). Judge style with `packs/frp_style_test.py` (three cameras)
+and fit with `assets/hero_mannequin.py --set shape=...`. A world holds about 250 textures
+counting every placed copy (Cinder's 256 samplers): the pack build counts them.
 
 `cad game list`, `cad game engine` (which Cinder package verifies; `CAD_CINDER`, else
 `../cinder/dist/cinder-windows-x64`), `cad game schema` (contract, checks, conventions and the

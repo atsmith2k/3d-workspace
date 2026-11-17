@@ -13,7 +13,7 @@ from .texture import (noise, fbm, streaks, blur, normal_from_height,  # noqa: F4
                       texel_maps, fill_background)
 from .checks import (size, tris, materials, texture_size, pivot, tiles, custom, uv_unique,   # noqa: F401
                      clips, phase_matched, deforms_cleanly)
-from .rig import Skeleton, Clip, Character, biped, biped_gait, quat, euler, qmul   # noqa: F401
+from .rig import Skeleton, Clip, Character, biped, humanoid, SOCKETS, biped_gait, quat, euler, qmul   # noqa: F401
 from .matlib import stone_blocks, flagstones, planks, iron, palette, swatch_uv           # noqa: F401
 
 # What `from cadkit.game import *` gives an asset script: names, not submodules. Without this a
