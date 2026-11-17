@@ -169,6 +169,23 @@ def iron_rusted(size=256, seed=9):
 
 
 @lru_cache(maxsize=None)
+def plate_worn(size=512, seed=12):
+    """Armour plate that has seen years of use: dull grey steel, hammer marks, scuffs, and rust
+    only in small spots where the damp sits (about a tenth of it). One repeat is a third of a
+    metre on a harness, so marks are a few centimetres across."""
+    hammer = blur(noise(size, 10, seed), size // 64)                               # dents from the forge
+    scuff = streaks(size, "x", cells=120, stretch=6, seed=seed + 1)
+    cloud = fbm(size, 5, 4, seed + 2)
+    rust = np.clip((fbm(size, 7, 5, seed + 3) - 0.63) * 7, 0, 1)
+    grey = tint(np.clip(0.5 * cloud + 0.3 * hammer + 0.2 * scuff, 0, 1), (0.20, 0.21, 0.23), (0.44, 0.45, 0.47))
+    base = grey * (1 - 0.85 * rust[..., None]) + np.asarray(P["rust"]) * 0.85 * rust[..., None]
+    rough = np.clip(0.42 + 0.18 * scuff + 0.35 * rust, 0, 1)
+    return Material("frp_plate", base=np.clip(base, 0, 1), orm=orm(1 - 0.3 * rust, rough, 1 - 0.8 * rust),
+                    normal=normal_from_height(0.7 * hammer + 0.15 * scuff - 0.3 * rust, size / 256),
+                    metallic=1.0, roughness=1.0)
+
+
+@lru_cache(maxsize=None)
 def steel_blade(size=256, seed=10):
     """A kept blade: bright steel, fine scratches along its length (v)."""
     scratch = streaks(size, "y", cells=200, stretch=10, seed=seed)

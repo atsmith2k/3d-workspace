@@ -181,7 +181,7 @@ directory.
 8. A body dropped onto a static floor comes to rest about 15 mm inside it (seen with the
    engine's own `shape kind="box"`: dropped from 0.5 m it rests at y=0.385 for a 0.8 m box,
    placed at rest it stays at 0.400).
-9. Samplers: the pool holds 256 (`cinder/gfx/resources.mojo`) and the world kit creates one per
+9. Samplers (filed as cinder#48): the pool holds 256 (`cinder/gfx/resources.mojo`) and the world kit creates one per
    texture per placed copy of a model, so a world stops loading at about 250 textures counting
    every copy (83 pieces of one textured material, 41 of two): "Pool is full (256 slots)".
    Samplers with the same settings should be shared, and textures shared between copies.

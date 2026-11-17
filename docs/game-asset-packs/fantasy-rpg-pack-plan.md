@@ -122,7 +122,11 @@ worlds**, including roughly 100 dark-fantasy pieces spread through the sub-packs
 
 Status 2026-11-17: 1, 2, 4, 6, 7 are built and proven by `assets/hero_mannequin.py` (35 bones, eight
 sockets, four shapes) and `packs/frp_style_test.py`; 3, 8 and 9 are specified in the style guide
-(`SLOTS`, `SOUND_PEAK`, icon rules) with no fitted armour or sound family built yet; 5 is not started.
+(`SLOTS`, `SOUND_PEAK`, icon rules). Later the same day: 3 is built (`arm_footman_iron`, seven slots,
+four shapes, body hidden under each piece), 5 has its first view model (`wpn_longsword_iron_fp`: arm and
+sword, idle and swing), 9 has its first family (`sfx_step_stone_01..04`) and the first generated sound
+(`sfx_creature_growl_01`, ElevenLabs). Open: gloved and bare arms per shape for view models, wood and
+dirt step families (recipes exist), icon generators per item family.
 
 These are decisions more than assets; each is a short spec with a test asset.
 
@@ -581,7 +585,7 @@ shown the same way.
 | UI draws no images (filed as cinder#44) | Icons, framed panels, cursors, portraits, minimap | Screens as text-and-panel documents; all art built ahead as atlases |
 | No audio in world files | Hearing a kit world | Sounds proven by the engine opening them; played from Mojo |
 | Textures not shared between models | Memory of large kits | Small shared sheets; manifest names them for the day sharing lands |
-| 256 samplers, one per texture per placed copy | Scenes over about 250 textures (83 one-material pieces) | Flat materials, 8 m ground tiles, atlases; the pack build counts samplers and refuses over 245 |
+| 256 samplers, one per texture per placed copy (filed as cinder#48) | Scenes over about 250 textures (83 one-material pieces) | Flat materials, 8 m ground tiles, atlases; the pack build counts samplers and refuses over 245 |
 | No terrain system | Open landscapes | Modular ground and cliff pieces on the grid (decided) |
 | No cylinder, convex or per-part colliders | Barrels that roll, trees with trunk-only collision | Collider wanted recorded in each manifest entry |
 | No public UI font setting | Using our fonts | Documented recipe; installed in `Game.start` |

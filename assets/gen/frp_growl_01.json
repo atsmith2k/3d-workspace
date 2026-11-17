@@ -1,0 +1,24 @@
+{
+ "id": "frp_growl_01",
+ "kind": "sound",
+ "file": "frp_growl_01.wav",
+ "provider": "elevenlabs",
+ "model": "eleven_text_to_sound_v2",
+ "prompt": "A single low guttural warning growl from a large beast, very close, dry studio recording, no music, no speech, no echo, no background noise",
+ "params": {
+  "seconds": 2.0,
+  "influence": 0.3,
+  "loop": false
+ },
+ "created_at": "2026-11-17T20:53:13Z",
+ "sha256": "be2c61a97b9839f35f8c1285fab7e1047a8062695b23e0f7702e9820b8458970",
+ "terms": "https://elevenlabs.io/terms-of-use",
+ "response": {
+  "request_id": null,
+  "character_cost": "20"
+ },
+ "cleared": false,
+ "cleared_by": null,
+ "cleared_note": null,
+ "cleared_at": null
+}

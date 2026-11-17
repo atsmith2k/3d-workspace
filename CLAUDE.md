@@ -688,7 +688,16 @@ kit, `tile(mesh, T.RED)`; built from ten Hive suggestions).
 `humanoid(shape)` (standard, stout, slight, tall) is the one 35-bone skeleton for every humanoid;
 `SOCKETS` are its eight attachment bones and `attach(character, parts, socket)` binds a held item
 (grip at its origin, blade along +Y). Judge style with `packs/frp_style_test.py` (three cameras)
-and fit with `assets/hero_mannequin.py --set shape=...`. A world holds about 250 textures
+and fit with `assets/hero_mannequin.py --set shape=...`. `assets/_frp_body.py` draws the dummy's
+`body(sk, shape)` and the plate `armour(sk, shape, slots)` from the skeleton's joints, so one piece
+fits all four shapes; `dress(ch, sk, shape, mats, worn)` leaves out the body regions the worn slots
+hide (`HIDES`). A plate that stops short of its joint leaves body showing: run each limb plate to
+the joint (`arm_footman_iron`'s `covers what it hides` check found four). Sound families are in
+`assets/_frp_sound.py` (`step(surface, variant)`, `write_family`, checks for level, likeness and
+heel-then-toe); `sfx_creature_growl_01` is the first ElevenLabs sound (the call works: mono 48 kHz
+WAV back in one request). A first-person view model (`wpn_longsword_iron_fp`) has the camera at its
+origin looking down -Z; rotating a forearm about an elbow that is out of frame mostly moves the
+hand, so cut from the wrist, and check the frame with pixels (`<name>_firstperson.png`). A world holds about 250 textures
 counting every placed copy (Cinder's 256 samplers): the pack build counts them.
 
 `cad game list`, `cad game engine` (which Cinder package verifies; `CAD_CINDER`, else

@@ -187,8 +187,19 @@ show through.
 | `cloak` | chest, spine | nothing |
 | `robe` | spine, chest, hips, upper_leg | torso and legs (takes the chest and legs slots) |
 
-A piece is modelled once on the standard shape and fitted to the others by the build (bone
-positions of the target shape, widths scaled by its `width`).
+A piece is drawn from the joints of the skeleton it is built for (`assets/_frp_body.py`:
+`armour(sk, shape, slots)`), so one piece fits all four shapes; `dress(...)` leaves out the body
+regions its slot hides (`HIDES`: chest hides the torso, legs the hips and legs, and so on).
+Every armour asset carries three checks: each piece is bound to its slot's bones; what a piece
+hides lies inside it (run each limb plate all the way to its joint); limb plates stand at least
+6 mm off the body. Plate is `plate_worn()`: dull steel with hammer marks and rust in spots, never
+the blotched `iron_rusted()` over a whole harness. Reference: `assets/arm_footman_iron.py`.
+
+**First-person view models** are separate assets with the camera at the origin, looking down -Z
+(70 degrees, 16:9, near plane 5 cm): forearm from an elbow that is out of frame, the world
+weapon's own meshes in `socket_hand.R`, clips `idle` and an attack. Checks: nothing nearer than
+the near plane, the whole weapon in frame at rest, the arm leaving by the bottom or right edge,
+the attack crossing the centre line. Reference: `assets/wpn_longsword_iron_fp.py`.
 
 ## 10. Weapons, items, icons
 
@@ -216,7 +227,11 @@ least four of anything heard repeatedly, so a game can avoid playing the same on
 | `hit`, `spell`, `voice`, `creature` | -3 | mono, spatial |
 | `ambience`, `music` | -8 | stereo, not spatial, streamed, loops whole |
 
-Voices are non-verbal only (grunts, breaths, cries). Every claim a Spec makes about a sound has
+A family is one recipe in `assets/_frp_sound.py` and one small asset script per variant
+(`write_family("stone", "assets")`). Family checks: variants within 3 dB RMS of each other, and
+no two more than 0.6 alike by cross-correlation. Sounds a synthesiser does badly (throats, voices,
+animals) come from `gen.sound` and are only trimmed and levelled here; they stay uncleared until
+a person has listened. Voices are non-verbal only (grunts, breaths, cries). Every claim a Spec makes about a sound has
 a `band` check; nobody in the pipeline can listen.
 
 ## 12. Before an asset is done

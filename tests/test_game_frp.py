@@ -133,3 +133,54 @@ def test_slots_and_sound_names():
     assert all(-12 <= v <= -3 for v in F.SOUND_PEAK.values())
     with pytest.raises(AssertionError):
         F.sound_name("explosion", "x")
+
+
+# ---------------------------------------------------------------- body, armour, sound family
+import _frp_body as BD  # noqa: E402
+import _frp_sound as SD  # noqa: E402
+
+
+@pytest.mark.parametrize("shape", list(SHAPES))
+def test_armour_fits_every_shape_and_stays_in_its_slot(shape):
+    sk = humanoid(shape)
+    worn = BD.armour(sk, shape)
+    assert {w.slot for w in worn} == {"head", "shoulders", "chest", "arms", "hands", "legs", "feet"}
+    for w in worn:
+        assert w.bone.split(".")[0] in F.SLOTS[w.slot]["bones"], (w.slot, w.bone)
+        assert w.bone in sk.names
+    assert set(BD.HIDES) == set(F.SLOTS)
+    limbs = {q.bone: q for q in BD.body(sk, shape) if q.region in ("arms", "legs") and q.mat == "wood"}
+    for w in worn:                                             # a plate is wider than the limb under it, in every shape
+        if w.mat == "plate" and w.bone in limbs and w.slot in ("arms", "legs"):
+            a, b = sk.head(w.bone), sk.tail(sk.index(w.bone))
+            d = (b - a) / np.linalg.norm(b - a)
+            rad = lambda v: np.linalg.norm((v - a) - np.outer((v - a) @ d, d), axis=1).max()   # noqa: E731
+            assert rad(w.mesh.v) > rad(limbs[w.bone].mesh.v) + 0.005
+
+
+def test_dress_leaves_out_what_the_armour_hides():
+    sk = humanoid()
+    mats = {k: Material(k, color=(1, 1, 1)) for k in ("wood", "joint", "plate", "trim")}
+    bare, clad, half = Character(sk), Character(sk), Character(sk)
+    assert BD.dress(bare, sk, "standard", mats) == []
+    hidden = BD.dress(clad, sk, "standard", mats, BD.armour(sk, "standard"))
+    assert {q.region for q in hidden} == {"torso", "arms", "hands", "hips", "legs", "feet"}
+    wood = lambda ch: sum(len(m.v) for m, mat in ch.parts if mat.name in ("wood", "joint"))   # noqa: E731
+    assert wood(clad) < 0.35 * wood(bare)                      # the face, neck and shoulder joints remain
+    some = BD.dress(half, sk, "standard", mats, BD.armour(sk, "standard", slots=("head", "chest")))
+    assert {q.region for q in some} == {"torso"} and wood(clad) < wood(half) < wood(bare)
+    assert BD.armour(sk, "standard", slots=()) == []
+
+
+@pytest.mark.parametrize("surface", list(SD.SURFACES))
+def test_step_family_is_level_and_varied(surface):
+    steps = [SD.step(surface, v) for v in range(1, SD.VARIANTS + 1)]
+    for x in steps:
+        assert 0.1 * SD.SR < len(x) < 0.36 * SD.SR
+        assert 20 * np.log10(np.abs(x).max()) == pytest.approx(F.SOUND_PEAK["step"], abs=0.1)
+        assert abs(x[0]) < 5e-3 and abs(x[-1]) < 5e-3
+    loud = [SD.rms_db(x) for x in steps]
+    assert max(loud) - min(loud) < 4.0
+    assert max(SD.likeness(steps[0], x) for x in steps[1:]) < 0.7
+    assert SD.likeness(steps[0], steps[0]) == pytest.approx(1.0)
+    assert np.array_equal(steps[1], SD.step(surface, 2))       # a variant is the same every build
