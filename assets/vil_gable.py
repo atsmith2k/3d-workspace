@@ -5,7 +5,8 @@ Spec:
   size: 4.0 x 2.0 x 0.32 m
   pivot: base centre on Y=0 (placed at wall-top height)
   budget: 1500 triangles, two materials, 1024 px textures
-  materials: stained plaster; a timber tie beam along the base and a king post to the apex
+  materials: stained plaster; a timber tie beam along the base, a king post to the apex, a collar
+             half way up and two queen posts
   use: one at each end of a roof; turn it 90 degrees for a ridge that runs along Z
   engine: body static, auto collider
 """

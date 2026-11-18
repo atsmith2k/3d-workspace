@@ -12,6 +12,7 @@ TITLE = "Fantasy RPG Pack: style test"
 DESCRIPTION = "the pack's ruler, palette, materials and building grammar in one small scene"
 COLLECTION = ("frp_village", "frp_wilderness", "frp_weapons", "frp_items", "frp_interface")
 LICENCE = "ash10 Fantasy RPG Pack licence (text pending)"
+LEFT_OUT = {"nat_boulder_mossy": "uses two generated surfaces (frp_granite, frp_moss) that no person has cleared"}
 DEMO = dict(seconds=2)
 SHOTS = [dict(name="third_person", position=(6.5, 2.6, 8.0), target=(-0.3, 1.6, 0.5), fov=45),
          dict(name="first_person", position=(1.1, 1.6, -1.3), target=(-1.3, 1.25, 2.0), fov=70),

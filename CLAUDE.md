@@ -697,7 +697,34 @@ the joint (`arm_footman_iron`'s `covers what it hides` check found four). Sound 
 heel-then-toe); `sfx_creature_growl_01` is the first ElevenLabs sound (the call works: mono 48 kHz
 WAV back in one request). A first-person view model (`wpn_longsword_iron_fp`) has the camera at its
 origin looking down -Z; rotating a forearm about an elbow that is out of frame mostly moves the
-hand, so cut from the wrist, and check the frame with pixels (`<name>_firstperson.png`). A world holds about 250 textures
+hand, so cut from the wrist, and check the frame with pixels (`<name>_firstperson.png`).
+The starter slice's environment half is `packs/frp_starter_slice.py` (a furnished cottage in a clearing, four
+cameras). Its kits: `assets/_frp_interior.py` (furniture: `boards_x`, `boards_z`, `upright`, `legs`; seat 0.45 m,
+table 0.75 m), `assets/_frp_nature.py` (solid foliage: `blob`, `lumpy`, `stem` for trunks and branches, `blade`,
+`two_sided`; materials `bark()`, `rock()`, `trodden()`), `assets/_frp_items.py` (`item(name, ...)`, `item_checks`,
+`flask`: items are flat colours with no textures, and `ui_item_icons` fails when an `itm_` asset has no icon frame).
+The slice's refinement pass set what "showcase" means here: (1) no razor edges: `_frp_interior.block` eases every
+edge 6 mm and `planked(...)` makes a top of separate boards; (2) no faceted rocks or foliage: `sculpt(shape, tris,
+size, lumps, facets, grain, fuse=, ground=)` in `_frp_nature` sculpts and bakes in Blender, `paint_rock` /
+`paint_foliage` paint the colour in world space from the bake (nothing generated, so nothing to clear), `clumps(...)`
+gives a crown a silhouette of leaf clumps, and `baked_checks(high_min, part=)` holds the bake; (3) light models
+form: a low warm sun over a dim cool sky, not an even grey. Lessons: moss placed by "faces that look up" alone is a
+cap (multiply by drifting noise, check `moss_up < 0.8`); a hard edge between two leaf colours reads as camouflage
+(soften it and rag it by the leaf clump); a canopy painted dark underneath is black once the engine shades it too;
+a beauty camera under a crown shows only its underside; a bake ray between fused lobes can return a texel leaning
+into the mesh (`_finish` stands it up); the face a rock stands on is dropped from the game mesh. A baked piece costs
+three samplers a copy where flat colours cost none: the slice's demo uses 222 of 245.
+A scene needs an end: `nat_ground_clearing` (one 40 m round piece, flat for 9 m, a bank at the rim; 3 samplers
+where six 8 m tiles cost 36) with `nat_treeline` (a flat-coloured forest ring, no samplers) standing on the bank,
+so the ground meets trees and not a cut edge against the sky. Thatch courses are geometry (`roof_slope`: four
+courses, thick at the butt), not lines drawn in the texture. In a tileable texture every `fbm`/`noise` cell count
+must divide the size (64, 32 on 1024): 70 and 46 left a bracket-shaped mark at every repeat, seen only from above.
+Fallen leaves at life size are specks from eye height: `nat_leaf_litter` draws them 13-21 cm.
+A pack script may set `LEFT_OUT = {asset: reason}` to ship a collection without a member (one whose generated input
+is not cleared); the manifest lists them. A step family whose variants must sit within 3 dB picks each variant from
+several takes (`takes`, `rms` in `SURFACES`); stone was approved as its first take and is not re-chosen. A point
+light closer than about a metre bleaches whatever it stands in (the hearth's firebox): put the light in front of
+the fire, not in it. A path overlay must be paler than the ground it lies on or it disappears. A world holds about 250 textures
 counting every placed copy (Cinder's 256 samplers): the pack build counts them.
 
 `cad game list`, `cad game engine` (which Cinder package verifies; `CAD_CINDER`, else

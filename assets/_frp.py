@@ -62,6 +62,9 @@ PALETTE = dict(
     # ground and growth
     dirt_dark=(0.15, 0.12, 0.09), dirt=(0.27, 0.21, 0.15), mud=(0.20, 0.17, 0.13), grass_dead=(0.36, 0.33, 0.18),
     grass=(0.22, 0.31, 0.14), grass_dark=(0.13, 0.20, 0.10), leaf_autumn=(0.50, 0.28, 0.10), blight=(0.30, 0.28, 0.20),
+    forest_near=(0.10, 0.14, 0.09), forest_far=(0.06, 0.09, 0.08), bark_dark=(0.12, 0.10, 0.08), bark=(0.27, 0.23, 0.18), leaf_rust=(0.36, 0.16, 0.07), leaf_dark=(0.16, 0.19, 0.09),
+    dust=(0.44, 0.38, 0.29), crust=(0.40, 0.25, 0.12), cheese=(0.72, 0.58, 0.24),
+    fungus=(0.55, 0.42, 0.30), fungus_cap=(0.30, 0.09, 0.06),
     # accents: kept for things that matter
     blood_fresh=(0.48, 0.03, 0.03), blood_dried=(0.25, 0.04, 0.03), blood_stain=(0.17, 0.07, 0.06),
     arcane=(0.20, 0.45, 0.95), fel=(0.35, 0.80, 0.20), holy=(0.95, 0.80, 0.35), ember=(1.0, 0.42, 0.08),
@@ -110,12 +113,12 @@ def plaster(size=1024, seed=5):
     """Lime plaster gone grey-brown, cracked and water-stained."""
     grain = fbm(size, 24, 4, seed)
     patch = blur(fbm(size, 5, 3, seed + 1), 6)
-    line = np.clip(1 - np.abs(fbm(size, 3, 6, seed + 2) - 0.5) * 60, 0, 1) ** 2        # hairlines where a slow field crosses 0.5
+    line = np.clip(1 - np.abs(fbm(size, 3, 6, seed + 2) - 0.5) * 150, 0, 1) ** 2       # hairlines where a slow field crosses 0.5
     broken = np.clip((fbm(size, 5, 3, seed + 9) - 0.52) * 6, 0, 1)                    # ...kept only in patches
     cracks = line * broken
     stain = _stains(size, seed + 3, 0.8)
     base = tint(0.35 * grain + 0.65 * patch, P["plaster_stain"], P["plaster_light"])
-    base = base * (1 - 0.45 * stain[..., None]) * (1 - 0.5 * cracks[..., None])
+    base = base * (1 - 0.45 * stain[..., None]) * (1 - 0.35 * cracks[..., None])
     height = 0.5 + 0.2 * grain - 0.4 * cracks
     return Material("frp_plaster", base=np.clip(base, 0, 1),
                     orm=orm(1 - 0.4 * cracks, np.clip(0.86 + 0.1 * grain, 0, 1), 0.0),
@@ -129,10 +132,11 @@ def thatch(size=1024, seed=6):
     damp = blur(fbm(size, 4, 3, seed + 2), 8)
     rows = np.arange(size)[:, None] + (fbm(size, 6, 2, seed + 4) - 0.5) * size / 14   # course lines that wander
     layers = blur((rows % (size // 4) < size // 30).astype(float), 2)
-    base = tint(np.clip(strand * 0.8 + 0.2 - 0.35 * damp, 0, 1), P["thatch_dark"], P["thatch_light"])
-    base = base * (1 - 0.3 * layers[..., None])
-    return Material("frp_thatch", base=np.clip(base, 0, 1), orm=orm(1 - 0.5 * layers, 0.95, 0.0),
-                    normal=normal_from_height(strand * 0.8 - layers, size / 128), metallic=1.0, roughness=1.0)
+    clump = blur(streaks(size, "y", cells=26, stretch=5, seed=seed + 6), size // 90)     # bundles of straw, a hand wide
+    base = tint(np.clip(strand * 0.6 + 0.3 * clump + 0.15 - 0.4 * damp, 0, 1), P["thatch_dark"], P["thatch_light"])
+    base = base * (1 - 0.08 * layers[..., None])                  # the courses are geometry (roof_slope): only a trace here
+    return Material("frp_thatch", base=np.clip(base, 0, 1), orm=orm(0.75 + 0.25 * clump, 0.95, 0.0),
+                    normal=normal_from_height(strand * 0.6 + 0.6 * clump - 0.15 * layers, size / 110), metallic=1.0, roughness=1.0)
 
 
 @lru_cache(maxsize=None)
@@ -143,9 +147,14 @@ def ground(size=1024, seed=7):
     soil = fbm(size, 20, 4, seed + 2)
     grass = tint(blades * (0.6 + 0.4 * fbm(size, 9, 3, seed + 3)), P["grass_dark"], P["grass_dead"])
     earth = tint(soil, P["dirt_dark"], P["dirt"])
-    base = earth * (1 - 0.75 * tuft[..., None]) + grass * 0.75 * tuft[..., None]
-    return Material("frp_ground", base=np.clip(base, 0, 1), orm=orm(1.0, 0.94, 0.0),
-                    normal=normal_from_height(0.5 * soil + 0.5 * tuft * blades, size / 200), metallic=1.0, roughness=1.0)
+    base = earth * (1 - 0.85 * tuft[..., None]) + grass * 0.85 * tuft[..., None]
+    litter = np.clip((fbm(size, 64, 2, seed + 7) - 0.70) * 9, 0, 1) * np.clip((fbm(size, 5, 3, seed + 8) - 0.35) * 3, 0, 1)
+    stones = np.clip((fbm(size, 32, 2, seed + 9) - 0.76) * 9, 0, 1) * (1 - tuft)    # cells divide the size, or it does not tile
+    base = base * (1 - 0.7 * litter[..., None]) + np.asarray(P["leaf_rust"]) * 0.7 * litter[..., None]     # fallen leaves, in drifts
+    base = base * (1 - 0.45 * stones[..., None]) + np.asarray(P["stone_dark"]) * 0.45 * stones[..., None]   # half buried, not chalk
+    height = 0.5 * soil + 0.5 * tuft * blades + 0.25 * litter + 0.5 * stones
+    return Material("frp_ground", base=np.clip(base, 0, 1), orm=orm(1.0, np.clip(0.94 - 0.1 * stones, 0, 1), 0.0),
+                    normal=normal_from_height(height, size / 150), metallic=1.0, roughness=1.0)
 
 
 @lru_cache(maxsize=None)
@@ -192,6 +201,45 @@ def steel_blade(size=256, seed=10):
     return Material("frp_steel", base=tint(scratch, (0.40, 0.42, 0.45), (0.62, 0.64, 0.67)),
                     orm=orm(1.0, np.clip(0.28 + 0.2 * scratch, 0, 1), 1.0),
                     normal=normal_from_height(scratch, 1.0), metallic=1.0, roughness=1.0)
+
+
+@lru_cache(maxsize=None)
+def bark(size=512, seed=13):
+    """Old bark: deep furrows running up the trunk (v), grey-brown, a little lichen."""
+    furrow = 0.6 * streaks(size, "y", cells=40, stretch=7, seed=seed) + 0.4 * streaks(size, "y", cells=110, stretch=5, seed=seed + 1)
+    cloud = fbm(size, 5, 4, seed + 2)
+    lichen = np.clip((fbm(size, 7, 4, seed + 3) - 0.62) * 6, 0, 1)
+    base = tint(np.clip(0.75 * furrow + 0.25 * cloud, 0, 1), P["bark_dark"], P["bark"])
+    base = base * (1 - 0.5 * lichen[..., None]) + np.asarray(P["blight"]) * 0.5 * lichen[..., None]
+    return Material("frp_bark", base=np.clip(base, 0, 1), orm=orm(0.6 + 0.4 * furrow, 0.92, 0.0),
+                    normal=normal_from_height(furrow, size / 96), metallic=1.0, roughness=1.0)
+
+
+@lru_cache(maxsize=None)
+def rock(size=512, seed=14):
+    """Field stone: cold grey, pitted, moss in drifts. Box-projected, so it needs no unwrap."""
+    form = fbm(size, 4, 5, seed)
+    grain = fbm(size, 28, 3, seed + 1)
+    vein = np.clip(1 - np.abs(fbm(size, 3, 5, seed + 2) - 0.5) * 30, 0, 1) ** 2 * np.clip((fbm(size, 4, 3, seed + 5) - 0.45) * 5, 0, 1)
+    moss = np.clip((fbm(size, 5, 4, seed + 3) - 0.60) * 5, 0, 1)
+    base = tint(np.clip(0.65 * form + 0.35 * grain, 0, 1), P["stone_shadow"], P["stone_light"]) * (1 - 0.5 * vein[..., None])
+    base = base * (1 - 0.8 * moss[..., None]) + np.asarray(P["moss"]) * 0.8 * moss[..., None]
+    height = 0.6 * form + 0.25 * grain - 0.5 * vein + 0.15 * moss
+    return Material("frp_rock", base=np.clip(base, 0, 1), orm=orm(1 - 0.5 * vein, np.clip(0.8 + 0.15 * moss, 0, 1), 0.0),
+                    normal=normal_from_height(height, size / 128), metallic=1.0, roughness=1.0)
+
+
+@lru_cache(maxsize=None)
+def trodden(size=512, seed=15):
+    """A path walked hard: packed soil gone pale and dry (it must read against the dark ground
+    it lies on), darker in the ruts that run along it (v), few stones."""
+    soil = fbm(size, 9, 4, seed)
+    ruts = blur(streaks(size, "y", cells=7, stretch=5, seed=seed + 1), size // 40)
+    pebbles = np.clip((fbm(size, 30, 2, seed + 2) - 0.74) * 8, 0, 1)
+    base = tint(np.clip(0.7 * soil + 0.3 * ruts, 0, 1), P["dirt"], P["dust"])
+    base = base * (1 - 0.6 * pebbles[..., None]) + np.asarray(P["stone_dark"]) * 0.6 * pebbles[..., None]
+    return Material("frp_trodden", base=np.clip(base, 0, 1), orm=orm(1.0, 0.95, 0.0),
+                    normal=normal_from_height(0.6 * soil + 0.4 * ruts + 0.3 * pebbles, size / 160), metallic=1.0, roughness=1.0)
 
 
 def flat_material(name, colour, roughness=0.7, metallic=0.0, emissive=None, strength=1.0):

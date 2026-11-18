@@ -101,7 +101,7 @@ def test_ruler_palette_and_budgets_hold_together():
     assert len(set(F.PREFIX.values())) == len(F.PREFIX)
 
 
-@pytest.mark.parametrize("make", ["stone", "timber", "plaster", "thatch", "ground", "boards"])
+@pytest.mark.parametrize("make", ["stone", "timber", "plaster", "thatch", "ground", "boards", "bark", "rock", "trodden"])
 def test_materials_tile_and_stay_dark(make):
     m = getattr(F, make)(256)
     assert m.base.shape == (256, 256, 3)
@@ -184,3 +184,45 @@ def test_step_family_is_level_and_varied(surface):
     assert max(SD.likeness(steps[0], x) for x in steps[1:]) < 0.7
     assert SD.likeness(steps[0], steps[0]) == pytest.approx(1.0)
     assert np.array_equal(steps[1], SD.step(surface, 2))       # a variant is the same every build
+
+
+def test_new_step_families_meet_the_claims_their_checks_hold():
+    for surface in ("wood", "dirt"):
+        s = SD.SURFACES[surface]
+        lo, hi = s["thud"]
+        clo, chi = s["click"]
+        for v in range(1, SD.VARIANTS + 1):
+            x = SD.step(surface, v)
+            assert 0.12 * SD.SR < len(x) < 0.36 * SD.SR
+            assert SD.share(x, lo * 0.8, hi * 1.3) >= 0.45
+            assert SD.share(x, clo * 0.9, chi * 1.2) >= SD.click_floor(s)
+        loud = [SD.rms_db(SD.step(surface, v)) for v in range(1, SD.VARIANTS + 1)]
+        assert max(loud) - min(loud) < 3.0                       # the family check's own limit
+
+
+def test_stone_steps_are_the_first_take():
+    assert SD.SURFACES["stone"].get("takes", 1) == 1           # the approved family is not re-chosen
+    assert np.array_equal(SD.step("stone", 3), SD._take("stone", 3, 0))
+
+
+def test_every_item_has_an_icon_and_no_textures():
+    import importlib
+    icons = importlib.import_module("ui_item_icons").ICONS
+    items = sorted(p.stem for p in Path(ASSETS).glob("itm_*.py"))
+    assert len(items) >= 9
+    for name in items:
+        mod = importlib.import_module(name)
+        assert name[4:] in icons, name
+        assert mod.PRODUCT["collection"] == "frp_items"
+        assert mod.PRODUCT["gameplay"]["icon"] == f"ui_item_icons:{name[4:]}"
+
+
+def test_a_pack_can_leave_a_member_out_only_by_name(tmp_path, monkeypatch):
+    from cadkit.game import pack as P
+    assets = tmp_path / "assets"
+    assets.mkdir()
+    for n in ("keep_me", "drop_me"):
+        (assets / f"{n}.py").write_text('PRODUCT = dict(collection="c")', encoding="utf-8")
+    monkeypatch.setattr(P, "ASSETS", assets)
+    assert [p.stem for p in P.members("c")] == ["drop_me", "keep_me"]
+    assert [p.stem for p in P.members("c", {"drop_me": "not cleared"})] == ["keep_me"]

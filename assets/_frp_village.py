@@ -60,17 +60,37 @@ def timber_wall(width=GRID, opening=None):
     return tiled(merge(*plaster_parts)), merge(tiled(merge(*timbers)), grain_up(merge(*uprights)))
 
 
+COURSES, BUTT, TAIL = 4, THATCH_T, 0.20            # thatch courses up a slope; thickness at a course's butt and at its tail
+
+
 def roof_slope(width=GRID):
-    """A thatched slope: `width` along X, rising toward +Z from the wall line (origin) to the ridge."""
-    pts = ccw([(-EAVE, -EAVE), (PITCH_RISE, PITCH_RISE), (PITCH_RISE, PITCH_RISE + THATCH_T), (-EAVE, -EAVE + THATCH_T)])
-    m = prism(pts, width).rotated(-90, "y")                       # the profile's run axis becomes +Z
-    down = (m.v[:, 2] + m.v[:, 1]) / 2 ** 0.5                     # distance up the slope
+    """A thatched slope: `width` along X, rising toward +Z from the wall line (origin) to the
+    ridge. The thatch is laid in courses, each thick at its lower edge (the butts of the straw)
+    and thin where the next one covers it, so the roof has the stepped outline of real thatch
+    and each course throws a shadow on the one below. The top course is full thickness at the
+    ridge, where the two slopes meet. Its bounds are those of a plain slab 0.3 m thick."""
+    run0, run1 = -EAVE, PITCH_RISE
+    edges = np.linspace(run0, run1, COURSES + 1)
+    parts = []
+    for i in range(COURSES):
+        a, b = edges[i], edges[i + 1]
+        top_b = BUTT if i == COURSES - 1 else TAIL
+        pts = ccw([(a, a), (b, b), (b, b + top_b), (a, a + BUTT)])
+        parts.append(prism(pts, width).rotated(-90, "y"))               # the profile's run axis becomes +Z
+    m = merge(*parts)
+    down = (m.v[:, 2] + m.v[:, 1]) / 2 ** 0.5                         # distance up the slope
     return directed_uv(m, np.c_[m.v[:, 0] / TILE, -down / TILE], (0, 1, -1))   # strands run down the slope
 
 
 def gable(depth=2 * GRID):
-    """(plaster, timber) for the triangular end wall of a roof over a building `depth` deep."""
+    """(plaster, timber) for the triangular end wall of a roof over a building `depth` deep:
+    a tie beam, a king post to the apex, a collar half way up and a queen post under each end of it."""
     half = depth / 2
     tri = prism(ccw([(-half, 0), (half, 0), (0, half * PITCH_RISE / GRID)]), PLASTER_T)
-    timbers = merge(tiled(block(depth, 0.18, BEAM)), grain_up(block(0.2, half - 0.1, POST)))
-    return tiled(tri), timbers
+    rise = half * PITCH_RISE / GRID
+    collar_y = 0.5 * rise
+    collar_w = depth * (1 - collar_y / rise) - 0.1                     # as wide as the gable is at that height
+    flats = [block(depth, 0.18, BEAM), block(collar_w, 0.14, BEAM, 0, collar_y)]                 # tie beam, collar
+    posts = [block(0.2, half - 0.1, POST)] + [block(0.14, collar_y - 0.18 + 0.004, POST - 0.02, sx * depth * 0.2, 0.18 - 0.002)
+                                             for sx in (-1, 1)]                             # king post, two queen posts
+    return tiled(tri), merge(tiled(merge(*flats)), grain_up(merge(*posts)))

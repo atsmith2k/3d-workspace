@@ -6,6 +6,8 @@ A pack script (`packs/<name>.py`) says what is in it and builds its demo world:
     DESCRIPTION = "one line"
     COLLECTION = "dungeon_kit"            # every asset whose PRODUCT["collection"] matches (or a tuple of them)
     LICENCE = "CC0-1.0"
+    LEFT_OUT = {"wall_tapestry": "its picture is not cleared"}   # members of the collection this pack does not
+                                                                 # ship, each with the reason; listed in the manifest
     DEMO = dict(seconds=30, autopilot=True, expect_won=True,
                 settle=dict(max_move=0.3, free=["bouncer"]))      # dynamic bodies must end where they were put
     SHOTS = [dict(name="hall", position=(0, 1.7, 0.4), target=(0, 1.2, -5),   # beauty frames;
@@ -44,10 +46,10 @@ LICENCES = {"CC0-1.0": "CC0 1.0 Universal: public domain dedication. Use, change
                        "https://creativecommons.org/publicdomain/zero/1.0/"}
 
 
-def members(collection):
+def members(collection, left_out=()):
     out = []
     for path in sorted(ASSETS.glob("*.py")):
-        if path.name.startswith("_"):
+        if path.name.startswith("_") or path.stem in left_out:
             continue
         prod = getattr(B.load_asset(path), "PRODUCT", None) or {}
         wanted = (collection,) if isinstance(collection, str) else tuple(collection)
@@ -282,7 +284,12 @@ def build_pack(script, refresh=False, quiet=False):
     mod = B.load_asset(script)
     name = script.stem
     licence = getattr(mod, "LICENCE", "CC0-1.0")
-    paths = members(mod.COLLECTION)
+    left_out = dict(getattr(mod, "LEFT_OUT", {}) or {})
+    unknown = [n for n in left_out if not (ASSETS / f"{n}.py").exists()]
+    if unknown or not all(isinstance(r, str) and r.strip() for r in left_out.values()):
+        raise SystemExit("LEFT_OUT names an asset and gives the reason it is not shipped; "
+                         + (f"no such asset: {', '.join(unknown)}" if unknown else "a reason is empty"))
+    paths = members(mod.COLLECTION, left_out)
     if not paths:
         raise SystemExit(f"no asset has PRODUCT['collection'] == '{mod.COLLECTION}'")
     builds = [_fresh(p, refresh) for p in paths]
@@ -423,6 +430,7 @@ def build_pack(script, refresh=False, quiet=False):
     ready = not problems
     manifest = dict(schema="cadkit-game/1", kind="game-asset-pack", name=name, title=mod.TITLE,
                     description=mod.DESCRIPTION, licence=licence, ready=ready, problems=problems,
+                    left_out=[dict(id=n, reason=r) for n, r in sorted(left_out.items())],
                     assets=entries, demo=demo, engine=eng.info() if eng else None,
                     totals=dict(assets=len(entries), models=len(models), sounds=len(sounds),
                                 interfaces=len(uis), sprite_sheets=len(sprites), fonts=len(fonts),

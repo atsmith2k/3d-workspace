@@ -17,15 +17,47 @@ VARIANTS = 4
 # surface: thud band (Hz), thud decay (s), click band, click gain, grit band low edge, grit gain
 SURFACES = dict(
     stone=dict(thud=(110, 650), ring=0.10, click=(1600, 5200), click_gain=0.6, grit=2600, grit_gain=0.14),
-    wood=dict(thud=(90, 420), ring=0.16, click=(700, 2400), click_gain=0.35, grit=3000, grit_gain=0.06),
-    dirt=dict(thud=(70, 380), ring=0.06, click=(900, 2200), click_gain=0.12, grit=1800, grit_gain=0.35),
+    wood=dict(thud=(90, 420), ring=0.16, click=(700, 2400), click_gain=0.35, grit=3000, grit_gain=0.06,
+              click_ring=0.05, takes=16, rms=-23.0),            # the knock rings on in the boards
+    dirt=dict(thud=(70, 380), ring=0.06, click=(900, 2200), click_gain=0.12, grit=1800, grit_gain=0.35,
+              takes=16, rms=-23.0),
 )
+# `takes`: a burst of noise is loud or quiet by luck, so a family that must sit within 3 dB is
+# chosen the way a foley editor chooses: several takes of each variant, keep the one nearest the
+# family's level (`rms`, dB) that is also a full-length step. Stone was approved as its first take.
 
 
 def step(surface, variant):
     """One footstep on a surface, mono, peaking at the family level."""
     s = SURFACES[surface]
-    rng = np.random.default_rng(1000 * (sorted(SURFACES).index(surface) + 1) + variant)
+    takes = [_take(surface, variant, t) for t in range(s.get("takes", 1))]
+    if len(takes) == 1:
+        return takes[0]
+    lo, hi = s["thud"]
+    clo, chi = s["click"]
+
+    def in_character(x):                                       # the claims the checks hold, with room to spare
+        return (0.13 * SR < len(x) < 0.34 * SR and share(x, lo * 0.8, hi * 1.3) > 0.52
+                and share(x, clo * 0.9, chi * 1.2) > 1.4 * click_floor(s))
+    full = [x for x in takes if in_character(x)] or takes
+    return min(full, key=lambda x: abs(rms_db(x) - s["rms"]))
+
+
+def share(x, lo, hi):
+    """Share of a sound's energy between two frequencies."""
+    e = np.abs(np.fft.rfft(x)) ** 2
+    f = np.fft.rfftfreq(len(x), 1 / SR)
+    return float(e[(f >= lo) & (f < hi)].sum() / e.sum())
+
+
+def click_floor(s):
+    """Least share of the energy the contact click must carry: it grows with the square of its gain."""
+    return 0.5 * s["click_gain"] ** 2 * 0.25
+
+
+def _take(surface, variant, take=0):
+    s = SURFACES[surface]
+    rng = np.random.default_rng(1000 * (["dirt", "stone", "wood"].index(surface) + 1) + variant + 7919 * take)
     shift = 1 + rng.uniform(-0.12, 0.12)                       # each step a little higher or lower
     toe = rng.uniform(0.045, 0.085)                            # heel, then toe
     out = np.zeros(n(0.34))
@@ -33,7 +65,7 @@ def step(surface, variant):
     thud = bandpass(noise(0.22, int(rng.integers(1 << 30)), "brown"), lo * shift, hi * shift) * decay(0.22, s["ring"] * rng.uniform(0.85, 1.2))
     place(out, thud, 0.004, 1.0)
     clo, chi = s["click"]
-    click = bandpass(noise(0.05, int(rng.integers(1 << 30))), clo * shift, chi * shift) * decay(0.05, 0.022)
+    click = bandpass(noise(0.05, int(rng.integers(1 << 30))), clo * shift, chi * shift) * decay(0.05, s.get("click_ring", 0.022))
     place(out, click, 0.004, s["click_gain"] * rng.uniform(0.8, 1.2))
     place(out, thud[: n(0.12)] * decay(0.12, 0.04), toe, 0.62 * rng.uniform(0.85, 1.15))        # the toe coming down, softer
     place(out, click, toe, 0.5 * s["click_gain"] * rng.uniform(0.6, 1.2))
@@ -84,7 +116,7 @@ def step_checks(surface, variant):
     return [duration(0.12, 0.36), peak(SOUND_PEAK["step"] - 0.6, SOUND_PEAK["step"] + 0.6),
             band(lo * 0.8, hi * 1.3, at_least=0.45 if surface != "stone" else 0.35, name="thud"),
             band(9000, 20000, at_most=0.2, name="no hiss"),
-            band(s["click"][0] * 0.9, s["click"][1] * 1.2, at_least=0.5 * s["click_gain"] ** 2 * 0.25, name="click"), custom("family", family), custom("heel and toe", two_beats)]
+            band(s["click"][0] * 0.9, s["click"][1] * 1.2, at_least=click_floor(s), name="click"), custom("family", family), custom("heel and toe", two_beats)]
 
 
 STEP_DOC = '''"""Footstep on {surface}, variant {v} of {n}: one of a family played at random.
