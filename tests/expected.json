@@ -706,6 +706,67 @@
       }
     }
   },
+  "smooth_candle_mold_kit": {
+    "model": "candle_master_mold.py",
+    "set": [
+      "style=smooth"
+    ],
+    "parts": {
+      "smooth_candle_mold_kit-master": {
+        "size": [
+          106.3,
+          106.3,
+          117.5
+        ],
+        "volume_cm3": 496.0,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "smooth_candle_mold_kit-housing": {
+        "size": [
+          100.3,
+          100.3,
+          114.0
+        ],
+        "volume_cm3": 83.9,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      }
+    }
+  },
+  "smooth_core_candle_mold_kit": {
+    "model": "candle_master_mold.py",
+    "set": [
+      "style=smooth",
+      "diameter=50"
+    ],
+    "parts": {
+      "smooth_core_candle_mold_kit-master": {
+        "size": [
+          81.3,
+          81.3,
+          117.5
+        ],
+        "volume_cm3": 226.9,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "smooth_core_candle_mold_kit-housing": {
+        "size": [
+          75.3,
+          75.3,
+          114.0
+        ],
+        "volume_cm3": 62.5,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      }
+    }
+  },
   "wax_melt_master": {
     "model": "wax_melt_master.py",
     "set": [],

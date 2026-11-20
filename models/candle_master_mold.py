@@ -2,12 +2,15 @@
 and you have a reusable candle mold.
 
 Choose the style in the title: ribbed (24 rounded ribs, 70 mm across, 90 mm tall),
-faceted (a ten-sided pillar with a gentle spiral, 65 x 85 mm) or twisted (a six-lobed
-pillar turning a third of a turn, 60 x 100 mm). The master stands on a base board; slide
+faceted (a ten-sided pillar with a gentle spiral, 65 x 85 mm), twisted (a six-lobed
+pillar turning a third of a turn, 60 x 100 mm) or smooth (a plain round column,
+75 x 100 mm, for candles with dried flowers and herbs showing through the outer wax;
+`--set diameter=50` gives the matching 50 mm core candle that stands inside it). The master stands on a base board; slide
 the housing tube over the base, seal the joint with a little clay, and pour silicone to
 the rim. The pin on top of the master leaves a ready-made wick hole through the silicone.
 Demold, and pour wax into the silicone through its open end, which forms the candle's
-flat base. Mix about 300 ml of silicone (ribbed 303 ml, faceted 275 ml, twisted 315 ml).
+flat base. Mix about 300 ml of silicone (ribbed 303 ml, faceted 275 ml, twisted 315 ml,
+smooth 338 ml, smooth 50 mm core 227 ml).
 Both parts print with no supports, about 2.5 hours each.
 
 Spec:
@@ -20,8 +23,9 @@ Spec:
                 and rests on the base flange
   orientation:  master: base board on the bed, candle and wick pin up; housing: either
                 end down; no supports
-  must have:    styles ribbed / faceted / twisted; 2 mm chamfer round the candle top;
-                wick pin 2.5 mm; silicone needed reported by the build (275-315 ml)
+  must have:    styles ribbed / faceted / twisted / smooth; 2 mm chamfer round the candle
+                top (smooth: a 2 mm rounded edge and a true round wall, no ribs or
+                facets); wick pin 2.5 mm; silicone needed reported by the build
   tolerances:   sliding 0.25 mm per side on the spigot
 
 Units: mm. Z is up, each part sits on Z=0 in its print pose.
@@ -45,13 +49,13 @@ PRODUCT = dict(
     post_processing=("Lightly sand the master's visible layer lines or brush on a sealer; the "
                      "silicone copies every line. Spray release on the master and housing, seal "
                      "the housing-to-base joint with modelling clay, then mix about 300 ml of "
-                     "silicone (ribbed 303, faceted 275, twisted 315 ml) and pour slowly into one "
+                     "silicone (ribbed 303, faceted 275, twisted 315, smooth 338, smooth 50 mm core 227 ml) and pour slowly into one "
                      "corner. Demold after full cure."),
 )
 LICENSE_NOTES = None   # original design
 
 PARAMS = dict(
-    style="ribbed",     # ribbed | faceted | twisted
+    style="ribbed",     # ribbed | faceted | twisted | smooth
     diameter=0.0,       # candle diameter (0 = the style's default)
     height=0.0,         # candle height (0 = the style's default)
     silicone=10.0,      # silicone wall round the candle and over its top
@@ -66,7 +70,9 @@ STYLES = {
     "ribbed": dict(d=70.0, h=90.0),
     "faceted": dict(d=65.0, h=85.0),
     "twisted": dict(d=60.0, h=100.0),
+    "smooth": dict(d=75.0, h=100.0),
 }
+SMOOTH_SEGMENTS = 240   # facets under 1 mm wide on a 75 mm column: reads as round
 
 
 def size(p):
@@ -99,8 +105,21 @@ def section(p, r):
 TWIST = {"ribbed": 0.0, "faceted": 36.0, "twisted": 120.0}
 
 
+def smooth_candle(p):
+    """A plain round column with a rounded top edge, revolved so the wall is one
+    unbroken surface (no ribs, facets or slice steps for the wax to copy)."""
+    d, h = size(p)
+    r, c = d / 2, p.chamfer
+    arc = [(r - c + c * math.cos(a), h - c + c * math.sin(a))
+           for a in (math.pi / 2 * i / 12 for i in range(13))]
+    profile = poly([(0, 0), (r, 0)] + arc + [(0, h)])
+    return Manifold.revolve(profile, SMOOTH_SEGMENTS)
+
+
 def candle(p):
     """The candle (the master's body), standing on Z=0."""
+    if p.style == "smooth":
+        return smooth_candle(p)
     d, h = size(p)
     r = d / 2
     body_h = h - p.chamfer
@@ -145,6 +164,8 @@ def checks(p):
             dims(z=top + p.silicone + 0.5),
             solid((0, 0, z0 + h / 2), (0, 0, top + p.silicone / 2)),            # candle, wick pin
             empty((d / 2 + p.silicone / 2, 0, z0 + h / 2)),                        # room for silicone
+            *([custom("round wall", lambda ctx: _roundness(ctx, d, z0 + h / 2))]
+              if p.style == "smooth" else []),
             custom("silicone to mix", lambda ctx: (True, f"{ml:.0f} ml (about {ml * 1.1:.0f} g)")),
             flat_base(math.pi * (d / 2 + p.silicone) ** 2 * 0.9),
             no_overhang(),
@@ -157,6 +178,17 @@ def checks(p):
             single_body(),
         ],
     }
+
+
+def _roundness(ctx, d, z):
+    """Smooth style: the wall at mid height is a true circle of the candle diameter."""
+    cut = ctx.tm.section(plane_origin=(0, 0, z), plane_normal=(0, 0, 1))
+    v = cut.vertices if cut is not None else []
+    rad = (v[:, 0] ** 2 + v[:, 1] ** 2) ** 0.5 if len(v) else []
+    if not len(rad):
+        return False, "no wall vertices found"
+    dev = max(rad.max() - d / 2, d / 2 - rad.min())
+    return dev < 0.05, f"radius {rad.min():.2f}-{rad.max():.2f} mm, target {d / 2:.2f}"
 
 
 def build(p):
