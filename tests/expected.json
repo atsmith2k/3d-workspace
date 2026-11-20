@@ -3487,5 +3487,33 @@
         "checks_ok": true
       }
     }
+  },
+  "wax_melter_oven": {
+    "model": "wax_melter_oven.py",
+    "set": [],
+    "parts": {
+      "wax_melter_oven-oven": {
+        "size": [
+          113.2,
+          147.0,
+          110.7
+        ],
+        "volume_cm3": 252.9,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      },
+      "wax_melter_oven-plate": {
+        "size": [
+          101.2,
+          101.2,
+          14.0
+        ],
+        "volume_cm3": 27.4,
+        "bodies": 1,
+        "watertight": true,
+        "checks_ok": true
+      }
+    }
   }
 }
