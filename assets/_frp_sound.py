@@ -16,6 +16,8 @@ VARIANTS = 4
 
 # surface: thud band (Hz), thud decay (s), click band, click gain, grit band low edge, grit gain
 SURFACES = dict(
+    grass=dict(thud=(75, 340), ring=0.055, click=(750, 1900), click_gain=0.08, grit=2100, grit_gain=0.14,
+               takes=16, rms=-23.0),
     stone=dict(thud=(110, 650), ring=0.10, click=(1600, 5200), click_gain=0.6, grit=2600, grit_gain=0.14),
     wood=dict(thud=(90, 420), ring=0.16, click=(700, 2400), click_gain=0.35, grit=3000, grit_gain=0.06,
               click_ring=0.05, takes=16, rms=-23.0),            # the knock rings on in the boards
@@ -57,7 +59,7 @@ def click_floor(s):
 
 def _take(surface, variant, take=0):
     s = SURFACES[surface]
-    rng = np.random.default_rng(1000 * (["dirt", "stone", "wood"].index(surface) + 1) + variant + 7919 * take)
+    rng = np.random.default_rng(1000 * (["dirt", "stone", "wood", "grass"].index(surface) + 1) + variant + 7919 * take)
     shift = 1 + rng.uniform(-0.12, 0.12)                       # each step a little higher or lower
     toe = rng.uniform(0.045, 0.085)                            # heel, then toe
     out = np.zeros(n(0.34))
@@ -72,6 +74,13 @@ def _take(surface, variant, take=0):
     grit_len = rng.uniform(0.07, 0.12)
     grit = bandpass(noise(grit_len, int(rng.integers(1 << 30))), s["grit"], s["grit"] * 2.6) * np.hanning(n(grit_len))
     place(out, grit, toe * rng.uniform(0.5, 1.1), s["grit_gain"] * rng.uniform(0.7, 1.3))
+    if surface == "grass":
+        # Short overlapping swishes follow the rolling toe as separate blades spring back.
+        for delay in (0.018, 0.053, 0.085):
+            length = rng.uniform(0.045, 0.085)
+            low = rng.uniform(1700, 3200)
+            blades = bandpass(noise(length, int(rng.integers(1 << 30))), low, low * 2.1)
+            place(out, blades * np.hanning(n(length)), toe + delay, rng.uniform(0.27, 0.38))
     out = lowpass(out, 8000)                                   # a boot has no sparkle
     live = np.nonzero(np.abs(out) > np.abs(out).max() * 10 ** (-45 / 20))[0]
     out = out[: min(live[-1] + n(0.012), len(out))]            # end where the sound does
@@ -113,7 +122,16 @@ def step_checks(surface, variant):
         later = e[n(0.04): n(0.12)].max()
         return later > 0.2 * first, f"heel then toe: the second beat is {later / first:.0%} of the first"
     lo, hi = s["thud"]
-    return [duration(0.12, 0.36), peak(SOUND_PEAK["step"] - 0.6, SOUND_PEAK["step"] + 0.6),
+    extra = []
+    if surface == "grass":
+        def rustle(ctx):
+            x = ctx.sound.samples
+            tail = x[n(0.12):]
+            energy = float(np.sum(tail**2) / np.sum(x**2))
+            bright = share(tail, 1600, 7500)
+            return energy > 0.015 and bright > 0.65, f"late vegetation carries {energy:.1%} of energy, {bright:.1%} in rustle band"
+        extra.append(custom("vegetation after contact", rustle))
+    return extra + [duration(0.12, 0.36), peak(SOUND_PEAK["step"] - 0.6, SOUND_PEAK["step"] + 0.6),
             band(lo * 0.8, hi * 1.3, at_least=0.45 if surface != "stone" else 0.35, name="thud"),
             band(9000, 20000, at_most=0.2, name="no hiss"),
             band(s["click"][0] * 0.9, s["click"][1] * 1.2, at_least=click_floor(s), name="click"), custom("family", family), custom("heel and toe", two_beats)]
@@ -149,7 +167,7 @@ def checks(p):
 def build(p):
     return step_sound(SURFACE, VARIANT)
 '''
-EXTRA = dict(stone="a hard click and a little grit under the sole", wood="a hollow knock that rings on in the boards",
+EXTRA = dict(grass="a muted dry tap and several overlapping swishes of vegetation", stone="a hard click and a little grit under the sole", wood="a hollow knock that rings on in the boards",
              dirt="hardly any click and a soft crunch of soil")
 
 
