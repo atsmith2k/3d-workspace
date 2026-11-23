@@ -1,7 +1,7 @@
 """Textured open-practice courts with collision derived from the authored layouts."""
 
-from _frp import ball, box, cylinder, ground, paving, stone, thatch, timber
-from _olden_elimination_venues import Yard, gable, route_fixture, solid, tint_surface
+from _frp import ball, box, cylinder, ground, paving, prism, stone, thatch, timber
+from _olden_elimination_venues import Yard, beam, gable, route_fixture, solid, tint_surface
 from _olden_ticketed_venues import slab
 
 
@@ -39,7 +39,14 @@ def lodge(yard, masonry, wood, roof, x, z, width, depth, height):
     for offset in (-width / 2 + .14, width / 2 - .14):
         yard.add(wood, box(.24, height, .24).moved(x + offset, height / 2, z - depth / 2))
     yard.add(wood, box(width, .24, .23, .94).moved(x, height - .12, z - depth / 2))
-    gable(yard, wood, roof, x, z, width + .55, depth + .43, height, width * .28)
+    roof_width, rise = width + .55, width * .28
+    for end in (-1, 1):
+        half_span = width / 2 - .02
+        top = rise * (1 - (roof_width - width) / roof_width)
+        yard.add(masonry, prism([(-half_span, 0), (half_span, 0), (0, top)], .18).moved(
+            x, height, z + end * (depth / 2 - .08),
+        ))
+    gable(yard, wood, roof, x, z, roof_width, depth + .43, height, rise)
 
 
 def plumb_court():
@@ -56,12 +63,19 @@ def plumb_court():
         lodge(yard, masonry, wood, roof, x, 14.65, 4.30, 3.35, 3.35)
     for x in (-12.3, -6.15, 0, 6.15, 12.3):
         lodge(yard, masonry, wood, roof, x, -14.68, 5.9, 3.35, 3.85)
-    for x in (-3.72, 3.72):
-        yard.add(coping, box(.54, 3.94, .64, .7).moved(x, 1.97, 12.54))
-    yard.add(wood, box(8.0, .34, .76, 1.3).moved(0, 3.76, 12.54))
+    for z in (12.54, 13.96):
+        for x in (-3.72, 3.72):
+            yard.add(coping, box(.54, 3.94, .64, .7).moved(x, 1.97, z))
+        yard.add(wood, box(8.0, .34, .44, 1.3).moved(0, 3.76, z))
+        yard.add(wood, prism([(-3.98, 0), (3.98, 0), (0, 1.16)], .23).moved(0, 3.96, z))
     gable(yard, wood, roof, 0, 13.25, 8.10, 2.15, 3.97, 1.18)
-    for x in (-2.5, -1.25, 0, 1.25, 2.5):
-        yard.add(wood, box(.15, .48, .22, .6).moved(x, 3.43, 12.32))
+    for side in (-1, 1):
+        for plank in range(10):
+            x = side * (.19 + .34 * plank)
+            yard.add(wood, box(.328, 2.55, .20, 1.1).moved(x, 1.275, 12.71))
+        for y in (.44, 2.11):
+            yard.add(wood, box(3.44, .17, .24, .76).moved(side * 1.75, y, 12.54))
+        yard.add(wood, beam((side * .13, .51, 12.47), (side * 3.39, 2.06, 12.47), .17, .14))
     return yard.finish()
 
 
@@ -90,8 +104,12 @@ def lintel_green():
         height = 3.5 + .35 * (i % 5)
         yard.add(wood, cylinder(.21, height, 8).moved(x, 0, z))
         crown = 1.8 + .14 * (i % 4)
-        yard.add(leaf, ball(crown, 10, 7).moved(x, height * .88, z))
-        yard.add(leaf, ball(crown * .74, 10, 7).moved(x + .83, height + .80, z + .41))
+        lean = (-1, 1)[i % 2]
+        branch_top = (x + lean * .89, height * .89, z + .55)
+        yard.add(wood, beam((x, height * .58, z), branch_top, .14, .14))
+        yard.add(leaf, ball(crown, 10, 7).moved(x, height + .22, z))
+        yard.add(leaf, ball(crown * .74, 9, 7).moved(*branch_top))
+        yard.add(leaf, ball(crown * .63, 9, 7).moved(x - lean * .88, height * .78, z - .51))
     return yard.finish()
 
 
